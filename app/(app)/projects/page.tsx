@@ -1,16 +1,29 @@
 import { NewProjectButton } from "@/components/projects/new-project-button";
 import { ProjectsTable } from "@/components/projects/projects-table";
+import { DataPagination } from "@/components/data-pagination";
+import { DataSearch } from "@/components/data-search";
 import {
+  DEFAULT_PER_PAGE,
   fetchClients,
   fetchEditors,
-  fetchProjects,
+  fetchProjectsList,
 } from "@/lib/projects/queries";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectsPage() {
-  const [projects, editors, clients] = await Promise.all([
-    fetchProjects(),
+type SearchParams = Promise<{ q?: string; page?: string }>;
+
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const params = await searchParams;
+  const query = params.q?.trim() || undefined;
+  const page = Math.max(1, Number(params.page) || 1);
+
+  const [{ projects, total }, editors, clients] = await Promise.all([
+    fetchProjectsList({ query, page }),
     fetchEditors(),
     fetchClients(),
   ]);
@@ -21,15 +34,27 @@ export default async function ProjectsPage() {
         <div className="flex items-baseline gap-4">
           <h1 className="text-2xl font-semibold tracking-tight">Proyectos</h1>
           <p className="text-sm text-muted-foreground">
-            {projects.length} proyecto{projects.length === 1 ? "" : "s"}
+            {total} proyecto{total === 1 ? "" : "s"}
           </p>
         </div>
         <NewProjectButton editors={editors} clients={clients} />
       </header>
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <DataSearch placeholder="Buscar por título o cliente…" />
+      </div>
+
       <div className="rounded-xl border bg-card p-2">
         <ProjectsTable projects={projects} />
       </div>
+
+      <DataPagination
+        page={page}
+        perPage={DEFAULT_PER_PAGE}
+        total={total}
+        basePath="/projects"
+        searchParams={{ q: query }}
+      />
     </main>
   );
 }

@@ -6,6 +6,17 @@ import { createClient } from "@/lib/supabase/server";
 import { CURRENCIES, PROJECT_STATUSES } from "./types";
 import type { CurrencyCode, ProjectStatus } from "./types";
 
+async function getClientName(clientId: string | null): Promise<string | null> {
+  if (!clientId) return null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("clients")
+    .select("name")
+    .eq("id", clientId)
+    .single();
+  return data?.name ?? null;
+}
+
 const statusEnum = z.enum(
   PROJECT_STATUSES as [ProjectStatus, ...ProjectStatus[]]
 );
@@ -33,6 +44,13 @@ export type ProjectInput = z.input<typeof projectInputSchema>;
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
+function revalidateAll() {
+  revalidatePath("/");
+  revalidatePath("/kanban");
+  revalidatePath("/projects");
+  revalidatePath("/clients");
+}
+
 export async function createProject(
   input: ProjectInput
 ): Promise<ActionResult> {
@@ -40,10 +58,13 @@ export async function createProject(
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("projects").insert(parsed.data);
+  const clientName = await getClientName(parsed.data.client_id);
+  const { error } = await supabase
+    .from("projects")
+    .insert({ ...parsed.data, client_name: clientName });
 
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/");
+  revalidateAll();
   return { ok: true };
 }
 
@@ -55,13 +76,14 @@ export async function updateProject(
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
   const supabase = await createClient();
+  const clientName = await getClientName(parsed.data.client_id);
   const { error } = await supabase
     .from("projects")
-    .update(parsed.data)
+    .update({ ...parsed.data, client_name: clientName })
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/");
+  revalidateAll();
   return { ok: true };
 }
 
