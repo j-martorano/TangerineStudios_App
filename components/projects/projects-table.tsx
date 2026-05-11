@@ -40,14 +40,14 @@ export function ProjectsTable({ projects }: { projects: ProjectWithEditor[] }) {
         {projects.map((p) => (
           <TableRow key={p.id}>
             <TableCell className="font-medium">{p.title}</TableCell>
-            <TableCell>{p.client_name ?? "—"}</TableCell>
+            <TableCell>{p.client?.name ?? p.client_name ?? "—"}</TableCell>
             <TableCell>
               <Badge variant="secondary" className={STATUS_CLASS[p.status]}>
                 {STATUS_LABEL[p.status]}
               </Badge>
             </TableCell>
             <TableCell className="text-right tabular-nums">
-              {formatPrice(p.price)}
+              {formatPrice(p.price, p.currency)}
             </TableCell>
             <TableCell>{p.editor?.name ?? "—"}</TableCell>
             <TableCell className="text-muted-foreground">

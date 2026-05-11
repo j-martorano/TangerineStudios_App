@@ -45,10 +45,12 @@ export function ProjectsKanban({
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="flex flex-col gap-1 text-xs text-muted-foreground">
-                      <span className="truncate">{p.client_name ?? "—"}</span>
+                      <span className="truncate">
+                        {p.client?.name ?? p.client_name ?? "—"}
+                      </span>
                       <div className="flex items-center justify-between gap-2 pt-1 text-foreground">
                         <span className="tabular-nums">
-                          {formatPrice(p.price)}
+                          {formatPrice(p.price, p.currency)}
                         </span>
                         <span className="truncate text-muted-foreground">
                           {p.editor?.name ?? "—"}

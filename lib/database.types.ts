@@ -39,6 +39,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      clients: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       editors: {
         Row: {
           created_at: string
@@ -62,8 +80,10 @@ export type Database = {
       }
       projects: {
         Row: {
+          client_id: string | null
           client_name: string | null
           created_at: string
+          currency: Database["public"]["Enums"]["currency_code"]
           editor_id: string | null
           id: string
           price: number | null
@@ -72,8 +92,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          client_id?: string | null
           client_name?: string | null
           created_at?: string
+          currency?: Database["public"]["Enums"]["currency_code"]
           editor_id?: string | null
           id?: string
           price?: number | null
@@ -82,8 +104,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          client_id?: string | null
           client_name?: string | null
           created_at?: string
+          currency?: Database["public"]["Enums"]["currency_code"]
           editor_id?: string | null
           id?: string
           price?: number | null
@@ -92,6 +116,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projects_editor_id_fkey"
             columns: ["editor_id"]
@@ -109,6 +140,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      currency_code: "ARS" | "USD" | "EUR"
       project_status:
         | "pending"
         | "in_progress"
@@ -245,6 +277,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      currency_code: ["ARS", "USD", "EUR"],
       project_status: [
         "pending",
         "in_progress",

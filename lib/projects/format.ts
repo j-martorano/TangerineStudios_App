@@ -1,4 +1,4 @@
-import type { ProjectStatus } from "./types";
+import type { CurrencyCode, ProjectStatus } from "./types";
 
 export const STATUS_LABEL: Record<ProjectStatus, string> = {
   pending: "Sin empezar",
@@ -16,22 +16,41 @@ export const STATUS_CLASS: Record<ProjectStatus, string> = {
   invoiced: "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300",
 };
 
-const currencyFormatter = new Intl.NumberFormat("es-AR", {
-  style: "currency",
-  currency: "ARS",
-  maximumFractionDigits: 0,
-});
+export const CURRENCY_LABEL: Record<CurrencyCode, string> = {
+  ARS: "ARS — Peso argentino",
+  USD: "USD — Dólar",
+  EUR: "EUR — Euro",
+};
 
 const dateFormatter = new Intl.DateTimeFormat("es-AR", {
   day: "2-digit",
   month: "short",
 });
 
-export function formatPrice(price: number | string | null): string {
+const currencyFormatters = new Map<CurrencyCode, Intl.NumberFormat>();
+
+function getCurrencyFormatter(currency: CurrencyCode): Intl.NumberFormat {
+  let fmt = currencyFormatters.get(currency);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency,
+      currencyDisplay: "code",
+      maximumFractionDigits: 0,
+    });
+    currencyFormatters.set(currency, fmt);
+  }
+  return fmt;
+}
+
+export function formatPrice(
+  price: number | string | null,
+  currency: CurrencyCode = "ARS"
+): string {
   if (price == null) return "—";
   const n = typeof price === "string" ? Number(price) : price;
   if (Number.isNaN(n)) return "—";
-  return currencyFormatter.format(n);
+  return getCurrencyFormatter(currency).format(n);
 }
 
 export function formatDate(iso: string): string {
