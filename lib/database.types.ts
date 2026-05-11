@@ -86,6 +86,7 @@ export type Database = {
           currency: Database["public"]["Enums"]["currency_code"]
           editor_id: string | null
           id: string
+          position: number
           price: number | null
           status: Database["public"]["Enums"]["project_status"]
           title: string
@@ -98,6 +99,7 @@ export type Database = {
           currency?: Database["public"]["Enums"]["currency_code"]
           editor_id?: string | null
           id?: string
+          position?: number
           price?: number | null
           status?: Database["public"]["Enums"]["project_status"]
           title: string
@@ -110,6 +112,7 @@ export type Database = {
           currency?: Database["public"]["Enums"]["currency_code"]
           editor_id?: string | null
           id?: string
+          position?: number
           price?: number | null
           status?: Database["public"]["Enums"]["project_status"]
           title?: string

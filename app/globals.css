@@ -83,54 +83,60 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-/* Dark theme tangerine — stone (cálido) + orange (primario) */
+/* Dark theme oficial de Tangerine Studios.
+   Paleta de marca:
+     #131200 — background dark (negro con tinte oliva)
+     #F7F7F2 — foreground crema
+     #FFAC37 — primary (naranja cálido)
+     #FFB93F — accent (amarillo-naranja, para highlights/charts)
+     #ED254E — destructive (rosa-rojo intenso) */
 .dark {
-  /* Superficies — paleta stone (cálida) en lugar de zinc/neutral */
-  --background: oklch(0.147 0.004 49.25);     /* stone-950 */
-  --foreground: oklch(0.985 0.001 106.423);   /* stone-50 */
-  --card: oklch(0.216 0.006 56.043);          /* stone-900 */
-  --card-foreground: oklch(0.985 0.001 106.423);
-  --popover: oklch(0.216 0.006 56.043);
-  --popover-foreground: oklch(0.985 0.001 106.423);
+  /* Superficies */
+  --background: #131200;
+  --foreground: #F7F7F2;
+  --card: oklch(0.215 0.025 100);             /* un pelín más claro que background */
+  --card-foreground: #F7F7F2;
+  --popover: oklch(0.215 0.025 100);
+  --popover-foreground: #F7F7F2;
 
-  /* Primario — naranja vibrante (tangerine) */
-  --primary: oklch(0.705 0.213 47.604);       /* orange-500 (#F97316) */
-  --primary-foreground: oklch(0.147 0.004 49.25); /* stone-950 — texto oscuro sobre naranja */
+  /* Primario — naranja cálido de marca */
+  --primary: #FFAC37;
+  --primary-foreground: #131200;
 
-  /* Secundario y muted — stone */
-  --secondary: oklch(0.268 0.007 34.298);     /* stone-800 */
-  --secondary-foreground: oklch(0.985 0.001 106.423);
-  --muted: oklch(0.268 0.007 34.298);         /* stone-800 */
-  --muted-foreground: oklch(0.709 0.01 56.259); /* stone-400 */
+  /* Secundario y muted — tonos del background */
+  --secondary: oklch(0.275 0.025 100);
+  --secondary-foreground: #F7F7F2;
+  --muted: oklch(0.275 0.025 100);
+  --muted-foreground: oklch(0.72 0.018 95);
 
   /* Acento — naranja oscuro con texto naranja claro */
-  --accent: oklch(0.266 0.079 36.259);        /* orange-950 */
-  --accent-foreground: oklch(0.901 0.076 70.697); /* orange-200 */
+  --accent: oklch(0.32 0.10 60);
+  --accent-foreground: #FFB93F;
 
-  /* Estado destructive — rojo legible en dark */
-  --destructive: oklch(0.704 0.191 22.216);
+  /* Destructive — rosa-rojo de marca */
+  --destructive: #ED254E;
 
-  /* Bordes y inputs — stone-800 sutil */
-  --border: oklch(0.268 0.007 34.298);
-  --input: oklch(0.268 0.007 34.298);
-  --ring: oklch(0.705 0.213 47.604);          /* orange-500 — focus en color de marca */
+  /* Bordes e inputs */
+  --border: oklch(0.30 0.02 95);
+  --input: oklch(0.30 0.02 95);
+  --ring: #FFAC37;
 
-  /* Charts — tonos naranjas para gráficos futuros */
-  --chart-1: oklch(0.705 0.213 47.604);       /* orange-500 */
-  --chart-2: oklch(0.837 0.128 66.29);        /* orange-300 */
-  --chart-3: oklch(0.646 0.222 41.116);       /* orange-600 */
-  --chart-4: oklch(0.553 0.195 38.402);       /* orange-700 */
-  --chart-5: oklch(0.901 0.076 70.697);       /* orange-200 */
+  /* Charts — gradient naranja → rosa */
+  --chart-1: #FFAC37;
+  --chart-2: #FFB93F;
+  --chart-3: oklch(0.70 0.20 35);
+  --chart-4: oklch(0.65 0.22 20);
+  --chart-5: #ED254E;
 
   /* Sidebar */
-  --sidebar: oklch(0.216 0.006 56.043);
-  --sidebar-foreground: oklch(0.985 0.001 106.423);
-  --sidebar-primary: oklch(0.705 0.213 47.604);
-  --sidebar-primary-foreground: oklch(0.147 0.004 49.25);
-  --sidebar-accent: oklch(0.266 0.079 36.259);
-  --sidebar-accent-foreground: oklch(0.901 0.076 70.697);
-  --sidebar-border: oklch(0.268 0.007 34.298);
-  --sidebar-ring: oklch(0.705 0.213 47.604);
+  --sidebar: oklch(0.18 0.02 100);
+  --sidebar-foreground: #F7F7F2;
+  --sidebar-primary: #FFAC37;
+  --sidebar-primary-foreground: #131200;
+  --sidebar-accent: oklch(0.32 0.10 60);
+  --sidebar-accent-foreground: #FFB93F;
+  --sidebar-border: oklch(0.30 0.02 95);
+  --sidebar-ring: #FFAC37;
 }
 
 @layer base {

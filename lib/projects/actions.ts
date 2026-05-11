@@ -24,20 +24,23 @@ const currencyEnum = z.enum(
   CURRENCIES as [CurrencyCode, ...CurrencyCode[]]
 );
 
+const uuidRegex =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const projectInputSchema = z.object({
   title: z
     .string()
     .trim()
     .min(1, "El título es obligatorio")
     .max(120, "El título no puede tener más de 120 caracteres"),
-  client_id: z.string().uuid("Cliente inválido").nullable(),
+  client_id: z.string().regex(uuidRegex, "Cliente inválido").nullable(),
   status: statusEnum,
   price: z
     .number()
     .nonnegative("El precio no puede ser negativo")
     .nullable(),
   currency: currencyEnum,
-  editor_id: z.string().uuid("Editor inválido").nullable(),
+  editor_id: z.string().regex(uuidRegex, "Editor inválido").nullable(),
 });
 
 export type ProjectInput = z.input<typeof projectInputSchema>;
@@ -101,7 +104,7 @@ export async function changeStatus(
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/");
+  revalidateAll();
   return { ok: true };
 }
 
@@ -110,7 +113,45 @@ export async function deleteProject(id: string): Promise<ActionResult> {
   const { error } = await supabase.from("projects").delete().eq("id", id);
 
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/");
+  revalidateAll();
+  return { ok: true };
+}
+
+export type ReorderUpdate = {
+  id: string;
+  status: ProjectStatus;
+  position: number;
+};
+
+const reorderSchema = z.array(
+  z.object({
+    id: z.string().regex(uuidRegex, "ID inválido"),
+    status: statusEnum,
+    position: z.number().int().nonnegative(),
+  })
+);
+
+export async function reorderProjects(
+  updates: ReorderUpdate[]
+): Promise<ActionResult> {
+  const parsed = reorderSchema.safeParse(updates);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  if (parsed.data.length === 0) return { ok: true };
+
+  const supabase = await createClient();
+  const results = await Promise.all(
+    parsed.data.map((u) =>
+      supabase
+        .from("projects")
+        .update({ status: u.status, position: u.position })
+        .eq("id", u.id)
+    )
+  );
+
+  const failure = results.find((r) => r.error);
+  if (failure?.error) return { ok: false, error: failure.error.message };
+
+  revalidateAll();
   return { ok: true };
 }
 

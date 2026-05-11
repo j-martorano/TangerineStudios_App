@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -33,13 +34,27 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-2">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary font-bold text-primary-foreground">
-            T
-          </div>
-          <span className="truncate text-sm font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
-            Tangerine Studios
-          </span>
+        <div className="flex items-center">
+          {/* Expandido: logo con texto (gradient de marca) */}
+          <Image
+            src="/branding/Logo_Y_Texto_Transparente.png"
+            alt="Tangerine Studios"
+            width={180}
+            height={40}
+            priority
+            unoptimized
+            className="h-9 w-auto object-contain group-data-[collapsible=icon]:hidden"
+          />
+          {/* Colapsado: solo el icono */}
+          <Image
+            src="/branding/Logo_Icono.png"
+            alt="Tangerine Studios"
+            width={32}
+            height={32}
+            priority
+            unoptimized
+            className="hidden size-8 shrink-0 object-contain group-data-[collapsible=icon]:block"
+          />
         </div>
       </SidebarHeader>
       <SidebarContent>

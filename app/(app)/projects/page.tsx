@@ -45,7 +45,7 @@ export default async function ProjectsPage({
       </div>
 
       <div className="rounded-xl border bg-card p-2">
-        <ProjectsTable projects={projects} />
+        <ProjectsTable projects={projects} editors={editors} clients={clients} />
       </div>
 
       <DataPagination

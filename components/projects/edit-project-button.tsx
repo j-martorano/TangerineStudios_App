@@ -1,0 +1,70 @@
+"use client";
+
+import { useState } from "react";
+import { PencilIcon } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+import { ProjectForm } from "./project-form";
+import type {
+  ClientMini,
+  EditorMini,
+  ProjectWithRelations,
+} from "@/lib/projects/types";
+
+type Props = {
+  project: ProjectWithRelations;
+  editors: EditorMini[];
+  clients: ClientMini[];
+  variant?: "icon" | "ghost-icon";
+};
+
+export function EditProjectButton({
+  project,
+  editors,
+  clients,
+  variant = "icon",
+}: Props) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Editar proyecto"
+            type="button"
+            className={
+              variant === "ghost-icon"
+                ? "text-muted-foreground hover:text-foreground"
+                : undefined
+            }
+          />
+        }
+      >
+        <PencilIcon className="size-4" />
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Editar proyecto</DialogTitle>
+        </DialogHeader>
+        <ProjectForm
+          mode="edit"
+          project={project}
+          editors={editors}
+          clients={clients}
+          onSuccess={() => setOpen(false)}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}

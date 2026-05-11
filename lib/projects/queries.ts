@@ -6,16 +6,24 @@ import type {
 } from "./types";
 
 const PROJECT_SELECT =
-  "id, title, client_name, status, price, currency, created_at, updated_at, editor_id, client_id, editor:editors ( id, name ), client:clients ( id, name )";
+  "id, title, client_name, status, price, currency, position, created_at, updated_at, editor_id, client_id, editor:editors ( id, name ), client:clients ( id, name )";
 
 export const DEFAULT_PER_PAGE = 20;
 
-export async function fetchProjects(): Promise<ProjectWithRelations[]> {
+export async function fetchProjects(
+  opts: { query?: string } = {}
+): Promise<ProjectWithRelations[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("projects")
-    .select(PROJECT_SELECT)
-    .order("updated_at", { ascending: false });
+  let q = supabase.from("projects").select(PROJECT_SELECT);
+
+  if (opts.query && opts.query.length > 0) {
+    const safe = opts.query.replace(/[(),]/g, " ").trim();
+    if (safe.length > 0) {
+      q = q.or(`title.ilike.%${safe}%,client_name.ilike.%${safe}%`);
+    }
+  }
+
+  const { data, error } = await q.order("status").order("position");
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as ProjectWithRelations[];
 }
