@@ -12,15 +12,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-import { ClientForm } from "./client-form";
-import type { ClientRow, EditorMini } from "@/lib/projects/types";
+import { EditorForm } from "./editor-form";
+import type { ClientMini, EditorRow } from "@/lib/projects/types";
 
-export function EditClientButton({
-  client,
-  availableEditors,
+export function EditEditorButton({
+  editor,
+  availableClients,
 }: {
-  client: ClientRow & { editors?: EditorMini[] };
-  availableEditors: EditorMini[];
+  editor: EditorRow & { clients?: ClientMini[] };
+  availableClients: ClientMini[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -28,19 +28,19 @@ export function EditClientButton({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button variant="ghost" size="icon-sm" aria-label="Editar cliente" />
+          <Button variant="ghost" size="icon-sm" aria-label="Editar editor" />
         }
       >
         <PencilIcon className="size-4" />
       </DialogTrigger>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Editar cliente</DialogTitle>
+          <DialogTitle>Editar editor</DialogTitle>
         </DialogHeader>
-        <ClientForm
+        <EditorForm
           mode="edit"
-          client={client}
-          availableEditors={availableEditors}
+          editor={editor}
+          availableClients={availableClients}
           onSuccess={() => setOpen(false)}
         />
       </DialogContent>

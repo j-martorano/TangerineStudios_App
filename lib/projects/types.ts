@@ -2,18 +2,22 @@ import type { Database } from "@/lib/database.types";
 
 export type ProjectStatus = Database["public"]["Enums"]["project_status"];
 export type CurrencyCode = Database["public"]["Enums"]["currency_code"];
+export type PaymentType = Database["public"]["Enums"]["payment_type"];
 
 export type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
 
-export type EditorMini = Pick<
-  Database["public"]["Tables"]["editors"]["Row"],
-  "id" | "name"
->;
+export type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
+export type EditorRow = Database["public"]["Tables"]["editors"]["Row"];
 
-export type ClientMini = Pick<
-  Database["public"]["Tables"]["clients"]["Row"],
-  "id" | "name"
->;
+export type EditorMini = Pick<EditorRow, "id" | "name">;
+export type ClientMini = Pick<ClientRow, "id" | "name" | "color">;
+
+export const PAYMENT_TYPES: PaymentType[] = ["por_proyecto", "mensual"];
+
+export const PAYMENT_TYPE_LABEL: Record<PaymentType, string> = {
+  por_proyecto: "Por proyecto",
+  mensual: "Mensual",
+};
 
 export type ProjectWithRelations = ProjectRow & {
   editor: EditorMini | null;

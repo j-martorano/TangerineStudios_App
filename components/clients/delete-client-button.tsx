@@ -49,7 +49,7 @@ export function DeleteClientButton({ id, name, projectCount }: Props) {
             variant="ghost"
             size="icon-sm"
             aria-label="Eliminar cliente"
-            className="text-destructive hover:text-destructive"
+            className="text-destructive hover:bg-destructive/20 hover:text-destructive"
           />
         }
       >
@@ -74,13 +74,9 @@ export function DeleteClientButton({ id, name, projectCount }: Props) {
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
           <AlertDialogAction
-            render={
-              <Button
-                variant="destructive"
-                onClick={handleConfirm}
-                disabled={pending}
-              />
-            }
+            variant="destructive"
+            onClick={handleConfirm}
+            disabled={pending}
           >
             {pending ? "Eliminando…" : "Eliminar"}
           </AlertDialogAction>

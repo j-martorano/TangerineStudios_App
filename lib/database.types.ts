@@ -39,42 +39,111 @@ export type Database = {
   }
   public: {
     Tables: {
-      clients: {
+      client_editors: {
         Row: {
+          client_id: string
           created_at: string
-          id: string
-          name: string
+          editor_id: string
         }
         Insert: {
+          client_id: string
           created_at?: string
-          id?: string
-          name: string
+          editor_id: string
         }
         Update: {
+          client_id?: string
           created_at?: string
+          editor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_editors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_editors_editor_id_fkey"
+            columns: ["editor_id"]
+            isOneToOne: false
+            referencedRelation: "editors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          agreed_price: number | null
+          balance: number
+          billing_info: string | null
+          color: string
+          created_at: string
+          docs_url: string | null
+          email: string | null
+          id: string
+          name: string
+          payment_type: Database["public"]["Enums"]["payment_type"]
+          phone: string | null
+        }
+        Insert: {
+          agreed_price?: number | null
+          balance?: number
+          billing_info?: string | null
+          color?: string
+          created_at?: string
+          docs_url?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          payment_type?: Database["public"]["Enums"]["payment_type"]
+          phone?: string | null
+        }
+        Update: {
+          agreed_price?: number | null
+          balance?: number
+          billing_info?: string | null
+          color?: string
+          created_at?: string
+          docs_url?: string | null
+          email?: string | null
           id?: string
           name?: string
+          payment_type?: Database["public"]["Enums"]["payment_type"]
+          phone?: string | null
         }
         Relationships: []
       }
       editors: {
         Row: {
+          bank_info: string | null
           created_at: string
           discord_id: string | null
+          docs_url: string | null
+          email: string | null
           id: string
           name: string
+          phone: string | null
         }
         Insert: {
+          bank_info?: string | null
           created_at?: string
           discord_id?: string | null
+          docs_url?: string | null
+          email?: string | null
           id?: string
           name: string
+          phone?: string | null
         }
         Update: {
+          bank_info?: string | null
           created_at?: string
           discord_id?: string | null
+          docs_url?: string | null
+          email?: string | null
           id?: string
           name?: string
+          phone?: string | null
         }
         Relationships: []
       }
@@ -144,6 +213,7 @@ export type Database = {
     }
     Enums: {
       currency_code: "ARS" | "USD" | "EUR"
+      payment_type: "por_proyecto" | "mensual"
       project_status:
         | "pending"
         | "in_progress"
@@ -281,6 +351,7 @@ export const Constants = {
   public: {
     Enums: {
       currency_code: ["ARS", "USD", "EUR"],
+      payment_type: ["por_proyecto", "mensual"],
       project_status: [
         "pending",
         "in_progress",

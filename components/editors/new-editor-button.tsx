@@ -12,13 +12,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-import { ClientForm } from "./client-form";
-import type { EditorMini } from "@/lib/projects/types";
+import { EditorForm } from "./editor-form";
+import type { ClientMini } from "@/lib/projects/types";
 
-export function NewClientButton({
-  availableEditors,
+export function NewEditorButton({
+  availableClients,
 }: {
-  availableEditors: EditorMini[];
+  availableClients: ClientMini[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -26,15 +26,15 @@ export function NewClientButton({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button />}>
         <PlusIcon className="size-4" />
-        Nuevo cliente
+        Nuevo editor
       </DialogTrigger>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Nuevo cliente</DialogTitle>
+          <DialogTitle>Nuevo editor</DialogTitle>
         </DialogHeader>
-        <ClientForm
+        <EditorForm
           mode="create"
-          availableEditors={availableEditors}
+          availableClients={availableClients}
           onSuccess={() => setOpen(false)}
         />
       </DialogContent>

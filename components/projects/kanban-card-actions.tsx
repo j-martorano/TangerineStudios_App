@@ -81,13 +81,16 @@ export function KanbanCardActions({ project, editors, clients }: Props) {
           <MoreVerticalIcon className="size-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+          <DropdownMenuItem
+            onSelect={() => setEditOpen(true)}
+            className="cursor-pointer"
+          >
             <PencilIcon className="size-4" />
             <span>Editar</span>
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => setDeleteOpen(true)}
-            className="text-destructive focus:text-destructive"
+            className="cursor-pointer text-destructive focus:bg-destructive/20 focus:text-destructive"
           >
             <Trash2Icon className="size-4" />
             <span>Eliminar</span>
@@ -122,13 +125,9 @@ export function KanbanCardActions({ project, editors, clients }: Props) {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              render={
-                <Button
-                  variant="destructive"
-                  onClick={handleDelete}
-                  disabled={pending}
-                />
-              }
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={pending}
             >
               {pending ? "Eliminando…" : "Eliminar"}
             </AlertDialogAction>

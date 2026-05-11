@@ -27,6 +27,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -113,8 +114,9 @@
   --accent: oklch(0.32 0.10 60);
   --accent-foreground: #FFB93F;
 
-  /* Destructive — rosa-rojo de marca */
-  --destructive: #ED254E;
+  /* Destructive — rojo intenso para acciones destructivas (más fuerte que el rosa de marca) */
+  --destructive: #DC2626;
+  --destructive-foreground: #F7F7F2;
 
   /* Bordes e inputs */
   --border: oklch(0.30 0.02 95);
@@ -148,5 +150,31 @@
   }
   html {
     @apply font-sans;
+  }
+
+  /* Scrollbars — versión sutil cálida que acompaña el theme dark */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground), transparent 60%) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--muted-foreground), transparent 65%);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--muted-foreground), transparent 35%);
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }

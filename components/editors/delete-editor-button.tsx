@@ -17,22 +17,23 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-import { deleteProject } from "@/lib/projects/actions";
+import { deleteEditor } from "@/lib/editors/actions";
 
 type Props = {
   id: string;
-  title: string;
+  name: string;
+  projectCount: number;
 };
 
-export function DeleteProjectButton({ id, title }: Props) {
+export function DeleteEditorButton({ id, name, projectCount }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function handleConfirm() {
     startTransition(async () => {
-      const result = await deleteProject(id);
+      const result = await deleteEditor(id);
       if (result.ok) {
-        toast.success(`Proyecto «${title}» eliminado`);
+        toast.success(`Editor «${name}» eliminado`);
         setOpen(false);
       } else {
         toast.error(result.error);
@@ -47,8 +48,7 @@ export function DeleteProjectButton({ id, title }: Props) {
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Eliminar proyecto"
-            type="button"
+            aria-label="Eliminar editor"
             className="text-destructive hover:bg-destructive/20 hover:text-destructive"
           />
         }
@@ -57,10 +57,18 @@ export function DeleteProjectButton({ id, title }: Props) {
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Eliminar «{title}»</AlertDialogTitle>
+          <AlertDialogTitle>Eliminar «{name}»</AlertDialogTitle>
           <AlertDialogDescription>
-            Esta acción no se puede deshacer. El proyecto se borra
-            definitivamente.
+            {projectCount > 0 ? (
+              <>
+                Este editor tiene <strong>{projectCount}</strong> proyecto
+                {projectCount === 1 ? "" : "s"} asignado
+                {projectCount === 1 ? "" : "s"}. Al eliminarlo, esos proyectos
+                van a quedar <em>sin editor</em> (no se borran). ¿Continuar?
+              </>
+            ) : (
+              "Esta acción no se puede deshacer."
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

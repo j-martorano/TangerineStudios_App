@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ColumnsIcon,
+  FilmIcon,
   LayoutDashboardIcon,
   TableIcon,
   UsersIcon,
@@ -26,6 +27,7 @@ const items = [
   { href: "/kanban", label: "Kanban", icon: ColumnsIcon, exact: false },
   { href: "/projects", label: "Proyectos", icon: TableIcon, exact: false },
   { href: "/clients", label: "Clientes", icon: UsersIcon, exact: false },
+  { href: "/editors", label: "Editores", icon: FilmIcon, exact: false },
 ];
 
 export function AppSidebar() {
