@@ -3,9 +3,9 @@ import { ArrowRightIcon } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchClients, fetchProjects } from "@/lib/projects/queries";
-import { PROJECT_STATUSES } from "@/lib/projects/types";
-import type { CurrencyCode, ProjectStatus } from "@/lib/projects/types";
-import { STATUS_CLASS, STATUS_LABEL, formatPrice } from "@/lib/projects/format";
+import { PROJECT_PHASES } from "@/lib/projects/types";
+import type { CurrencyCode, ProjectPhase } from "@/lib/projects/types";
+import { PHASE_CLASS, PHASE_LABEL, formatPrice } from "@/lib/projects/format";
 
 export const dynamic = "force-dynamic";
 
@@ -15,28 +15,27 @@ export default async function DashboardPage() {
     fetchClients(),
   ]);
 
-  const byStatus = countBy(projects, (p) => p.status);
-  const active =
-    (byStatus.pending ?? 0) +
-    (byStatus.in_progress ?? 0) +
-    (byStatus.revising ?? 0);
-  const toCollect = byStatus.done ?? 0;
-  const invoicedCount = byStatus.invoiced ?? 0;
+  const byPhase = countBy(projects, (p) => p.phase);
+  const active = (byPhase.por_asignar ?? 0) + (byPhase.editando ?? 0);
 
-  // Agrupado por moneda lo que está pendiente de cobro (status=done)
-  const pendingByCurrency = sumByCurrency(
-    projects.filter((p) => p.status === "done")
+  // Por cobrar: proyectos terminados que no están cobrados todavía
+  const toCollectProjects = projects.filter(
+    (p) => p.phase === "terminado" && p.cobrado !== "si"
   );
-  const invoicedByCurrency = sumByCurrency(
-    projects.filter((p) => p.status === "invoiced")
+  // Por pagar: proyectos terminados que no le pagamos al editor todavía
+  const toPayProjects = projects.filter(
+    (p) => p.phase === "terminado" && p.pagado !== "pago_total"
   );
+
+  const toCollectByCurrency = sumByCurrency(toCollectProjects);
+  const toPayByCurrency = sumByCurrency(toPayProjects);
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-6 md:p-8">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground">
-          {projects.length} proyecto{projects.length === 1 ? "" : "s"} · {" "}
+          {projects.length} proyecto{projects.length === 1 ? "" : "s"} ·{" "}
           {clients.length} cliente{clients.length === 1 ? "" : "s"}
         </p>
       </header>
@@ -45,20 +44,20 @@ export default async function DashboardPage() {
         <StatCard
           label="Activos"
           value={active}
-          hint="Sin empezar + En proceso + Corrigiendo"
+          hint="Por asignar + Editando"
           href="/kanban"
         />
         <StatCard
           label="Por cobrar"
-          value={toCollect}
-          hint={summaryByCurrency(pendingByCurrency)}
+          value={toCollectProjects.length}
+          hint={summaryByCurrency(toCollectByCurrency)}
           href="/projects"
           highlight
         />
         <StatCard
-          label="Facturados"
-          value={invoicedCount}
-          hint={summaryByCurrency(invoicedByCurrency)}
+          label="Por pagar"
+          value={toPayProjects.length}
+          hint={summaryByCurrency(toPayByCurrency)}
           href="/projects"
         />
         <StatCard
@@ -71,23 +70,23 @@ export default async function DashboardPage() {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Por estado
+          Por fase
         </h2>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
-          {PROJECT_STATUSES.map((status) => {
-            const count = byStatus[status] ?? 0;
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {PROJECT_PHASES.map((phase) => {
+            const count = byPhase[phase] ?? 0;
             const pct =
               projects.length === 0 ? 0 : (count / projects.length) * 100;
             return (
               <Link
-                key={status}
+                key={phase}
                 href="/kanban"
                 className="group flex flex-col gap-2 rounded-xl bg-card p-4 ring-1 ring-foreground/10 transition-colors hover:bg-accent/30"
               >
                 <span
-                  className={`w-fit rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[status]}`}
+                  className={`w-fit rounded-full px-2 py-0.5 text-xs font-medium ${PHASE_CLASS[phase]}`}
                 >
-                  {STATUS_LABEL[status]}
+                  {PHASE_LABEL[phase]}
                 </span>
                 <span className="text-2xl font-semibold tabular-nums">
                   {count}
@@ -151,9 +150,9 @@ function StatCard({
 
 function countBy<T>(
   arr: T[],
-  key: (item: T) => ProjectStatus
-): Partial<Record<ProjectStatus, number>> {
-  const acc: Partial<Record<ProjectStatus, number>> = {};
+  key: (item: T) => ProjectPhase
+): Partial<Record<ProjectPhase, number>> {
+  const acc: Partial<Record<ProjectPhase, number>> = {};
   for (const item of arr) {
     const k = key(item);
     acc[k] = (acc[k] ?? 0) + 1;

@@ -9,7 +9,8 @@ import {
 
 import { DeleteProjectButton } from "./delete-project-button";
 import { EditProjectButton } from "./edit-project-button";
-import { QuickStatusBadge } from "./quick-status-badge";
+import { QuickPhaseBadge } from "./quick-phase-badge";
+import { QuickPaymentBadge } from "./quick-payment-badge";
 
 import { formatDate, formatPrice } from "@/lib/projects/format";
 import type {
@@ -39,9 +40,12 @@ export function ProjectsTable({ projects, editors, clients }: Props) {
         <TableRow>
           <TableHead>Título</TableHead>
           <TableHead>Cliente</TableHead>
-          <TableHead>Estado</TableHead>
+          <TableHead>Fase</TableHead>
           <TableHead className="text-right">Precio</TableHead>
           <TableHead>Editor</TableHead>
+          <TableHead>Cobrado</TableHead>
+          <TableHead>Pagado</TableHead>
+          <TableHead>Facturado</TableHead>
           <TableHead>Actualizado</TableHead>
           <TableHead className="w-24 text-right">Acciones</TableHead>
         </TableRow>
@@ -52,12 +56,21 @@ export function ProjectsTable({ projects, editors, clients }: Props) {
             <TableCell className="font-medium">{p.title}</TableCell>
             <TableCell>{p.client?.name ?? p.client_name ?? "—"}</TableCell>
             <TableCell>
-              <QuickStatusBadge id={p.id} status={p.status} />
+              <QuickPhaseBadge id={p.id} phase={p.phase} />
             </TableCell>
             <TableCell className="text-right tabular-nums">
               {formatPrice(p.price, p.currency)}
             </TableCell>
             <TableCell>{p.editor?.name ?? "—"}</TableCell>
+            <TableCell>
+              <QuickPaymentBadge kind="cobrado" id={p.id} value={p.cobrado} />
+            </TableCell>
+            <TableCell>
+              <QuickPaymentBadge kind="pagado" id={p.id} value={p.pagado} />
+            </TableCell>
+            <TableCell>
+              <QuickPaymentBadge kind="invoiced" id={p.id} value={p.invoiced} />
+            </TableCell>
             <TableCell className="text-muted-foreground">
               {formatDate(p.updated_at)}
             </TableCell>

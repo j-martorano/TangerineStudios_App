@@ -12,33 +12,33 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { changeStatus } from "@/lib/projects/actions";
-import { PROJECT_STATUSES } from "@/lib/projects/types";
-import type { ProjectStatus } from "@/lib/projects/types";
-import { STATUS_CLASS, STATUS_LABEL } from "@/lib/projects/format";
+import { changePhase } from "@/lib/projects/actions";
+import { PROJECT_PHASES } from "@/lib/projects/types";
+import type { ProjectPhase } from "@/lib/projects/types";
+import { PHASE_CLASS, PHASE_LABEL } from "@/lib/projects/format";
 
 type Props = {
   id: string;
-  status: ProjectStatus;
+  phase: ProjectPhase;
 };
 
-export function QuickStatusBadge({ id, status }: Props) {
-  const [optimistic, setOptimistic] = useState<ProjectStatus | null>(null);
+export function QuickPhaseBadge({ id, phase }: Props) {
+  const [optimistic, setOptimistic] = useState<ProjectPhase | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const current = optimistic ?? status;
+  const current = optimistic ?? phase;
 
-  function handleChange(next: ProjectStatus) {
+  function handleChange(next: ProjectPhase) {
     if (next === current) return;
     const previous = current;
     setOptimistic(next);
     startTransition(async () => {
-      const result = await changeStatus(id, next);
+      const result = await changePhase(id, next);
       if (!result.ok) {
         toast.error(result.error);
         setOptimistic(previous);
       } else {
-        toast.success("Estado actualizado");
+        toast.success("Fase actualizada");
       }
     });
   }
@@ -50,26 +50,27 @@ export function QuickStatusBadge({ id, status }: Props) {
           <button
             type="button"
             disabled={pending}
-            aria-label="Cambiar estado"
+            aria-label="Cambiar fase"
             className="cursor-pointer rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           />
         }
       >
-        <Badge variant="secondary" className={STATUS_CLASS[current]}>
-          {STATUS_LABEL[current]}
+        <Badge variant="secondary" className={PHASE_CLASS[current]}>
+          {PHASE_LABEL[current]}
         </Badge>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        {PROJECT_STATUSES.map((s) => (
+        {PROJECT_PHASES.map((p) => (
           <DropdownMenuItem
-            key={s}
-            onSelect={() => handleChange(s)}
+            key={p}
+            onClick={() => handleChange(p)}
             disabled={pending}
+            className="cursor-pointer"
           >
-            <Badge variant="secondary" className={STATUS_CLASS[s]}>
-              {STATUS_LABEL[s]}
+            <Badge variant="secondary" className={PHASE_CLASS[p]}>
+              {PHASE_LABEL[p]}
             </Badge>
-            {current === s ? (
+            {current === p ? (
               <CheckIcon className="ml-auto size-4 text-muted-foreground" />
             ) : null}
           </DropdownMenuItem>

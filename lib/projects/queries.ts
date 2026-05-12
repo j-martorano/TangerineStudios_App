@@ -6,7 +6,7 @@ import type {
 } from "./types";
 
 const PROJECT_SELECT =
-  "id, title, client_name, status, price, currency, position, created_at, updated_at, editor_id, client_id, editor:editors ( id, name ), client:clients ( id, name )";
+  "id, title, client_name, phase, cobrado, pagado, invoiced, status, price, currency, position, created_at, updated_at, editor_id, client_id, editor:editors ( id, name ), client:clients ( id, name, color )";
 
 export const DEFAULT_PER_PAGE = 20;
 
@@ -23,7 +23,7 @@ export async function fetchProjects(
     }
   }
 
-  const { data, error } = await q.order("status").order("position");
+  const { data, error } = await q.order("phase").order("position");
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as ProjectWithRelations[];
 }

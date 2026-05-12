@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -21,20 +21,21 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { GripHorizontalIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { KanbanCardActions } from "./kanban-card-actions";
 
-import { PROJECT_STATUSES } from "@/lib/projects/types";
+import { PROJECT_PHASES } from "@/lib/projects/types";
 import type {
   ClientMini,
   EditorMini,
-  ProjectStatus,
+  ProjectPhase,
   ProjectWithRelations,
 } from "@/lib/projects/types";
-import { STATUS_CLASS, STATUS_LABEL, formatPrice } from "@/lib/projects/format";
+import { PHASE_CLASS, PHASE_LABEL, formatPrice } from "@/lib/projects/format";
 import { reorderProjects } from "@/lib/projects/actions";
 
 type Props = {
@@ -43,24 +44,24 @@ type Props = {
   clients: ClientMini[];
 };
 
-type ColumnsMap = Record<ProjectStatus, ProjectWithRelations[]>;
+type ColumnsMap = Record<ProjectPhase, ProjectWithRelations[]>;
 
 function buildColumns(projects: ProjectWithRelations[]): ColumnsMap {
   const map = {} as ColumnsMap;
-  for (const status of PROJECT_STATUSES) map[status] = [];
-  for (const p of projects) map[p.status].push(p);
-  for (const status of PROJECT_STATUSES) {
-    map[status].sort((a, b) => a.position - b.position);
+  for (const phase of PROJECT_PHASES) map[phase] = [];
+  for (const p of projects) map[p.phase].push(p);
+  for (const phase of PROJECT_PHASES) {
+    map[phase].sort((a, b) => a.position - b.position);
   }
   return map;
 }
 
-function findContainer(cols: ColumnsMap, id: string): ProjectStatus | null {
-  if ((PROJECT_STATUSES as string[]).includes(id)) {
-    return id as ProjectStatus;
+function findContainer(cols: ColumnsMap, id: string): ProjectPhase | null {
+  if ((PROJECT_PHASES as string[]).includes(id)) {
+    return id as ProjectPhase;
   }
-  for (const status of PROJECT_STATUSES) {
-    if (cols[status].some((p) => p.id === id)) return status;
+  for (const phase of PROJECT_PHASES) {
+    if (cols[phase].some((p) => p.id === id)) return phase;
   }
   return null;
 }
@@ -79,16 +80,16 @@ export function ProjectsKanban(props: Props) {
 function StaticKanban({ projects, editors, clients }: Props) {
   const columns = buildColumns(projects);
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-      {PROJECT_STATUSES.map((status) => {
-        const items = columns[status];
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {PROJECT_PHASES.map((phase) => {
+        const items = columns[phase];
         return (
-          <div key={status} className="flex min-w-0 flex-col gap-3">
+          <div key={phase} className="flex min-w-0 flex-col gap-3">
             <div className="flex items-center justify-between px-1">
               <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[status]}`}
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${PHASE_CLASS[phase]}`}
               >
-                {STATUS_LABEL[status]}
+                {PHASE_LABEL[phase]}
               </span>
               <span className="text-xs text-muted-foreground tabular-nums">
                 {items.length}
@@ -126,9 +127,23 @@ function InteractiveKanban({ projects, editors, clients }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
+  // Sincronizamos columnas locales con projects sólo cuando el contenido
+  // cambia de verdad (no en cada re-render). Comparamos por una clave
+  // estable: ids + posiciones + fases. Esto evita que setColumns dispare
+  // re-renders en cadena que rompen las dependencias de dnd-kit.
+  const projectsKey = useMemo(
+    () =>
+      projects
+        .map((p) => `${p.id}:${p.phase}:${p.position}`)
+        .join("|"),
+    [projects]
+  );
+  const lastKeyRef = useRef(projectsKey);
   useEffect(() => {
+    if (lastKeyRef.current === projectsKey) return;
+    lastKeyRef.current = projectsKey;
     setColumns(buildColumns(projects));
-  }, [projects]);
+  }, [projectsKey, projects]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -171,7 +186,7 @@ function InteractiveKanban({ projects, editors, clients }: Props) {
       const newActive = activeItems.filter((_, i) => i !== activeIndex);
       const newOver = [
         ...overItems.slice(0, overIndex),
-        { ...moving, status: overContainer },
+        { ...moving, phase: overContainer },
         ...overItems.slice(overIndex),
       ];
 
@@ -216,13 +231,13 @@ function InteractiveKanban({ projects, editors, clients }: Props) {
 
     const updates: {
       id: string;
-      status: ProjectStatus;
+      phase: ProjectPhase;
       position: number;
     }[] = [];
     const affected = new Set([activeContainer, overContainer]);
-    for (const status of affected) {
-      next[status].forEach((p, idx) => {
-        updates.push({ id: p.id, status, position: idx });
+    for (const phase of affected) {
+      next[phase].forEach((p, idx) => {
+        updates.push({ id: p.id, phase, position: idx });
       });
     }
 
@@ -243,12 +258,12 @@ function InteractiveKanban({ projects, editors, clients }: Props) {
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {PROJECT_STATUSES.map((status) => (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {PROJECT_PHASES.map((phase) => (
           <KanbanColumn
-            key={status}
-            status={status}
-            items={columns[status]}
+            key={phase}
+            phase={phase}
+            items={columns[phase]}
             editors={editors}
             clients={clients}
           />
@@ -262,33 +277,34 @@ function InteractiveKanban({ projects, editors, clients }: Props) {
 }
 
 function KanbanColumn({
-  status,
+  phase,
   items,
   editors,
   clients,
 }: {
-  status: ProjectStatus;
+  phase: ProjectPhase;
   items: ProjectWithRelations[];
   editors: EditorMini[];
   clients: ClientMini[];
 }) {
-  const { isOver, setNodeRef } = useDroppableColumn(status);
+  const { isOver, setNodeRef } = useDroppableColumn(phase);
+  const itemIds = useMemo(() => items.map((p) => p.id), [items]);
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex items-center justify-between px-1">
         <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[status]}`}
+          className={`rounded-full px-2 py-0.5 text-xs font-medium ${PHASE_CLASS[phase]}`}
         >
-          {STATUS_LABEL[status]}
+          {PHASE_LABEL[phase]}
         </span>
         <span className="text-xs text-muted-foreground tabular-nums">
           {items.length}
         </span>
       </div>
       <SortableContext
-        id={status}
-        items={items.map((p) => p.id)}
+        id={phase}
+        items={itemIds}
         strategy={verticalListSortingStrategy}
       >
         <div
@@ -317,7 +333,7 @@ function KanbanColumn({
   );
 }
 
-function useDroppableColumn(id: ProjectStatus) {
+function useDroppableColumn(id: ProjectPhase) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return { setNodeRef, isOver };
 }
@@ -382,14 +398,18 @@ function CardView({
           />
         </div>
       ) : null}
-      <CardHeader
-        className="cursor-grab active:cursor-grabbing"
+      <div
+        className="relative -mt-3 cursor-grab border-b border-border/40 bg-muted/40 px-3 pt-5 pb-3 active:cursor-grabbing"
         {...dragHandleProps}
       >
-        <CardTitle className="line-clamp-2 pr-8 text-sm">
+        <GripHorizontalIcon
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-1 size-3.5 -translate-x-1/2 text-muted-foreground/60"
+        />
+        <h3 className="line-clamp-2 pr-8 text-sm font-medium leading-snug">
           {project.title}
-        </CardTitle>
-      </CardHeader>
+        </h3>
+      </div>
       <CardContent className="flex flex-col gap-1 text-xs text-muted-foreground">
         <span className="truncate">
           {project.client?.name ?? project.client_name ?? "—"}

@@ -82,14 +82,14 @@ export function KanbanCardActions({ project, editors, clients }: Props) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem
-            onSelect={() => setEditOpen(true)}
+            onClick={() => setEditOpen(true)}
             className="cursor-pointer"
           >
             <PencilIcon className="size-4" />
             <span>Editar</span>
           </DropdownMenuItem>
           <DropdownMenuItem
-            onSelect={() => setDeleteOpen(true)}
+            onClick={() => setDeleteOpen(true)}
             className="cursor-pointer text-destructive focus:bg-destructive/20 focus:text-destructive"
           >
             <Trash2Icon className="size-4" />

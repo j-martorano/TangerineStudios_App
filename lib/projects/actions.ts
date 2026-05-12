@@ -3,8 +3,20 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { CURRENCIES, PROJECT_STATUSES } from "./types";
-import type { CurrencyCode, ProjectStatus } from "./types";
+import {
+  COBRADO_STATUSES,
+  CURRENCIES,
+  INVOICED_STATUSES,
+  PAGADO_STATUSES,
+  PROJECT_PHASES,
+} from "./types";
+import type {
+  CobradoStatus,
+  CurrencyCode,
+  InvoicedStatus,
+  PagadoStatus,
+  ProjectPhase,
+} from "./types";
 
 async function getClientName(clientId: string | null): Promise<string | null> {
   if (!clientId) return null;
@@ -17,12 +29,17 @@ async function getClientName(clientId: string | null): Promise<string | null> {
   return data?.name ?? null;
 }
 
-const statusEnum = z.enum(
-  PROJECT_STATUSES as [ProjectStatus, ...ProjectStatus[]]
+const phaseEnum = z.enum(PROJECT_PHASES as [ProjectPhase, ...ProjectPhase[]]);
+const cobradoEnum = z.enum(
+  COBRADO_STATUSES as [CobradoStatus, ...CobradoStatus[]]
 );
-const currencyEnum = z.enum(
-  CURRENCIES as [CurrencyCode, ...CurrencyCode[]]
+const pagadoEnum = z.enum(
+  PAGADO_STATUSES as [PagadoStatus, ...PagadoStatus[]]
 );
+const invoicedEnum = z.enum(
+  INVOICED_STATUSES as [InvoicedStatus, ...InvoicedStatus[]]
+);
+const currencyEnum = z.enum(CURRENCIES as [CurrencyCode, ...CurrencyCode[]]);
 
 const uuidRegex =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -34,7 +51,10 @@ const projectInputSchema = z.object({
     .min(1, "El título es obligatorio")
     .max(120, "El título no puede tener más de 120 caracteres"),
   client_id: z.string().regex(uuidRegex, "Cliente inválido").nullable(),
-  status: statusEnum,
+  phase: phaseEnum,
+  cobrado: cobradoEnum.default("no"),
+  pagado: pagadoEnum.default("sin_pagar"),
+  invoiced: invoicedEnum.default("no"),
   price: z
     .number()
     .nonnegative("El precio no puede ser negativo")
@@ -52,6 +72,11 @@ function revalidateAll() {
   revalidatePath("/kanban");
   revalidatePath("/projects");
   revalidatePath("/clients");
+  revalidatePath("/editors");
+}
+
+function firstError(err: z.ZodError): string {
+  return err.issues[0]?.message ?? "Datos inválidos";
 }
 
 export async function createProject(
@@ -90,17 +115,72 @@ export async function updateProject(
   return { ok: true };
 }
 
-export async function changeStatus(
+export async function changePhase(
   id: string,
-  status: ProjectStatus
+  phase: ProjectPhase
 ): Promise<ActionResult> {
-  const parsed = statusEnum.safeParse(status);
-  if (!parsed.success) return { ok: false, error: "Estado inválido" };
+  const parsed = phaseEnum.safeParse(phase);
+  if (!parsed.success) return { ok: false, error: "Fase inválida" };
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("projects")
-    .update({ status: parsed.data })
+    .update({ phase: parsed.data })
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function changeCobrado(
+  id: string,
+  cobrado: CobradoStatus
+): Promise<ActionResult> {
+  const parsed = cobradoEnum.safeParse(cobrado);
+  if (!parsed.success) return { ok: false, error: "Estado de cobro inválido" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("projects")
+    .update({ cobrado: parsed.data })
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function changePagado(
+  id: string,
+  pagado: PagadoStatus
+): Promise<ActionResult> {
+  const parsed = pagadoEnum.safeParse(pagado);
+  if (!parsed.success) return { ok: false, error: "Estado de pago inválido" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("projects")
+    .update({ pagado: parsed.data })
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function changeInvoiced(
+  id: string,
+  invoiced: InvoicedStatus
+): Promise<ActionResult> {
+  const parsed = invoicedEnum.safeParse(invoiced);
+  if (!parsed.success)
+    return { ok: false, error: "Estado de facturación inválido" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("projects")
+    .update({ invoiced: parsed.data })
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
@@ -119,14 +199,14 @@ export async function deleteProject(id: string): Promise<ActionResult> {
 
 export type ReorderUpdate = {
   id: string;
-  status: ProjectStatus;
+  phase: ProjectPhase;
   position: number;
 };
 
 const reorderSchema = z.array(
   z.object({
     id: z.string().regex(uuidRegex, "ID inválido"),
-    status: statusEnum,
+    phase: phaseEnum,
     position: z.number().int().nonnegative(),
   })
 );
@@ -143,7 +223,7 @@ export async function reorderProjects(
     parsed.data.map((u) =>
       supabase
         .from("projects")
-        .update({ status: u.status, position: u.position })
+        .update({ phase: u.phase, position: u.position })
         .eq("id", u.id)
     )
   );
@@ -153,8 +233,4 @@ export async function reorderProjects(
 
   revalidateAll();
   return { ok: true };
-}
-
-function firstError(err: z.ZodError): string {
-  return err.issues[0]?.message ?? "Datos inválidos";
 }

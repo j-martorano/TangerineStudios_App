@@ -151,39 +151,51 @@ export type Database = {
         Row: {
           client_id: string | null
           client_name: string | null
+          cobrado: Database["public"]["Enums"]["cobrado_status"]
           created_at: string
           currency: Database["public"]["Enums"]["currency_code"]
           editor_id: string | null
           id: string
+          invoiced: Database["public"]["Enums"]["invoiced_status"]
+          pagado: Database["public"]["Enums"]["pagado_status"]
+          phase: Database["public"]["Enums"]["project_phase"]
           position: number
           price: number | null
-          status: Database["public"]["Enums"]["project_status"]
+          status: Database["public"]["Enums"]["project_status"] | null
           title: string
           updated_at: string
         }
         Insert: {
           client_id?: string | null
           client_name?: string | null
+          cobrado?: Database["public"]["Enums"]["cobrado_status"]
           created_at?: string
           currency?: Database["public"]["Enums"]["currency_code"]
           editor_id?: string | null
           id?: string
+          invoiced?: Database["public"]["Enums"]["invoiced_status"]
+          pagado?: Database["public"]["Enums"]["pagado_status"]
+          phase?: Database["public"]["Enums"]["project_phase"]
           position?: number
           price?: number | null
-          status?: Database["public"]["Enums"]["project_status"]
+          status?: Database["public"]["Enums"]["project_status"] | null
           title: string
           updated_at?: string
         }
         Update: {
           client_id?: string | null
           client_name?: string | null
+          cobrado?: Database["public"]["Enums"]["cobrado_status"]
           created_at?: string
           currency?: Database["public"]["Enums"]["currency_code"]
           editor_id?: string | null
           id?: string
+          invoiced?: Database["public"]["Enums"]["invoiced_status"]
+          pagado?: Database["public"]["Enums"]["pagado_status"]
+          phase?: Database["public"]["Enums"]["project_phase"]
           position?: number
           price?: number | null
-          status?: Database["public"]["Enums"]["project_status"]
+          status?: Database["public"]["Enums"]["project_status"] | null
           title?: string
           updated_at?: string
         }
@@ -212,8 +224,12 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      cobrado_status: "si" | "no" | "parcial"
       currency_code: "ARS" | "USD" | "EUR"
+      invoiced_status: "si" | "no" | "parcial"
+      pagado_status: "pago_total" | "parcial" | "sin_pagar"
       payment_type: "por_proyecto" | "mensual"
+      project_phase: "editando" | "por_asignar" | "terminado"
       project_status:
         | "pending"
         | "in_progress"
@@ -350,8 +366,12 @@ export const Constants = {
   },
   public: {
     Enums: {
+      cobrado_status: ["si", "no", "parcial"],
       currency_code: ["ARS", "USD", "EUR"],
+      invoiced_status: ["si", "no", "parcial"],
+      pagado_status: ["pago_total", "parcial", "sin_pagar"],
       payment_type: ["por_proyecto", "mensual"],
+      project_phase: ["editando", "por_asignar", "terminado"],
       project_status: [
         "pending",
         "in_progress",
