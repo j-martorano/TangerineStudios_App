@@ -5,7 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchClients, fetchProjects } from "@/lib/projects/queries";
 import { PROJECT_PHASES } from "@/lib/projects/types";
 import type { CurrencyCode, ProjectPhase } from "@/lib/projects/types";
-import { PHASE_CLASS, PHASE_LABEL, formatPrice } from "@/lib/projects/format";
+import {
+  PHASE_CLASS,
+  PHASE_LABEL,
+  computePrice,
+  formatPrice,
+} from "@/lib/projects/format";
+import type { ProjectWithRelations } from "@/lib/projects/types";
 
 export const dynamic = "force-dynamic";
 
@@ -161,12 +167,13 @@ function countBy<T>(
 }
 
 function sumByCurrency(
-  projects: { price: number | null; currency: CurrencyCode }[]
+  projects: ProjectWithRelations[]
 ): Partial<Record<CurrencyCode, number>> {
   const acc: Partial<Record<CurrencyCode, number>> = {};
   for (const p of projects) {
-    if (p.price == null) continue;
-    acc[p.currency] = (acc[p.currency] ?? 0) + Number(p.price);
+    const price = computePrice(p);
+    if (price == null) continue;
+    acc[p.currency] = (acc[p.currency] ?? 0) + price;
   }
   return acc;
 }

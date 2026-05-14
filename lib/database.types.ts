@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -147,20 +147,61 @@ export type Database = {
         }
         Relationships: []
       }
+      project_editors: {
+        Row: {
+          cost: number | null
+          created_at: string
+          editor_id: string
+          project_id: string
+          role: Database["public"]["Enums"]["editor_role"]
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          editor_id: string
+          project_id: string
+          role: Database["public"]["Enums"]["editor_role"]
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          editor_id?: string
+          project_id?: string
+          role?: Database["public"]["Enums"]["editor_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_editors_editor_id_fkey"
+            columns: ["editor_id"]
+            isOneToOne: false
+            referencedRelation: "editors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_editors_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           client_id: string | null
           client_name: string | null
           cobrado: Database["public"]["Enums"]["cobrado_status"]
+          cost: number | null
           created_at: string
           currency: Database["public"]["Enums"]["currency_code"]
-          editor_id: string | null
+          duration_minutes: number | null
           id: string
           invoiced: Database["public"]["Enums"]["invoiced_status"]
           pagado: Database["public"]["Enums"]["pagado_status"]
           phase: Database["public"]["Enums"]["project_phase"]
           position: number
           price: number | null
+          project_code: string
           status: Database["public"]["Enums"]["project_status"] | null
           title: string
           updated_at: string
@@ -169,15 +210,17 @@ export type Database = {
           client_id?: string | null
           client_name?: string | null
           cobrado?: Database["public"]["Enums"]["cobrado_status"]
+          cost?: number | null
           created_at?: string
           currency?: Database["public"]["Enums"]["currency_code"]
-          editor_id?: string | null
+          duration_minutes?: number | null
           id?: string
           invoiced?: Database["public"]["Enums"]["invoiced_status"]
           pagado?: Database["public"]["Enums"]["pagado_status"]
           phase?: Database["public"]["Enums"]["project_phase"]
           position?: number
           price?: number | null
+          project_code: string
           status?: Database["public"]["Enums"]["project_status"] | null
           title: string
           updated_at?: string
@@ -186,15 +229,17 @@ export type Database = {
           client_id?: string | null
           client_name?: string | null
           cobrado?: Database["public"]["Enums"]["cobrado_status"]
+          cost?: number | null
           created_at?: string
           currency?: Database["public"]["Enums"]["currency_code"]
-          editor_id?: string | null
+          duration_minutes?: number | null
           id?: string
           invoiced?: Database["public"]["Enums"]["invoiced_status"]
           pagado?: Database["public"]["Enums"]["pagado_status"]
           phase?: Database["public"]["Enums"]["project_phase"]
           position?: number
           price?: number | null
+          project_code?: string
           status?: Database["public"]["Enums"]["project_status"] | null
           title?: string
           updated_at?: string
@@ -207,13 +252,6 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "projects_editor_id_fkey"
-            columns: ["editor_id"]
-            isOneToOne: false
-            referencedRelation: "editors"
-            referencedColumns: ["id"]
-          },
         ]
       }
     }
@@ -221,11 +259,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      slugify: { Args: { input: string }; Returns: string }
+      unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {
       cobrado_status: "si" | "no" | "parcial"
       currency_code: "ARS" | "USD" | "EUR"
+      editor_role: "primary" | "secondary"
       invoiced_status: "si" | "no" | "parcial"
       pagado_status: "pago_total" | "parcial" | "sin_pagar"
       payment_type: "por_proyecto" | "mensual"
@@ -368,6 +408,7 @@ export const Constants = {
     Enums: {
       cobrado_status: ["si", "no", "parcial"],
       currency_code: ["ARS", "USD", "EUR"],
+      editor_role: ["primary", "secondary"],
       invoiced_status: ["si", "no", "parcial"],
       pagado_status: ["pago_total", "parcial", "sin_pagar"],
       payment_type: ["por_proyecto", "mensual"],

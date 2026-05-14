@@ -22,6 +22,8 @@ import {
   INVOICED_STATUSES,
   PAGADO_STATUSES,
   PROJECT_PHASES,
+  getPrimaryEditor,
+  getSecondaryEditor,
 } from "@/lib/projects/types";
 import type {
   ClientMini,
@@ -39,6 +41,9 @@ import {
   INVOICED_LABEL,
   PAGADO_LABEL,
   PHASE_LABEL,
+  computePrice,
+  computeProfit,
+  formatPrice,
 } from "@/lib/projects/format";
 import { createProject, updateProject } from "@/lib/projects/actions";
 
@@ -59,6 +64,9 @@ export function ProjectForm({
   project,
   onSuccess,
 }: Props) {
+  const initialPrimary = project ? getPrimaryEditor(project) : null;
+  const initialSecondary = project ? getSecondaryEditor(project) : null;
+
   const [title, setTitle] = useState(project?.title ?? "");
   const [clientId, setClientId] = useState<string | null>(
     project?.client?.id ?? null
@@ -75,14 +83,26 @@ export function ProjectForm({
   const [invoiced, setInvoiced] = useState<InvoicedStatus>(
     project?.invoiced ?? "no"
   );
-  const [price, setPrice] = useState<string>(
-    project?.price != null ? String(project.price) : ""
+  const [cost, setCost] = useState<string>(
+    project?.cost != null ? String(project.cost) : ""
   );
   const [currency, setCurrency] = useState<CurrencyCode>(
     project?.currency ?? "ARS"
   );
-  const [editorId, setEditorId] = useState<string>(
-    project?.editor?.id ?? NO_EDITOR
+  const [durationMinutes, setDurationMinutes] = useState<string>(
+    project?.duration_minutes != null ? String(project.duration_minutes) : ""
+  );
+  const [primaryEditorId, setPrimaryEditorId] = useState<string>(
+    initialPrimary?.editor?.id ?? NO_EDITOR
+  );
+  const [hasSecondary, setHasSecondary] = useState<boolean>(
+    initialSecondary != null
+  );
+  const [secondaryEditorId, setSecondaryEditorId] = useState<string>(
+    initialSecondary?.editor?.id ?? NO_EDITOR
+  );
+  const [secondaryEditorCost, setSecondaryEditorCost] = useState<string>(
+    initialSecondary?.cost != null ? String(initialSecondary.cost) : ""
   );
   const [pending, startTransition] = useTransition();
 
@@ -95,9 +115,38 @@ export function ProjectForm({
       return;
     }
 
-    const parsedPrice = price === "" ? null : Number(price);
-    if (parsedPrice !== null && Number.isNaN(parsedPrice)) {
-      toast.error("Precio inválido");
+    const parsedCost = cost === "" ? null : Number(cost);
+    if (parsedCost !== null && Number.isNaN(parsedCost)) {
+      toast.error("Costo inválido");
+      return;
+    }
+
+    const parsedSecondaryCost =
+      secondaryEditorCost === "" ? null : Number(secondaryEditorCost);
+    if (
+      parsedSecondaryCost !== null &&
+      Number.isNaN(parsedSecondaryCost)
+    ) {
+      toast.error("Costo del segundo editor inválido");
+      return;
+    }
+
+    const parsedDuration =
+      durationMinutes === "" ? null : Number(durationMinutes);
+    if (parsedDuration !== null && Number.isNaN(parsedDuration)) {
+      toast.error("Duración inválida");
+      return;
+    }
+
+    const primaryId =
+      primaryEditorId === NO_EDITOR ? null : primaryEditorId;
+    const secondaryId =
+      !hasSecondary || secondaryEditorId === NO_EDITOR
+        ? null
+        : secondaryEditorId;
+
+    if (secondaryId && secondaryId === primaryId) {
+      toast.error("El segundo editor no puede ser el mismo que el principal");
       return;
     }
 
@@ -108,9 +157,13 @@ export function ProjectForm({
       cobrado,
       pagado,
       invoiced,
-      price: parsedPrice,
+      price: null,
+      cost: parsedCost,
       currency,
-      editor_id: editorId === NO_EDITOR ? null : editorId,
+      duration_minutes: parsedDuration,
+      primary_editor_id: primaryId,
+      secondary_editor_id: secondaryId,
+      secondary_editor_cost: secondaryId ? parsedSecondaryCost : null,
     };
 
     startTransition(async () => {
@@ -159,73 +212,144 @@ export function ProjectForm({
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="phase">Fase</Label>
-            <Select
-              value={phase}
-              onValueChange={(v) => v && setPhase(v as ProjectPhase)}
-            >
-              <SelectTrigger id="phase" className="w-full">
-                <SelectValue>
-                  {(v: string | null) =>
-                    v ? PHASE_LABEL[v as ProjectPhase] : ""
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {PROJECT_PHASES.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {PHASE_LABEL[p]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="phase">Fase</Label>
+              <Select
+                value={phase}
+                onValueChange={(v) => v && setPhase(v as ProjectPhase)}
+              >
+                <SelectTrigger id="phase" className="w-full">
+                  <SelectValue>
+                    {(v: string | null) =>
+                      v ? PHASE_LABEL[v as ProjectPhase] : ""
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {PROJECT_PHASES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {PHASE_LABEL[p]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="duration_minutes">
+                Duración{" "}
+                <span className="text-xs text-muted-foreground">(min)</span>
+              </Label>
+              <Input
+                id="duration_minutes"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.5"
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(e.target.value)}
+                placeholder="0"
+              />
+            </div>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="price">Precio</Label>
-            <Input
-              id="price"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="0"
-            />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="cost">
+                Costo{" "}
+                <span className="text-xs text-muted-foreground">(pagamos)</span>
+              </Label>
+              <Input
+                id="cost"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="currency">Moneda</Label>
+              <Select
+                value={currency}
+                onValueChange={(v) => v && setCurrency(v as CurrencyCode)}
+              >
+                <SelectTrigger id="currency" className="w-full">
+                  <SelectValue>
+                    {(v: string | null) => (v ? v : "")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {CURRENCY_LABEL[c]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="currency">Moneda</Label>
-            <Select
-              value={currency}
-              onValueChange={(v) => v && setCurrency(v as CurrencyCode)}
-            >
-              <SelectTrigger id="currency" className="w-full">
-                <SelectValue>
-                  {(v: string | null) => (v ? v : "")}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {CURRENCIES.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {CURRENCY_LABEL[c]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {(() => {
+            const selectedClient =
+              clients.find((c) => c.id === clientId) ?? null;
+            const parsedDur =
+              durationMinutes === "" ? null : Number(durationMinutes);
+            const parsedCost = cost === "" ? null : Number(cost);
+            const preview = {
+              duration_minutes:
+                parsedDur != null && !Number.isNaN(parsedDur) ? parsedDur : null,
+              cost: parsedCost != null && !Number.isNaN(parsedCost) ? parsedCost : null,
+              client: selectedClient,
+            };
+            const computedPrice = computePrice(preview);
+            const computedProfit = computeProfit(preview);
+            const isMensual = selectedClient?.payment_type === "mensual";
+            return (
+              <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-xs">
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Precio (calc.)</span>
+                  <span className="font-medium tabular-nums">
+                    {isMensual
+                      ? "Mensual"
+                      : computedPrice != null
+                        ? formatPrice(computedPrice, currency)
+                        : "—"}
+                  </span>
+                </div>
+                <div className="mt-1 flex justify-between gap-3">
+                  <span className="text-muted-foreground">Ganancia (calc.)</span>
+                  <span
+                    className={`font-medium tabular-nums ${
+                      computedProfit != null && computedProfit < 0
+                        ? "text-destructive"
+                        : ""
+                    }`}
+                  >
+                    {isMensual
+                      ? "—"
+                      : computedProfit != null
+                        ? formatPrice(computedProfit, currency)
+                        : "—"}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="editor_id">Editor</Label>
+          <Label htmlFor="primary_editor_id">Editor principal</Label>
           <Select
-            value={editorId}
-            onValueChange={(v) => setEditorId(v ?? NO_EDITOR)}
+            value={primaryEditorId}
+            onValueChange={(v) => setPrimaryEditorId(v ?? NO_EDITOR)}
           >
-            <SelectTrigger id="editor_id" className="w-full">
+            <SelectTrigger id="primary_editor_id" className="w-full">
               <SelectValue>
                 {(v: string | null) => {
                   if (!v || v === NO_EDITOR) return "Sin asignar";
@@ -242,6 +366,72 @@ export function ProjectForm({
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-muted/30 p-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm select-none">
+            <input
+              type="checkbox"
+              checked={hasSecondary}
+              onChange={(e) => setHasSecondary(e.target.checked)}
+              className="size-4 cursor-pointer accent-primary"
+            />
+            <span>Segundo editor</span>
+          </label>
+
+          {hasSecondary ? (
+            <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr]">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="secondary_editor_id" className="text-xs">
+                  Editor secundario
+                </Label>
+                <Select
+                  value={secondaryEditorId}
+                  onValueChange={(v) =>
+                    setSecondaryEditorId(v ?? NO_EDITOR)
+                  }
+                >
+                  <SelectTrigger
+                    id="secondary_editor_id"
+                    className="w-full"
+                  >
+                    <SelectValue>
+                      {(v: string | null) => {
+                        if (!v || v === NO_EDITOR) return "Sin asignar";
+                        return editorById.get(v) ?? "—";
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_EDITOR}>Sin asignar</SelectItem>
+                    {editors
+                      .filter((ed) => ed.id !== primaryEditorId)
+                      .map((ed) => (
+                        <SelectItem key={ed.id} value={ed.id}>
+                          {ed.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="secondary_editor_cost" className="text-xs">
+                  Costo
+                </Label>
+                <Input
+                  id="secondary_editor_cost"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={secondaryEditorCost}
+                  onChange={(e) => setSecondaryEditorCost(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="border-t pt-4">

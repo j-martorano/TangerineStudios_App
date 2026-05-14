@@ -28,14 +28,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { KanbanCardActions } from "./kanban-card-actions";
 
-import { PROJECT_PHASES } from "@/lib/projects/types";
+import {
+  PROJECT_PHASES,
+  getPrimaryEditor,
+  getSecondaryEditor,
+} from "@/lib/projects/types";
 import type {
   ClientMini,
   EditorMini,
   ProjectPhase,
   ProjectWithRelations,
 } from "@/lib/projects/types";
-import { PHASE_CLASS, PHASE_LABEL, formatPrice } from "@/lib/projects/format";
+import {
+  PHASE_CLASS,
+  PHASE_LABEL,
+  computePrice,
+  formatPrice,
+} from "@/lib/projects/format";
 import { reorderProjects } from "@/lib/projects/actions";
 
 type Props = {
@@ -406,6 +415,9 @@ function CardView({
           aria-hidden
           className="pointer-events-none absolute left-1/2 top-1 size-3.5 -translate-x-1/2 text-muted-foreground/60"
         />
+        <p className="mb-0.5 truncate pr-8 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/80">
+          {project.project_code}
+        </p>
         <h3 className="line-clamp-2 pr-8 text-sm font-medium leading-snug">
           {project.title}
         </h3>
@@ -416,10 +428,24 @@ function CardView({
         </span>
         <div className="flex items-center justify-between gap-2 pt-1 text-foreground">
           <span className="tabular-nums">
-            {formatPrice(project.price, project.currency)}
+            {project.client?.payment_type === "mensual"
+              ? "Mensual"
+              : (() => {
+                  const price = computePrice(project);
+                  return price != null
+                    ? formatPrice(price, project.currency)
+                    : "—";
+                })()}
           </span>
           <span className="truncate text-muted-foreground">
-            {project.editor?.name ?? "—"}
+            {(() => {
+              const primary = getPrimaryEditor(project);
+              const secondary = getSecondaryEditor(project);
+              const names = [primary?.editor?.name, secondary?.editor?.name]
+                .filter(Boolean)
+                .join(" + ");
+              return names || "—";
+            })()}
           </span>
         </div>
       </CardContent>

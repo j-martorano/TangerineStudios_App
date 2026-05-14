@@ -6,7 +6,7 @@ import type {
 } from "./types";
 
 const PROJECT_SELECT =
-  "id, title, client_name, phase, cobrado, pagado, invoiced, status, price, currency, position, created_at, updated_at, editor_id, client_id, editor:editors ( id, name ), client:clients ( id, name, color )";
+  "id, project_code, title, client_name, phase, cobrado, pagado, invoiced, status, price, cost, currency, duration_minutes, position, created_at, updated_at, client_id, client:clients(id, name, color, payment_type, agreed_price, balance), editors:project_editors(role, cost, editor:editors(id, name))";
 
 export const DEFAULT_PER_PAGE = 20;
 
@@ -19,7 +19,9 @@ export async function fetchProjects(
   if (opts.query && opts.query.length > 0) {
     const safe = opts.query.replace(/[(),]/g, " ").trim();
     if (safe.length > 0) {
-      q = q.or(`title.ilike.%${safe}%,client_name.ilike.%${safe}%`);
+      q = q.or(
+        `title.ilike.%${safe}%,client_name.ilike.%${safe}%,project_code.ilike.%${safe}%`
+      );
     }
   }
 
@@ -53,7 +55,9 @@ export async function fetchProjectsList(
     // Escapar comas, paréntesis y comillas que rompen la sintaxis de Supabase .or()
     const safe = query.replace(/[(),]/g, " ").trim();
     if (safe.length > 0) {
-      q = q.or(`title.ilike.%${safe}%,client_name.ilike.%${safe}%`);
+      q = q.or(
+        `title.ilike.%${safe}%,client_name.ilike.%${safe}%,project_code.ilike.%${safe}%`
+      );
     }
   }
 
@@ -90,7 +94,7 @@ export type EditorWithCount = EditorRow & {
 };
 
 const EDITOR_FULL_SELECT =
-  "id, name, email, phone, discord_id, bank_info, docs_url, created_at, projects(count), client_editors(client:clients(id, name, color))";
+  "id, name, email, phone, discord_id, bank_info, docs_url, created_at, project_editors(count), client_editors(client:clients(id, name, color, payment_type, agreed_price, balance))";
 
 function mapEditor(e: {
   id: string;
@@ -101,7 +105,7 @@ function mapEditor(e: {
   bank_info: string | null;
   docs_url: string | null;
   created_at: string;
-  projects?: { count: number }[] | null;
+  project_editors?: { count: number }[] | null;
   client_editors?: { client: ClientMini | null }[] | null;
 }): EditorWithCount {
   return {
@@ -113,7 +117,7 @@ function mapEditor(e: {
     bank_info: e.bank_info,
     docs_url: e.docs_url,
     created_at: e.created_at,
-    project_count: e.projects?.[0]?.count ?? 0,
+    project_count: e.project_editors?.[0]?.count ?? 0,
     clients: (e.client_editors ?? [])
       .map((ce) => ce.client)
       .filter((c): c is ClientMini => c != null),

@@ -12,7 +12,17 @@ import { EditProjectButton } from "./edit-project-button";
 import { QuickPhaseBadge } from "./quick-phase-badge";
 import { QuickPaymentBadge } from "./quick-payment-badge";
 
-import { formatDate, formatPrice } from "@/lib/projects/format";
+import {
+  computePrice,
+  computeProfit,
+  formatDate,
+  formatDuration,
+  formatPrice,
+} from "@/lib/projects/format";
+import {
+  getPrimaryEditor,
+  getSecondaryEditor,
+} from "@/lib/projects/types";
 import type {
   ClientMini,
   EditorMini,
@@ -38,10 +48,14 @@ export function ProjectsTable({ projects, editors, clients }: Props) {
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead className="w-32">Código</TableHead>
           <TableHead>Título</TableHead>
           <TableHead>Cliente</TableHead>
           <TableHead>Fase</TableHead>
           <TableHead className="text-right">Precio</TableHead>
+          <TableHead className="text-right">Costo</TableHead>
+          <TableHead className="text-right">Ganancia</TableHead>
+          <TableHead>Duración</TableHead>
           <TableHead>Editor</TableHead>
           <TableHead>Cobrado</TableHead>
           <TableHead>Pagado</TableHead>
@@ -53,15 +67,50 @@ export function ProjectsTable({ projects, editors, clients }: Props) {
       <TableBody>
         {projects.map((p) => (
           <TableRow key={p.id}>
+            <TableCell className="font-mono text-xs text-muted-foreground">
+              {p.project_code}
+            </TableCell>
             <TableCell className="font-medium">{p.title}</TableCell>
             <TableCell>{p.client?.name ?? p.client_name ?? "—"}</TableCell>
             <TableCell>
               <QuickPhaseBadge id={p.id} phase={p.phase} />
             </TableCell>
             <TableCell className="text-right tabular-nums">
-              {formatPrice(p.price, p.currency)}
+              {p.client?.payment_type === "mensual"
+                ? "Mensual"
+                : (() => {
+                    const price = computePrice(p);
+                    return price != null ? formatPrice(price, p.currency) : "—";
+                  })()}
             </TableCell>
-            <TableCell>{p.editor?.name ?? "—"}</TableCell>
+            <TableCell className="text-right tabular-nums text-muted-foreground">
+              {formatPrice(p.cost, p.currency)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {(() => {
+                const profit = computeProfit(p);
+                if (profit == null) return "—";
+                return (
+                  <span className={profit < 0 ? "text-destructive" : ""}>
+                    {formatPrice(profit, p.currency)}
+                  </span>
+                );
+              })()}
+            </TableCell>
+            <TableCell className="tabular-nums">
+              {formatDuration(p.duration_minutes)}
+            </TableCell>
+            <TableCell>
+              {(() => {
+                const primary = getPrimaryEditor(p);
+                const secondary = getSecondaryEditor(p);
+                if (!primary && !secondary) return "—";
+                const names = [primary?.editor?.name, secondary?.editor?.name]
+                  .filter(Boolean)
+                  .join(" + ");
+                return names || "—";
+              })()}
+            </TableCell>
             <TableCell>
               <QuickPaymentBadge kind="cobrado" id={p.id} value={p.cobrado} />
             </TableCell>

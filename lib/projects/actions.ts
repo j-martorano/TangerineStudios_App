@@ -44,24 +44,56 @@ const currencyEnum = z.enum(CURRENCIES as [CurrencyCode, ...CurrencyCode[]]);
 const uuidRegex =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const projectInputSchema = z.object({
-  title: z
-    .string()
-    .trim()
-    .min(1, "El título es obligatorio")
-    .max(120, "El título no puede tener más de 120 caracteres"),
-  client_id: z.string().regex(uuidRegex, "Cliente inválido").nullable(),
-  phase: phaseEnum,
-  cobrado: cobradoEnum.default("no"),
-  pagado: pagadoEnum.default("sin_pagar"),
-  invoiced: invoicedEnum.default("no"),
-  price: z
-    .number()
-    .nonnegative("El precio no puede ser negativo")
-    .nullable(),
-  currency: currencyEnum,
-  editor_id: z.string().regex(uuidRegex, "Editor inválido").nullable(),
-});
+const projectInputSchema = z
+  .object({
+    title: z
+      .string()
+      .trim()
+      .min(1, "El título es obligatorio")
+      .max(120, "El título no puede tener más de 120 caracteres"),
+    client_id: z.string().regex(uuidRegex, "Cliente inválido").nullable(),
+    phase: phaseEnum,
+    cobrado: cobradoEnum.default("no"),
+    pagado: pagadoEnum.default("sin_pagar"),
+    invoiced: invoicedEnum.default("no"),
+    price: z
+      .number()
+      .nonnegative("El precio no puede ser negativo")
+      .nullable(),
+    cost: z
+      .number()
+      .nonnegative("El costo no puede ser negativo")
+      .nullable(),
+    currency: currencyEnum,
+    duration_minutes: z
+      .number()
+      .nonnegative("La duración no puede ser negativa")
+      .nullable(),
+    primary_editor_id: z
+      .string()
+      .regex(uuidRegex, "Editor inválido")
+      .nullable(),
+    secondary_editor_id: z
+      .string()
+      .regex(uuidRegex, "Editor secundario inválido")
+      .nullable(),
+    secondary_editor_cost: z
+      .number()
+      .nonnegative("El costo no puede ser negativo")
+      .nullable(),
+  })
+  .refine(
+    (d) =>
+      !d.secondary_editor_id || d.secondary_editor_id !== d.primary_editor_id,
+    {
+      message: "El segundo editor no puede ser el mismo que el principal",
+      path: ["secondary_editor_id"],
+    }
+  )
+  .refine((d) => !d.secondary_editor_cost || d.secondary_editor_id, {
+    message: "Hay un costo pero ningún segundo editor asignado",
+    path: ["secondary_editor_cost"],
+  });
 
 export type ProjectInput = z.input<typeof projectInputSchema>;
 
@@ -79,19 +111,81 @@ function firstError(err: z.ZodError): string {
   return err.issues[0]?.message ?? "Datos inválidos";
 }
 
+type EditorRow = {
+  project_id: string;
+  editor_id: string;
+  role: "primary" | "secondary";
+  cost: number | null;
+};
+
+function buildEditorRows(
+  projectId: string,
+  primary: string | null,
+  secondary: string | null,
+  secondaryCost: number | null
+): EditorRow[] {
+  const rows: EditorRow[] = [];
+  if (primary) {
+    rows.push({
+      project_id: projectId,
+      editor_id: primary,
+      role: "primary",
+      cost: null,
+    });
+  }
+  if (secondary) {
+    rows.push({
+      project_id: projectId,
+      editor_id: secondary,
+      role: "secondary",
+      cost: secondaryCost,
+    });
+  }
+  return rows;
+}
+
 export async function createProject(
   input: ProjectInput
 ): Promise<ActionResult> {
   const parsed = projectInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
-  const supabase = await createClient();
-  const clientName = await getClientName(parsed.data.client_id);
-  const { error } = await supabase
-    .from("projects")
-    .insert({ ...parsed.data, client_name: clientName });
+  const {
+    primary_editor_id,
+    secondary_editor_id,
+    secondary_editor_cost,
+    ...projectData
+  } = parsed.data;
 
-  if (error) return { ok: false, error: error.message };
+  const supabase = await createClient();
+  const clientName = await getClientName(projectData.client_id);
+
+  // project_code lo rellena el trigger `projects_set_code_trg`. El tipo
+  // generado lo marca required → cast a never.
+  const { data: created, error } = await supabase
+    .from("projects")
+    .insert({ ...projectData, client_name: clientName } as never)
+    .select("id")
+    .single<{ id: string }>();
+
+  if (error || !created) {
+    return { ok: false, error: error?.message ?? "Error al crear proyecto" };
+  }
+
+  const editorRows = buildEditorRows(
+    created.id,
+    primary_editor_id,
+    secondary_editor_id,
+    secondary_editor_cost
+  );
+
+  if (editorRows.length > 0) {
+    const { error: editorError } = await supabase
+      .from("project_editors")
+      .insert(editorRows);
+    if (editorError) return { ok: false, error: editorError.message };
+  }
+
   revalidateAll();
   return { ok: true };
 }
@@ -103,14 +197,44 @@ export async function updateProject(
   const parsed = projectInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
+  const {
+    primary_editor_id,
+    secondary_editor_id,
+    secondary_editor_cost,
+    ...projectData
+  } = parsed.data;
+
   const supabase = await createClient();
-  const clientName = await getClientName(parsed.data.client_id);
+  const clientName = await getClientName(projectData.client_id);
+
   const { error } = await supabase
     .from("projects")
-    .update({ ...parsed.data, client_name: clientName })
+    .update({ ...projectData, client_name: clientName })
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
+
+  // Sync editors: delete-then-insert para mantener la pivot consistente.
+  const { error: deleteError } = await supabase
+    .from("project_editors")
+    .delete()
+    .eq("project_id", id);
+  if (deleteError) return { ok: false, error: deleteError.message };
+
+  const editorRows = buildEditorRows(
+    id,
+    primary_editor_id,
+    secondary_editor_id,
+    secondary_editor_cost
+  );
+
+  if (editorRows.length > 0) {
+    const { error: insertError } = await supabase
+      .from("project_editors")
+      .insert(editorRows);
+    if (insertError) return { ok: false, error: insertError.message };
+  }
+
   revalidateAll();
   return { ok: true };
 }

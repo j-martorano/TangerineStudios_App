@@ -1,10 +1,49 @@
 import type {
+  ClientMini,
   CobradoStatus,
   CurrencyCode,
   InvoicedStatus,
   PagadoStatus,
   ProjectPhase,
 } from "./types";
+
+// Porcentaje que el estudio descuenta del margen para clientes mensuales.
+export const MONTHLY_FEE_RATE = 0.1;
+
+type ProjectForCalc = {
+  duration_minutes: number | null;
+  cost: number | null;
+  client: ClientMini | null;
+};
+
+// Precio calculado del proyecto:
+//   - por_proyecto: client.agreed_price * duration_minutes
+//   - mensual: null (no se factura por proyecto, va por saldo mensual)
+//   - sin cliente o sin datos: null
+export function computePrice(p: ProjectForCalc): number | null {
+  const client = p.client;
+  if (!client) return null;
+  if (client.payment_type === "mensual") return null;
+  if (client.agreed_price == null) return null;
+  if (p.duration_minutes == null) return null;
+  return Number(client.agreed_price) * Number(p.duration_minutes);
+}
+
+// Ganancia calculada del proyecto:
+//   - por_proyecto: precio - costo
+//   - mensual: null (la facturación va por saldo mensual, no por proyecto;
+//     la ganancia real se calcula en la Pestaña Finanzas a nivel mes)
+// Retorna null si no se puede calcular (faltan datos).
+export function computeProfit(p: ProjectForCalc): number | null {
+  const client = p.client;
+  if (!client) return null;
+  if (client.payment_type === "mensual") return null;
+  const price = computePrice(p);
+  if (price == null) return null;
+  const cost = p.cost == null ? null : Number(p.cost);
+  if (cost == null) return price;
+  return price - cost;
+}
 
 export const PHASE_LABEL: Record<ProjectPhase, string> = {
   por_asignar: "Por asignar",
@@ -96,4 +135,24 @@ export function formatPrice(
 
 export function formatDate(iso: string): string {
   return dateFormatter.format(new Date(iso));
+}
+
+// Duración en minutos → "5 min" | "1h 30min" | "2h" | "—" si null.
+// Acepta decimales: 1.5 → "1min 30s", 0.5 → "30s".
+export function formatDuration(minutes: number | null | undefined): string {
+  if (minutes == null) return "—";
+  const n = Number(minutes);
+  if (Number.isNaN(n) || n < 0) return "—";
+
+  const totalSeconds = Math.round(n * 60);
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0) parts.push(`${mins}min`);
+  if (hours === 0 && mins === 0 && secs > 0) parts.push(`${secs}s`);
+  if (parts.length === 0) return "0 min";
+  return parts.join(" ");
 }
