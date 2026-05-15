@@ -6,6 +6,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 
@@ -13,7 +20,15 @@ import { MultiCombobox } from "@/components/ui/multi-combobox";
 
 import { createEditor, updateEditor } from "@/lib/editors/actions";
 import { createClient } from "@/lib/clients/actions";
-import type { ClientMini, EditorRow } from "@/lib/projects/types";
+import {
+  EDITOR_PAYMENT_TYPES,
+  EDITOR_PAYMENT_TYPE_LABEL,
+} from "@/lib/projects/types";
+import type {
+  ClientMini,
+  EditorPaymentType,
+  EditorRow,
+} from "@/lib/projects/types";
 
 type Props = {
   mode: "create" | "edit";
@@ -34,6 +49,15 @@ export function EditorForm({
   const [discordId, setDiscordId] = useState(editor?.discord_id ?? "");
   const [bankInfo, setBankInfo] = useState(editor?.bank_info ?? "");
   const [docsUrl, setDocsUrl] = useState(editor?.docs_url ?? "");
+  const [paymentType, setPaymentType] = useState<EditorPaymentType>(
+    editor?.payment_type ?? "por_rate"
+  );
+  const [rate, setRate] = useState<string>(
+    editor?.rate != null ? String(editor.rate) : ""
+  );
+  const [monthlyFee, setMonthlyFee] = useState<string>(
+    editor?.monthly_fee != null ? String(editor.monthly_fee) : ""
+  );
   const [clientIds, setClientIds] = useState<string[]>(
     editor?.clients?.map((c) => c.id) ?? []
   );
@@ -47,6 +71,17 @@ export function EditorForm({
       return;
     }
 
+    const parsedRate = rate === "" ? null : Number(rate);
+    if (parsedRate !== null && Number.isNaN(parsedRate)) {
+      toast.error("Rate inválido");
+      return;
+    }
+    const parsedMonthly = monthlyFee === "" ? null : Number(monthlyFee);
+    if (parsedMonthly !== null && Number.isNaN(parsedMonthly)) {
+      toast.error("Salario mensual inválido");
+      return;
+    }
+
     const payload = {
       name: trimmed,
       email: email.trim() || null,
@@ -54,6 +89,9 @@ export function EditorForm({
       discord_id: discordId.trim() || null,
       bank_info: bankInfo.trim() || null,
       docs_url: docsUrl.trim() || null,
+      payment_type: paymentType,
+      rate: paymentType === "por_rate" ? parsedRate : null,
+      monthly_fee: paymentType === "mensual" ? parsedMonthly : null,
       client_ids: clientIds,
     };
 
@@ -117,6 +155,67 @@ export function EditorForm({
             placeholder="298745632100000001"
           />
         </Field>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field
+            label="Tipo de pago"
+            hint="Define cómo se calcula su costo en los proyectos."
+          >
+            <Select
+              value={paymentType}
+              onValueChange={(v) =>
+                v && setPaymentType(v as EditorPaymentType)
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue>
+                  {(v: string | null) =>
+                    v ? EDITOR_PAYMENT_TYPE_LABEL[v as EditorPaymentType] : ""
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {EDITOR_PAYMENT_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {EDITOR_PAYMENT_TYPE_LABEL[t]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          {paymentType === "por_rate" ? (
+            <Field
+              label="Rate"
+              hint="Precio por minuto de video editado."
+            >
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={rate}
+                onChange={(e) => setRate(e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+          ) : (
+            <Field
+              label="Salario mensual"
+              hint="Monto fijo mensual (no aporta al costo individual de los proyectos)."
+            >
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={monthlyFee}
+                onChange={(e) => setMonthlyFee(e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+          )}
+        </div>
 
         <Field
           label="Clientes asignados"

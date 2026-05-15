@@ -8,6 +8,7 @@ import type { CurrencyCode, ProjectPhase } from "@/lib/projects/types";
 import {
   PHASE_CLASS,
   PHASE_LABEL,
+  computeCost,
   computePrice,
   formatPrice,
 } from "@/lib/projects/format";
@@ -33,8 +34,10 @@ export default async function DashboardPage() {
     (p) => p.phase === "terminado" && p.pagado !== "pago_total"
   );
 
-  const toCollectByCurrency = sumByCurrency(toCollectProjects);
-  const toPayByCurrency = sumByCurrency(toPayProjects);
+  // Cobros usan precio calculado (lo que nos debe el cliente).
+  // Pagos usan cost (lo que le debemos al editor).
+  const toCollectByCurrency = sumPriceByCurrency(toCollectProjects);
+  const toPayByCurrency = sumCostByCurrency(toPayProjects);
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-6 md:p-8">
@@ -57,14 +60,14 @@ export default async function DashboardPage() {
           label="Por cobrar"
           value={toCollectProjects.length}
           hint={summaryByCurrency(toCollectByCurrency)}
-          href="/projects"
+          href="/finanzas"
           highlight
         />
         <StatCard
           label="Por pagar"
           value={toPayProjects.length}
           hint={summaryByCurrency(toPayByCurrency)}
-          href="/projects"
+          href="/finanzas"
         />
         <StatCard
           label="Clientes"
@@ -166,7 +169,7 @@ function countBy<T>(
   return acc;
 }
 
-function sumByCurrency(
+function sumPriceByCurrency(
   projects: ProjectWithRelations[]
 ): Partial<Record<CurrencyCode, number>> {
   const acc: Partial<Record<CurrencyCode, number>> = {};
@@ -174,6 +177,18 @@ function sumByCurrency(
     const price = computePrice(p);
     if (price == null) continue;
     acc[p.currency] = (acc[p.currency] ?? 0) + price;
+  }
+  return acc;
+}
+
+function sumCostByCurrency(
+  projects: ProjectWithRelations[]
+): Partial<Record<CurrencyCode, number>> {
+  const acc: Partial<Record<CurrencyCode, number>> = {};
+  for (const p of projects) {
+    const cost = computeCost(p);
+    if (cost == null) continue;
+    acc[p.currency] = (acc[p.currency] ?? 0) + cost;
   }
   return acc;
 }

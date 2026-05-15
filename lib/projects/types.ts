@@ -8,16 +8,27 @@ export type EditorRole = Database["public"]["Enums"]["editor_role"];
 
 export type CurrencyCode = Database["public"]["Enums"]["currency_code"];
 export type PaymentType = Database["public"]["Enums"]["payment_type"];
+export type EditorPaymentType =
+  Database["public"]["Enums"]["editor_payment_type"];
 
 export type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
 
 export type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
 export type EditorRow = Database["public"]["Tables"]["editors"]["Row"];
 
-export type EditorMini = Pick<EditorRow, "id" | "name">;
+export type EditorMini = Pick<
+  EditorRow,
+  "id" | "name" | "payment_type" | "rate" | "monthly_fee"
+>;
 export type ClientMini = Pick<
   ClientRow,
-  "id" | "name" | "color" | "payment_type" | "agreed_price" | "balance"
+  | "id"
+  | "name"
+  | "color"
+  | "payment_type"
+  | "agreed_price"
+  | "monthly_fee"
+  | "balance"
 >;
 
 export type ProjectEditorAssignment = {
@@ -47,11 +58,23 @@ export const INVOICED_STATUSES: InvoicedStatus[] = ["no", "parcial", "si"];
 
 export const CURRENCIES: CurrencyCode[] = ["ARS", "USD", "EUR"];
 
-export const PAYMENT_TYPES: PaymentType[] = ["por_proyecto", "mensual"];
+export const PAYMENT_TYPES: PaymentType[] = [
+  "por_proyecto",
+  "por_rate",
+  "mensual",
+];
 
 export const PAYMENT_TYPE_LABEL: Record<PaymentType, string> = {
-  por_proyecto: "Por proyecto",
-  mensual: "Mensual",
+  por_proyecto: "Precio por proyecto (manual)",
+  por_rate: "Por rate × duración",
+  mensual: "Mensual fijo",
+};
+
+export const EDITOR_PAYMENT_TYPES: EditorPaymentType[] = ["por_rate", "mensual"];
+
+export const EDITOR_PAYMENT_TYPE_LABEL: Record<EditorPaymentType, string> = {
+  por_rate: "Por rate × duración",
+  mensual: "Mensual fijo",
 };
 
 // Helpers para extraer editor principal / segundo desde el array.

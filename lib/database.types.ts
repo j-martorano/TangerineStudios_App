@@ -82,6 +82,7 @@ export type Database = {
           docs_url: string | null
           email: string | null
           id: string
+          monthly_fee: number | null
           name: string
           payment_type: Database["public"]["Enums"]["payment_type"]
           phone: string | null
@@ -95,6 +96,7 @@ export type Database = {
           docs_url?: string | null
           email?: string | null
           id?: string
+          monthly_fee?: number | null
           name: string
           payment_type?: Database["public"]["Enums"]["payment_type"]
           phone?: string | null
@@ -108,6 +110,7 @@ export type Database = {
           docs_url?: string | null
           email?: string | null
           id?: string
+          monthly_fee?: number | null
           name?: string
           payment_type?: Database["public"]["Enums"]["payment_type"]
           phone?: string | null
@@ -122,8 +125,11 @@ export type Database = {
           docs_url: string | null
           email: string | null
           id: string
+          monthly_fee: number | null
           name: string
+          payment_type: Database["public"]["Enums"]["editor_payment_type"]
           phone: string | null
+          rate: number | null
         }
         Insert: {
           bank_info?: string | null
@@ -132,8 +138,11 @@ export type Database = {
           docs_url?: string | null
           email?: string | null
           id?: string
+          monthly_fee?: number | null
           name: string
+          payment_type?: Database["public"]["Enums"]["editor_payment_type"]
           phone?: string | null
+          rate?: number | null
         }
         Update: {
           bank_info?: string | null
@@ -142,8 +151,32 @@ export type Database = {
           docs_url?: string | null
           email?: string | null
           id?: string
+          monthly_fee?: number | null
           name?: string
+          payment_type?: Database["public"]["Enums"]["editor_payment_type"]
           phone?: string | null
+          rate?: number | null
+        }
+        Relationships: []
+      }
+      monthly_settlements: {
+        Row: {
+          party_id: string
+          party_type: Database["public"]["Enums"]["settlement_party_type"]
+          settled_at: string
+          year_month: string
+        }
+        Insert: {
+          party_id: string
+          party_type: Database["public"]["Enums"]["settlement_party_type"]
+          settled_at?: string
+          year_month: string
+        }
+        Update: {
+          party_id?: string
+          party_type?: Database["public"]["Enums"]["settlement_party_type"]
+          settled_at?: string
+          year_month?: string
         }
         Relationships: []
       }
@@ -265,10 +298,11 @@ export type Database = {
     Enums: {
       cobrado_status: "si" | "no" | "parcial"
       currency_code: "ARS" | "USD" | "EUR"
+      editor_payment_type: "por_rate" | "mensual"
       editor_role: "primary" | "secondary"
       invoiced_status: "si" | "no" | "parcial"
       pagado_status: "pago_total" | "parcial" | "sin_pagar"
-      payment_type: "por_proyecto" | "mensual"
+      payment_type: "por_rate" | "mensual" | "por_proyecto"
       project_phase: "editando" | "por_asignar" | "terminado"
       project_status:
         | "pending"
@@ -276,6 +310,7 @@ export type Database = {
         | "revising"
         | "done"
         | "invoiced"
+      settlement_party_type: "client_cobro" | "editor_pago"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -408,10 +443,11 @@ export const Constants = {
     Enums: {
       cobrado_status: ["si", "no", "parcial"],
       currency_code: ["ARS", "USD", "EUR"],
+      editor_payment_type: ["por_rate", "mensual"],
       editor_role: ["primary", "secondary"],
       invoiced_status: ["si", "no", "parcial"],
       pagado_status: ["pago_total", "parcial", "sin_pagar"],
-      payment_type: ["por_proyecto", "mensual"],
+      payment_type: ["por_rate", "mensual", "por_proyecto"],
       project_phase: ["editando", "por_asignar", "terminado"],
       project_status: [
         "pending",
@@ -420,6 +456,7 @@ export const Constants = {
         "done",
         "invoiced",
       ],
+      settlement_party_type: ["client_cobro", "editor_pago"],
     },
   },
 } as const

@@ -3,7 +3,12 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
-import type { EditorMini } from "@/lib/projects/types";
+import { EDITOR_PAYMENT_TYPES } from "@/lib/projects/types";
+import type { EditorMini, EditorPaymentType } from "@/lib/projects/types";
+
+const editorPaymentTypeEnum = z.enum(
+  EDITOR_PAYMENT_TYPES as [EditorPaymentType, ...EditorPaymentType[]]
+);
 
 const editorInputSchema = z.object({
   name: z
@@ -19,6 +24,17 @@ const editorInputSchema = z.object({
   bank_info: z.string().nullable().default(null),
   docs_url: z
     .union([z.string().url("URL inválida"), z.literal(""), z.null()])
+    .default(null),
+  payment_type: editorPaymentTypeEnum.default("por_rate"),
+  rate: z
+    .number()
+    .nonnegative("El rate no puede ser negativo")
+    .nullable()
+    .default(null),
+  monthly_fee: z
+    .number()
+    .nonnegative("El salario mensual no puede ser negativo")
+    .nullable()
     .default(null),
   /** IDs de clientes asignados. Si está definido, se sincroniza la pivot client_editors. */
   client_ids: z.array(z.string()).optional(),
@@ -91,8 +107,12 @@ export async function createEditor(
       discord_id: normalizeText(parsed.data.discord_id),
       bank_info: normalizeText(parsed.data.bank_info),
       docs_url: normalizeText(parsed.data.docs_url),
+      payment_type: parsed.data.payment_type,
+      rate: parsed.data.payment_type === "por_rate" ? parsed.data.rate : null,
+      monthly_fee:
+        parsed.data.payment_type === "mensual" ? parsed.data.monthly_fee : null,
     })
-    .select("id, name")
+    .select("id, name, payment_type, rate, monthly_fee")
     .single();
 
   if (error) {
@@ -126,6 +146,10 @@ export async function updateEditor(
       discord_id: normalizeText(parsed.data.discord_id),
       bank_info: normalizeText(parsed.data.bank_info),
       docs_url: normalizeText(parsed.data.docs_url),
+      payment_type: parsed.data.payment_type,
+      rate: parsed.data.payment_type === "por_rate" ? parsed.data.rate : null,
+      monthly_fee:
+        parsed.data.payment_type === "mensual" ? parsed.data.monthly_fee : null,
     })
     .eq("id", id);
 

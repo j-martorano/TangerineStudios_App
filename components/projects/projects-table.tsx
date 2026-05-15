@@ -13,6 +13,7 @@ import { QuickPhaseBadge } from "./quick-phase-badge";
 import { QuickPaymentBadge } from "./quick-payment-badge";
 
 import {
+  computeCost,
   computePrice,
   computeProfit,
   formatDate,
@@ -84,7 +85,10 @@ export function ProjectsTable({ projects, editors, clients }: Props) {
                   })()}
             </TableCell>
             <TableCell className="text-right tabular-nums text-muted-foreground">
-              {formatPrice(p.cost, p.currency)}
+              {(() => {
+                const c = computeCost(p);
+                return c != null ? formatPrice(c, p.currency) : "—";
+              })()}
             </TableCell>
             <TableCell className="text-right tabular-nums">
               {(() => {

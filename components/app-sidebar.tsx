@@ -9,6 +9,7 @@ import {
   LayoutDashboardIcon,
   TableIcon,
   UsersIcon,
+  WalletIcon,
 } from "lucide-react";
 
 import {
@@ -28,6 +29,7 @@ const items = [
   { href: "/projects", label: "Proyectos", icon: TableIcon, exact: false },
   { href: "/clients", label: "Clientes", icon: UsersIcon, exact: false },
   { href: "/editors", label: "Editores", icon: FilmIcon, exact: false },
+  { href: "/finanzas", label: "Finanzas", icon: WalletIcon, exact: false },
 ];
 
 export function AppSidebar() {

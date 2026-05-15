@@ -26,6 +26,7 @@ const clientInputSchema = z.object({
   payment_type: paymentTypeEnum.default("por_proyecto"),
   balance: z.number().default(0),
   agreed_price: z.number().nonnegative().nullable().default(null),
+  monthly_fee: z.number().nonnegative().nullable().default(null),
   billing_info: z.string().nullable().default(null),
   email: z.string().email("Email inválido").nullable().or(z.literal("")).default(null),
   phone: z.string().nullable().default(null),
@@ -108,12 +109,13 @@ export async function createClient(
       payment_type: parsed.data.payment_type,
       balance: parsed.data.balance,
       agreed_price: parsed.data.agreed_price,
+      monthly_fee: parsed.data.monthly_fee,
       billing_info: parsed.data.billing_info,
       email: normalizeText(parsed.data.email),
       phone: normalizeText(parsed.data.phone),
       docs_url: normalizeUrl(parsed.data.docs_url),
     })
-    .select("id, name, color")
+    .select("id, name, color, payment_type, agreed_price, monthly_fee, balance")
     .single();
 
   if (error) {
@@ -146,6 +148,7 @@ export async function updateClient(
       payment_type: parsed.data.payment_type,
       balance: parsed.data.balance,
       agreed_price: parsed.data.agreed_price,
+      monthly_fee: parsed.data.monthly_fee,
       billing_info: parsed.data.billing_info,
       email: normalizeText(parsed.data.email),
       phone: normalizeText(parsed.data.phone),

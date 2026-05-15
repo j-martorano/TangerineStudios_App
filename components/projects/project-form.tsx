@@ -41,6 +41,7 @@ import {
   INVOICED_LABEL,
   PAGADO_LABEL,
   PHASE_LABEL,
+  computeCost,
   computePrice,
   computeProfit,
   formatPrice,
@@ -83,8 +84,8 @@ export function ProjectForm({
   const [invoiced, setInvoiced] = useState<InvoicedStatus>(
     project?.invoiced ?? "no"
   );
-  const [cost, setCost] = useState<string>(
-    project?.cost != null ? String(project.cost) : ""
+  const [manualPrice, setManualPrice] = useState<string>(
+    project?.price != null ? String(project.price) : ""
   );
   const [currency, setCurrency] = useState<CurrencyCode>(
     project?.currency ?? "ARS"
@@ -101,9 +102,6 @@ export function ProjectForm({
   const [secondaryEditorId, setSecondaryEditorId] = useState<string>(
     initialSecondary?.editor?.id ?? NO_EDITOR
   );
-  const [secondaryEditorCost, setSecondaryEditorCost] = useState<string>(
-    initialSecondary?.cost != null ? String(initialSecondary.cost) : ""
-  );
   const [pending, startTransition] = useTransition();
 
   function onSubmit(e: React.FormEvent) {
@@ -115,19 +113,10 @@ export function ProjectForm({
       return;
     }
 
-    const parsedCost = cost === "" ? null : Number(cost);
-    if (parsedCost !== null && Number.isNaN(parsedCost)) {
-      toast.error("Costo inválido");
-      return;
-    }
-
-    const parsedSecondaryCost =
-      secondaryEditorCost === "" ? null : Number(secondaryEditorCost);
-    if (
-      parsedSecondaryCost !== null &&
-      Number.isNaN(parsedSecondaryCost)
-    ) {
-      toast.error("Costo del segundo editor inválido");
+    const parsedPrice =
+      manualPrice === "" ? null : Number(manualPrice);
+    if (parsedPrice !== null && Number.isNaN(parsedPrice)) {
+      toast.error("Precio inválido");
       return;
     }
 
@@ -150,6 +139,12 @@ export function ProjectForm({
       return;
     }
 
+    // El precio sólo se guarda cuando el cliente es 'por_proyecto' (manual).
+    // Para 'por_rate' y 'mensual' se calcula on-read desde rate o monthly_fee.
+    const selectedClient = clients.find((c) => c.id === clientId) ?? null;
+    const priceToStore =
+      selectedClient?.payment_type === "por_proyecto" ? parsedPrice : null;
+
     const payload = {
       title: trimmedTitle,
       client_id: clientId,
@@ -157,13 +152,13 @@ export function ProjectForm({
       cobrado,
       pagado,
       invoiced,
-      price: null,
-      cost: parsedCost,
+      price: priceToStore,
+      cost: null,
       currency,
       duration_minutes: parsedDuration,
       primary_editor_id: primaryId,
       secondary_editor_id: secondaryId,
-      secondary_editor_cost: secondaryId ? parsedSecondaryCost : null,
+      secondary_editor_cost: null,
     };
 
     startTransition(async () => {
@@ -257,23 +252,6 @@ export function ProjectForm({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="cost">
-                Costo{" "}
-                <span className="text-xs text-muted-foreground">(pagamos)</span>
-              </Label>
-              <Input
-                id="cost"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                value={cost}
-                onChange={(e) => setCost(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
               <Label htmlFor="currency">Moneda</Label>
               <Select
                 value={currency}
@@ -293,54 +271,33 @@ export function ProjectForm({
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          {(() => {
-            const selectedClient =
-              clients.find((c) => c.id === clientId) ?? null;
-            const parsedDur =
-              durationMinutes === "" ? null : Number(durationMinutes);
-            const parsedCost = cost === "" ? null : Number(cost);
-            const preview = {
-              duration_minutes:
-                parsedDur != null && !Number.isNaN(parsedDur) ? parsedDur : null,
-              cost: parsedCost != null && !Number.isNaN(parsedCost) ? parsedCost : null,
-              client: selectedClient,
-            };
-            const computedPrice = computePrice(preview);
-            const computedProfit = computeProfit(preview);
-            const isMensual = selectedClient?.payment_type === "mensual";
-            return (
-              <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-xs">
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Precio (calc.)</span>
-                  <span className="font-medium tabular-nums">
-                    {isMensual
-                      ? "Mensual"
-                      : computedPrice != null
-                        ? formatPrice(computedPrice, currency)
-                        : "—"}
-                  </span>
+            {(() => {
+              const selectedClient =
+                clients.find((c) => c.id === clientId) ?? null;
+              if (selectedClient?.payment_type !== "por_proyecto") return null;
+              return (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="price">
+                    Precio{" "}
+                    <span className="text-xs text-muted-foreground">
+                      (manual)
+                    </span>
+                  </Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    value={manualPrice}
+                    onChange={(e) => setManualPrice(e.target.value)}
+                    placeholder="0"
+                  />
                 </div>
-                <div className="mt-1 flex justify-between gap-3">
-                  <span className="text-muted-foreground">Ganancia (calc.)</span>
-                  <span
-                    className={`font-medium tabular-nums ${
-                      computedProfit != null && computedProfit < 0
-                        ? "text-destructive"
-                        : ""
-                    }`}
-                  >
-                    {isMensual
-                      ? "—"
-                      : computedProfit != null
-                        ? formatPrice(computedProfit, currency)
-                        : "—"}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
+          </div>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -380,59 +337,113 @@ export function ProjectForm({
           </label>
 
           {hasSecondary ? (
-            <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr]">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="secondary_editor_id" className="text-xs">
-                  Editor secundario
-                </Label>
-                <Select
-                  value={secondaryEditorId}
-                  onValueChange={(v) =>
-                    setSecondaryEditorId(v ?? NO_EDITOR)
-                  }
+            <div className="mt-1 flex flex-col gap-2">
+              <Label htmlFor="secondary_editor_id" className="text-xs">
+                Editor secundario
+              </Label>
+              <Select
+                value={secondaryEditorId}
+                onValueChange={(v) => setSecondaryEditorId(v ?? NO_EDITOR)}
+              >
+                <SelectTrigger
+                  id="secondary_editor_id"
+                  className="w-full"
                 >
-                  <SelectTrigger
-                    id="secondary_editor_id"
-                    className="w-full"
-                  >
-                    <SelectValue>
-                      {(v: string | null) => {
-                        if (!v || v === NO_EDITOR) return "Sin asignar";
-                        return editorById.get(v) ?? "—";
-                      }}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_EDITOR}>Sin asignar</SelectItem>
-                    {editors
-                      .filter((ed) => ed.id !== primaryEditorId)
-                      .map((ed) => (
-                        <SelectItem key={ed.id} value={ed.id}>
-                          {ed.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="secondary_editor_cost" className="text-xs">
-                  Costo
-                </Label>
-                <Input
-                  id="secondary_editor_cost"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={secondaryEditorCost}
-                  onChange={(e) => setSecondaryEditorCost(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
+                  <SelectValue>
+                    {(v: string | null) => {
+                      if (!v || v === NO_EDITOR) return "Sin asignar";
+                      return editorById.get(v) ?? "—";
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_EDITOR}>Sin asignar</SelectItem>
+                  {editors
+                    .filter((ed) => ed.id !== primaryEditorId)
+                    .map((ed) => (
+                      <SelectItem key={ed.id} value={ed.id}>
+                        {ed.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             </div>
           ) : null}
         </div>
+
+        {/* Preview de precio / costo / ganancia con la lógica nueva. */}
+        {(() => {
+          const selectedClient =
+            clients.find((c) => c.id === clientId) ?? null;
+          const parsedDur =
+            durationMinutes === "" ? null : Number(durationMinutes);
+          const parsedPrice =
+            manualPrice === "" ? null : Number(manualPrice);
+          const primary = editors.find((ed) => ed.id === primaryEditorId) ?? null;
+          const secondary = hasSecondary
+            ? editors.find((ed) => ed.id === secondaryEditorId) ?? null
+            : null;
+          const editorEntries = [
+            primary ? { role: "primary" as const, cost: null, editor: primary } : null,
+            secondary
+              ? { role: "secondary" as const, cost: null, editor: secondary }
+              : null,
+          ].filter((e): e is NonNullable<typeof e> => e != null);
+          const preview = {
+            duration_minutes:
+              parsedDur != null && !Number.isNaN(parsedDur) ? parsedDur : null,
+            price:
+              selectedClient?.payment_type === "por_proyecto" &&
+              parsedPrice != null &&
+              !Number.isNaN(parsedPrice)
+                ? parsedPrice
+                : null,
+            client: selectedClient,
+            editors: editorEntries,
+          };
+          const computedPrice = computePrice(preview);
+          const computedCost = computeCost(preview);
+          const computedProfit = computeProfit(preview);
+          const isMensual = selectedClient?.payment_type === "mensual";
+          return (
+            <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-xs">
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Precio (calc.)</span>
+                <span className="font-medium tabular-nums">
+                  {isMensual
+                    ? "Mensual"
+                    : computedPrice != null
+                      ? formatPrice(computedPrice, currency)
+                      : "—"}
+                </span>
+              </div>
+              <div className="mt-1 flex justify-between gap-3">
+                <span className="text-muted-foreground">Costo (calc.)</span>
+                <span className="font-medium tabular-nums">
+                  {computedCost != null
+                    ? formatPrice(computedCost, currency)
+                    : "—"}
+                </span>
+              </div>
+              <div className="mt-1 flex justify-between gap-3">
+                <span className="text-muted-foreground">Ganancia (calc.)</span>
+                <span
+                  className={`font-medium tabular-nums ${
+                    computedProfit != null && computedProfit < 0
+                      ? "text-destructive"
+                      : ""
+                  }`}
+                >
+                  {isMensual
+                    ? "—"
+                    : computedProfit != null
+                      ? formatPrice(computedProfit, currency)
+                      : "—"}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="border-t pt-4">
           <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">

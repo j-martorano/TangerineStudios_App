@@ -4,44 +4,70 @@ import type {
   CurrencyCode,
   InvoicedStatus,
   PagadoStatus,
+  ProjectEditorAssignment,
   ProjectPhase,
 } from "./types";
 
-// Porcentaje que el estudio descuenta del margen para clientes mensuales.
-export const MONTHLY_FEE_RATE = 0.1;
-
 type ProjectForCalc = {
   duration_minutes: number | null;
-  cost: number | null;
+  price: number | null; // override manual; usado sólo para client.payment_type='por_proyecto'
   client: ClientMini | null;
+  editors: ProjectEditorAssignment[];
 };
 
-// Precio calculado del proyecto:
-//   - por_proyecto: client.agreed_price * duration_minutes
-//   - mensual: null (no se factura por proyecto, va por saldo mensual)
-//   - sin cliente o sin datos: null
+// Precio calculado del proyecto según el payment_type del cliente:
+//   - por_proyecto : project.price (manual)
+//   - por_rate     : client.agreed_price * duration_minutes
+//   - mensual      : null (la facturación va a nivel mes en Finanzas)
+//   - sin cliente o sin datos suficientes: null
 export function computePrice(p: ProjectForCalc): number | null {
   const client = p.client;
   if (!client) return null;
-  if (client.payment_type === "mensual") return null;
-  if (client.agreed_price == null) return null;
-  if (p.duration_minutes == null) return null;
-  return Number(client.agreed_price) * Number(p.duration_minutes);
+  if (client.payment_type === "por_proyecto") {
+    return p.price == null ? null : Number(p.price);
+  }
+  if (client.payment_type === "por_rate") {
+    if (client.agreed_price == null) return null;
+    if (p.duration_minutes == null) return null;
+    return Number(client.agreed_price) * Number(p.duration_minutes);
+  }
+  // mensual
+  return null;
+}
+
+// Costo calculado del proyecto: suma de aportes de cada editor según su
+// payment_type:
+//   - por_rate : editor.rate * duration_minutes
+//   - mensual  : 0 (salario fijo a nivel mes, no aporta al cost del proyecto)
+// Si falta duration o rate para un editor por_rate, ese editor aporta null
+// (no se suma, pero tampoco rompe el total).
+export function computeCost(p: ProjectForCalc): number | null {
+  const duration = p.duration_minutes == null ? null : Number(p.duration_minutes);
+  let total = 0;
+  let anyContribution = false;
+  for (const entry of p.editors) {
+    const editor = entry.editor;
+    if (!editor) continue;
+    if (editor.payment_type === "mensual") continue; // no aporta al proyecto
+    if (editor.rate == null || duration == null) continue;
+    total += Number(editor.rate) * duration;
+    anyContribution = true;
+  }
+  return anyContribution ? total : null;
 }
 
 // Ganancia calculada del proyecto:
-//   - por_proyecto: precio - costo
-//   - mensual: null (la facturación va por saldo mensual, no por proyecto;
-//     la ganancia real se calcula en la Pestaña Finanzas a nivel mes)
-// Retorna null si no se puede calcular (faltan datos).
+//   - por_proyecto / por_rate: precio - costo
+//   - mensual: null (la ganancia real se calcula a nivel mes en Finanzas)
+// Si falta precio o costo, retorna null.
 export function computeProfit(p: ProjectForCalc): number | null {
   const client = p.client;
   if (!client) return null;
   if (client.payment_type === "mensual") return null;
   const price = computePrice(p);
   if (price == null) return null;
-  const cost = p.cost == null ? null : Number(p.cost);
-  if (cost == null) return price;
+  const cost = computeCost(p);
+  if (cost == null) return price; // si no hay editores con rate, ganancia = precio
   return price - cost;
 }
 

@@ -50,6 +50,9 @@ export function ClientForm({
   const [agreedPrice, setAgreedPrice] = useState<string>(
     client?.agreed_price != null ? String(client.agreed_price) : ""
   );
+  const [monthlyFee, setMonthlyFee] = useState<string>(
+    client?.monthly_fee != null ? String(client.monthly_fee) : ""
+  );
   const [balance, setBalance] = useState<string>(
     client?.balance != null ? String(client.balance) : "0"
   );
@@ -72,7 +75,13 @@ export function ClientForm({
 
     const parsedPrice = agreedPrice === "" ? null : Number(agreedPrice);
     if (parsedPrice !== null && Number.isNaN(parsedPrice)) {
-      toast.error("Precio acordado inválido");
+      toast.error("Rate inválido");
+      return;
+    }
+
+    const parsedMonthly = monthlyFee === "" ? null : Number(monthlyFee);
+    if (parsedMonthly !== null && Number.isNaN(parsedMonthly)) {
+      toast.error("Monto mensual inválido");
       return;
     }
 
@@ -87,7 +96,8 @@ export function ClientForm({
       color,
       payment_type: paymentType,
       balance: parsedBalance,
-      agreed_price: parsedPrice,
+      agreed_price: paymentType === "por_rate" ? parsedPrice : null,
+      monthly_fee: paymentType === "mensual" ? parsedMonthly : null,
       billing_info: billingInfo.trim() || null,
       email: email.trim() || null,
       phone: phone.trim() || null,
@@ -157,7 +167,10 @@ export function ClientForm({
         </Field>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Tipo de pago">
+          <Field
+            label="Tipo de pago"
+            hint="Define cómo se calcula el precio de cada proyecto."
+          >
             <Select
               value={paymentType}
               onValueChange={(v) => v && setPaymentType(v as PaymentType)}
@@ -179,17 +192,44 @@ export function ClientForm({
             </Select>
           </Field>
 
-          <Field label="Precio acordado">
-            <Input
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              value={agreedPrice}
-              onChange={(e) => setAgreedPrice(e.target.value)}
-              placeholder="0"
-            />
-          </Field>
+          {paymentType === "por_rate" ? (
+            <Field
+              label="Rate por minuto"
+              hint="Lo que cobramos por minuto de video editado."
+            >
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={agreedPrice}
+                onChange={(e) => setAgreedPrice(e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+          ) : paymentType === "mensual" ? (
+            <Field
+              label="Monto mensual"
+              hint="Lo que factura este cliente por mes (se ve en Finanzas)."
+            >
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={monthlyFee}
+                onChange={(e) => setMonthlyFee(e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+          ) : (
+            <Field
+              label="Precio por proyecto"
+              hint="Se carga manualmente en cada proyecto al crearlo."
+            >
+              <Input disabled placeholder="Manual al crear el proyecto" />
+            </Field>
+          )}
         </div>
 
         {paymentType === "mensual" ? (
