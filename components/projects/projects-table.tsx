@@ -20,6 +20,7 @@ import {
   formatDuration,
   formatPrice,
 } from "@/lib/projects/format";
+import { monthTone } from "@/lib/projects/month-colors";
 import {
   getPrimaryEditor,
   getSecondaryEditor,
@@ -49,6 +50,7 @@ export function ProjectsTable({ projects, editors, clients }: Props) {
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead className="w-1 p-0" />
           <TableHead className="w-32">Código</TableHead>
           <TableHead>Título</TableHead>
           <TableHead>Cliente</TableHead>
@@ -66,13 +68,35 @@ export function ProjectsTable({ projects, editors, clients }: Props) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {projects.map((p) => (
-          <TableRow key={p.id}>
+        {projects.map((p) => {
+          const tone = monthTone(p.created_at);
+          return (
+          <TableRow
+            key={p.id}
+            style={{ backgroundColor: tone.tint }}
+          >
+            <TableCell
+              className="w-1 p-0"
+              style={{ backgroundColor: tone.solid }}
+              aria-label="Color del mes"
+            />
             <TableCell className="font-mono text-xs text-muted-foreground">
               {p.project_code}
             </TableCell>
             <TableCell className="font-medium">{p.title}</TableCell>
-            <TableCell>{p.client?.name ?? p.client_name ?? "—"}</TableCell>
+            <TableCell>
+              {p.client ? (
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: p.client.color }}
+                  />
+                  {p.client.name}
+                </span>
+              ) : (
+                p.client_name ?? "—"
+              )}
+            </TableCell>
             <TableCell>
               <QuickPhaseBadge id={p.id} phase={p.phase} />
             </TableCell>
@@ -138,7 +162,8 @@ export function ProjectsTable({ projects, editors, clients }: Props) {
               </div>
             </TableCell>
           </TableRow>
-        ))}
+        );
+        })}
       </TableBody>
     </Table>
   );

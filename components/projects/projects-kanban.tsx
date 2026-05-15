@@ -423,9 +423,17 @@ function CardView({
         </h3>
       </div>
       <CardContent className="flex flex-col gap-1 text-xs text-muted-foreground">
-        <span className="truncate">
-          {project.client?.name ?? project.client_name ?? "—"}
-        </span>
+        {project.client ? (
+          <span className="inline-flex items-center gap-1.5 truncate">
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: project.client.color }}
+            />
+            <span className="truncate">{project.client.name}</span>
+          </span>
+        ) : (
+          <span className="truncate">{project.client_name ?? "—"}</span>
+        )}
         <div className="flex items-center justify-between gap-2 pt-1 text-foreground">
           <span className="tabular-nums">
             {project.client?.payment_type === "mensual"

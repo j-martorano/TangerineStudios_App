@@ -7,6 +7,7 @@ import {
   computeProfit,
   formatPrice,
 } from "@/lib/projects/format";
+import { monthToneFromKey } from "@/lib/projects/month-colors";
 import type {
   CurrencyCode,
   ProjectWithRelations,
@@ -566,8 +567,17 @@ function ProjectList({
 }
 
 function MonthCard({ bucket }: { bucket: MonthBucket }) {
+  const tone = monthToneFromKey(bucket.key);
   return (
-    <Card>
+    <Card
+      className="relative overflow-hidden"
+      style={{ backgroundColor: tone.tint }}
+    >
+      <span
+        aria-hidden
+        className="absolute inset-y-0 left-0 w-1"
+        style={{ backgroundColor: tone.solid }}
+      />
       <CardHeader className="flex flex-row items-baseline justify-between gap-2 border-b pb-3">
         <CardTitle className="capitalize">{bucket.label}</CardTitle>
         <span className="text-xs text-muted-foreground">
