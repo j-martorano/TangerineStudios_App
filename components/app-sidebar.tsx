@@ -3,10 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTransition } from "react";
+import { toast } from "sonner";
 import {
   ColumnsIcon,
   FilmIcon,
   LayoutDashboardIcon,
+  LogOutIcon,
   TableIcon,
   UsersIcon,
   WalletIcon,
@@ -15,6 +18,7 @@ import {
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -22,6 +26,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+
+import { signOut } from "@/lib/auth/actions";
 
 const items = [
   { href: "/", label: "Dashboard", icon: LayoutDashboardIcon, exact: true },
@@ -34,6 +40,17 @@ const items = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const [pending, startTransition] = useTransition();
+
+  function handleLogout() {
+    startTransition(async () => {
+      try {
+        await signOut();
+      } catch {
+        toast.error("No se pudo cerrar sesión");
+      }
+    });
+  }
 
   return (
     <Sidebar collapsible="icon">
@@ -88,6 +105,20 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={handleLogout}
+              disabled={pending}
+              tooltip="Cerrar sesión"
+            >
+              <LogOutIcon />
+              <span>{pending ? "Saliendo…" : "Cerrar sesión"}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   );
 }
