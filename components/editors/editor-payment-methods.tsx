@@ -97,7 +97,7 @@ export function EditorPaymentMethods({ catalog, value, onChange }: Props) {
     });
   }
 
-  function handleDeleteFromCatalog(method: PaymentMethod) {
+  function deleteFromCatalog(method: PaymentMethod) {
     startTransition(async () => {
       const result = await deletePaymentMethod(method.id);
       if (result.ok) {
@@ -108,6 +108,21 @@ export function EditorPaymentMethods({ catalog, value, onChange }: Props) {
       } else {
         toast.error(result.error);
       }
+    });
+  }
+
+  // Borrar un método del catálogo afecta a TODOS los editores que lo tengan
+  // asignado, así que pedimos confirmación antes.
+  function confirmDeleteFromCatalog(method: PaymentMethod) {
+    toast.warning(`¿Eliminar «${method.name}» permanentemente?`, {
+      description:
+        "Se borra del catálogo y de todos los editores que lo tengan asignado.",
+      duration: 10000,
+      action: {
+        label: "Eliminar",
+        onClick: () => deleteFromCatalog(method),
+      },
+      cancel: { label: "Cancelar", onClick: () => {} },
     });
   }
 
@@ -195,7 +210,7 @@ export function EditorPaymentMethods({ catalog, value, onChange }: Props) {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            handleDeleteFromCatalog(method);
+                            confirmDeleteFromCatalog(method);
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
                           className="rounded p-0.5 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"

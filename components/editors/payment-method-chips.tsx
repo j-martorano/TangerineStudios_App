@@ -38,15 +38,20 @@ export function PaymentMethodChips({
           key={method.method_id}
           type="button"
           onClick={() => copy(method)}
-          title={
+          aria-label={
             method.info
               ? `Copiar info de ${method.name}`
               : `${method.name} — sin info guardada`
           }
-          className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs transition-colors hover:bg-secondary/70"
+          title={
+            method.info
+              ? `Clickeá para copiar la info de ${method.name}`
+              : `${method.name} — sin info guardada`
+          }
+          className="group/chip inline-flex cursor-pointer items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs ring-1 ring-border transition-colors hover:bg-primary/15 hover:text-foreground hover:ring-primary/50 active:scale-95"
         >
           {method.name}
-          <CopyIcon className="size-3 opacity-60" />
+          <CopyIcon className="size-3 opacity-50 transition-opacity group-hover/chip:opacity-100" />
         </button>
       ))}
     </div>
