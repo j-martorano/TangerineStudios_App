@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import {
+  ArchiveIcon,
+  CheckCircle2Icon,
   MoreVerticalIcon,
   PencilIcon,
-  Trash2Icon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -33,7 +34,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { ProjectForm } from "./project-form";
-import { deleteProject } from "@/lib/projects/actions";
+import {
+  setProjectArchived,
+  setProjectFinalized,
+} from "@/lib/projects/actions";
 import type {
   ClientMini,
   EditorMini,
@@ -48,15 +52,26 @@ type Props = {
 
 export function KanbanCardActions({ project, editors, clients }: Props) {
   const [editOpen, setEditOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  function handleDelete() {
+  function handleArchive() {
     startTransition(async () => {
-      const result = await deleteProject(project.id);
+      const result = await setProjectArchived(project.id, true);
       if (result.ok) {
-        toast.success(`Proyecto «${project.title}» eliminado`);
-        setDeleteOpen(false);
+        toast.success(`«${project.title}» archivado`);
+        setArchiveOpen(false);
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function handleFinalize() {
+    startTransition(async () => {
+      const result = await setProjectFinalized(project.id, true);
+      if (result.ok) {
+        toast.success(`«${project.title}» finalizado`);
       } else {
         toast.error(result.error);
       }
@@ -89,11 +104,19 @@ export function KanbanCardActions({ project, editors, clients }: Props) {
             <span>Editar</span>
           </DropdownMenuItem>
           <DropdownMenuItem
-            onClick={() => setDeleteOpen(true)}
-            className="cursor-pointer text-destructive focus:bg-destructive/20 focus:text-destructive"
+            onClick={handleFinalize}
+            disabled={pending}
+            className="cursor-pointer text-emerald-500 focus:bg-emerald-500/15 focus:text-emerald-500"
           >
-            <Trash2Icon className="size-4" />
-            <span>Eliminar</span>
+            <CheckCircle2Icon className="size-4" />
+            <span>Finalizar</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => setArchiveOpen(true)}
+            className="cursor-pointer"
+          >
+            <ArchiveIcon className="size-4" />
+            <span>Archivar</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -113,23 +136,20 @@ export function KanbanCardActions({ project, editors, clients }: Props) {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar «{project.title}»</AlertDialogTitle>
+            <AlertDialogTitle>Archivar «{project.title}»</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. El proyecto se borra
-              definitivamente.
+              El proyecto sale de las vistas activas pero queda en el registro.
+              Lo podés ver y desarchivar desde Proyectos con el filtro
+              «Mostrar archivados».
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={pending}
-            >
-              {pending ? "Eliminando…" : "Eliminar"}
+            <AlertDialogAction onClick={handleArchive} disabled={pending}>
+              {pending ? "Archivando…" : "Archivar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

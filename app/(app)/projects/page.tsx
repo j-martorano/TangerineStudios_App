@@ -11,7 +11,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ q?: string; year?: string }>;
+type SearchParams = Promise<{ q?: string; year?: string; archived?: string }>;
 
 function projectYear(iso: string | null | undefined): number {
   if (!iso) return 0;
@@ -25,9 +25,10 @@ export default async function ProjectsPage({
 }) {
   const params = await searchParams;
   const query = params.q?.trim() || undefined;
+  const showArchived = params.archived === "1";
 
   const [projects, editors, clients] = await Promise.all([
-    fetchProjects({ query }),
+    fetchProjects({ query, includeArchived: showArchived }),
     fetchEditors(),
     fetchClients(),
   ]);
@@ -53,8 +54,19 @@ export default async function ProjectsPage({
     const sp = new URLSearchParams();
     sp.set("year", String(year));
     if (query) sp.set("q", query);
+    if (showArchived) sp.set("archived", "1");
     return `/projects?${sp.toString()}`;
   }
+
+  function archivedToggleHref(): string {
+    const sp = new URLSearchParams();
+    if (query) sp.set("q", query);
+    if (!showArchived) sp.set("archived", "1");
+    const qs = sp.toString();
+    return qs ? `/projects?${qs}` : "/projects";
+  }
+
+  const archivedCount = projects.filter((p) => p.archived).length;
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 md:p-8">
@@ -70,6 +82,18 @@ export default async function ProjectsPage({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <DataSearch placeholder="Buscar por título o cliente…" />
+        <Link
+          href={archivedToggleHref()}
+          className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+            showArchived
+              ? "border-border bg-accent text-foreground"
+              : "border-border text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+          }`}
+        >
+          {showArchived
+            ? "Ocultar archivados"
+            : `Mostrar archivados${archivedCount > 0 ? ` (${archivedCount})` : ""}`}
+        </Link>
       </div>
 
       {years.length > 0 ? (

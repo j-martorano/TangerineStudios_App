@@ -10,6 +10,7 @@ import {
   computeCost,
   computePrice,
   computeProfit,
+  formatDuration,
   formatPrice,
 } from "@/lib/projects/format";
 import { monthToneFromKey } from "@/lib/projects/month-colors";
@@ -108,8 +109,12 @@ function build(
   }
 
   for (const p of projects) {
-    const key = monthKey(p.created_at);
-    const bucket = ensureBucket(key, p.created_at);
+    // Un proyecto entra a Finanzas sólo cuando está finalizado, y lo hace en
+    // el mes en que se finalizó (finalized_at).
+    if (!p.finalized) continue;
+    const monthIso = p.finalized_at ?? p.created_at;
+    const key = monthKey(monthIso);
+    const bucket = ensureBucket(key, monthIso);
     bucket.projects.push(p);
 
     const client = p.client;
@@ -551,6 +556,51 @@ function MonthCard({ bucket }: { bucket: MonthBucket }) {
             tone={bucket.profit < 0 ? undefined : "positive"}
           />
         </div>
+
+        {bucket.projects.length > 0 ? (
+          <div className="mt-4 border-t pt-3">
+            <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Recap — videos finalizados
+            </h4>
+            <div className="flex flex-col divide-y divide-border/40">
+              {bucket.projects.map((p) => {
+                const price = computePrice(p);
+                const profit = computeProfit(p);
+                return (
+                  <div
+                    key={p.id}
+                    className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-1.5 text-xs"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                        {p.project_code}
+                      </span>
+                      <span className="truncate font-medium">{p.title}</span>
+                      <span className="truncate text-muted-foreground">
+                        {p.client?.name ?? p.client_name ?? "Sin cliente"}
+                      </span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3 tabular-nums">
+                      <span className="text-muted-foreground">
+                        {formatDuration(p.duration_minutes)}
+                      </span>
+                      <span>{price != null ? formatPrice(price) : "—"}</span>
+                      <span
+                        className={
+                          profit != null && profit < 0
+                            ? "text-destructive"
+                            : "text-emerald-500"
+                        }
+                      >
+                        {profit != null ? formatPrice(profit) : "—"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

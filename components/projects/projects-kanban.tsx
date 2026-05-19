@@ -59,6 +59,33 @@ function clientTint(hex: string | null | undefined): string | undefined {
   return `${hex}1f`; // hex de 8 dígitos: #RRGGBB + alpha 0x1f
 }
 
+const MONTH_NAMES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
+
+function monthKey(iso: string | null | undefined): string {
+  if (!iso) return "0000-00";
+  const d = new Date(iso);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(key: string): string {
+  const [year, month] = key.split("-");
+  const name = MONTH_NAMES[Number(month) - 1] ?? "Sin fecha";
+  return year === "0000" ? "Sin fecha" : `${name} ${year}`;
+}
+
 type ColumnsMap = Record<ProjectPhase, ProjectWithRelations[]>;
 
 function buildColumns(projects: ProjectWithRelations[]): ColumnsMap {
@@ -88,8 +115,78 @@ export function ProjectsKanban(props: Props) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  if (!mounted) return <StaticKanban {...props} />;
-  return <InteractiveKanban {...props} />;
+  // Filtro por mes (created_at). "all" = todos.
+  const [month, setMonth] = useState<string>("all");
+
+  const months = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of props.projects) set.add(monthKey(p.created_at));
+    return [...set].sort((a, b) => b.localeCompare(a));
+  }, [props.projects]);
+
+  const filtered = useMemo(
+    () =>
+      month === "all"
+        ? props.projects
+        : props.projects.filter((p) => monthKey(p.created_at) === month),
+    [props.projects, month]
+  );
+
+  const boardProps = {
+    projects: filtered,
+    editors: props.editors,
+    clients: props.clients,
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {months.length > 1 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <MonthTab active={month === "all"} onClick={() => setMonth("all")}>
+            Todos
+          </MonthTab>
+          {months.map((m) => (
+            <MonthTab
+              key={m}
+              active={month === m}
+              onClick={() => setMonth(m)}
+            >
+              {monthLabel(m)}
+            </MonthTab>
+          ))}
+        </div>
+      ) : null}
+      {mounted ? (
+        <InteractiveKanban {...boardProps} />
+      ) : (
+        <StaticKanban {...boardProps} />
+      )}
+    </div>
+  );
+}
+
+function MonthTab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+        active
+          ? "border-border bg-accent text-foreground"
+          : "border-border/60 text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
+  );
 }
 
 function StaticKanban({ projects, editors, clients }: Props) {

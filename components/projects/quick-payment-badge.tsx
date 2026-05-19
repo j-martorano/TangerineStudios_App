@@ -36,10 +36,14 @@ import type {
   PagadoStatus,
 } from "@/lib/projects/types";
 
-type Props =
+type Props = (
   | { kind: "cobrado"; id: string; value: CobradoStatus }
   | { kind: "pagado"; id: string; value: PagadoStatus }
-  | { kind: "invoiced"; id: string; value: InvoicedStatus };
+  | { kind: "invoiced"; id: string; value: InvoicedStatus }
+) & {
+  /** Proyecto finalizado: el estado queda bloqueado (badge no interactivo). */
+  disabled?: boolean;
+};
 
 type Config = {
   options: readonly string[];
@@ -83,6 +87,14 @@ export function QuickPaymentBadge(props: Props) {
   const [pending, startTransition] = useTransition();
 
   const current = optimistic ?? props.value;
+
+  if (props.disabled) {
+    return (
+      <Badge variant="secondary" className={cfg.classes[current]}>
+        {cfg.labels[current]}
+      </Badge>
+    );
+  }
 
   function handleChange(next: string) {
     if (next === current) return;

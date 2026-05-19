@@ -24,6 +24,8 @@ type Props = {
   editors: EditorMini[];
   clients: ClientMini[];
   variant?: "icon" | "ghost-icon";
+  /** Si el proyecto está finalizado, la edición queda bloqueada. */
+  disabled?: boolean;
 };
 
 export function EditProjectButton({
@@ -31,6 +33,7 @@ export function EditProjectButton({
   editors,
   clients,
   variant = "icon",
+  disabled = false,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -41,8 +44,13 @@ export function EditProjectButton({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Editar proyecto"
+            aria-label={
+              disabled
+                ? "Edición bloqueada — proyecto finalizado"
+                : "Editar proyecto"
+            }
             type="button"
+            disabled={disabled}
             className={
               variant === "ghost-icon"
                 ? "text-muted-foreground hover:text-foreground"

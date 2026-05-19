@@ -20,13 +20,23 @@ import { PHASE_CLASS, PHASE_LABEL } from "@/lib/projects/format";
 type Props = {
   id: string;
   phase: ProjectPhase;
+  /** Proyecto finalizado: la fase queda bloqueada (badge no interactivo). */
+  disabled?: boolean;
 };
 
-export function QuickPhaseBadge({ id, phase }: Props) {
+export function QuickPhaseBadge({ id, phase, disabled = false }: Props) {
   const [optimistic, setOptimistic] = useState<ProjectPhase | null>(null);
   const [pending, startTransition] = useTransition();
 
   const current = optimistic ?? phase;
+
+  if (disabled) {
+    return (
+      <Badge variant="secondary" className={PHASE_CLASS[current]}>
+        {PHASE_LABEL[current]}
+      </Badge>
+    );
+  }
 
   function handleChange(next: ProjectPhase) {
     if (next === current) return;

@@ -331,12 +331,16 @@ export type Database = {
       }
       projects: {
         Row: {
+          archived: boolean
+          archived_at: string | null
           client_id: string | null
           client_name: string | null
           cobrado: Database["public"]["Enums"]["cobrado_status"]
           cost: number | null
           created_at: string
           duration_minutes: number | null
+          finalized: boolean
+          finalized_at: string | null
           id: string
           invoiced: Database["public"]["Enums"]["invoiced_status"]
           pagado: Database["public"]["Enums"]["pagado_status"]
@@ -349,12 +353,16 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived?: boolean
+          archived_at?: string | null
           client_id?: string | null
           client_name?: string | null
           cobrado?: Database["public"]["Enums"]["cobrado_status"]
           cost?: number | null
           created_at?: string
           duration_minutes?: number | null
+          finalized?: boolean
+          finalized_at?: string | null
           id?: string
           invoiced?: Database["public"]["Enums"]["invoiced_status"]
           pagado?: Database["public"]["Enums"]["pagado_status"]
@@ -367,12 +375,16 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived?: boolean
+          archived_at?: string | null
           client_id?: string | null
           client_name?: string | null
           cobrado?: Database["public"]["Enums"]["cobrado_status"]
           cost?: number | null
           created_at?: string
           duration_minutes?: number | null
+          finalized?: boolean
+          finalized_at?: string | null
           id?: string
           invoiced?: Database["public"]["Enums"]["invoiced_status"]
           pagado?: Database["public"]["Enums"]["pagado_status"]

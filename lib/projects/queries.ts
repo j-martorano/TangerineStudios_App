@@ -6,18 +6,28 @@ import type {
 } from "./types";
 
 const PROJECT_SELECT =
-  "id, project_code, title, client_name, phase, cobrado, pagado, invoiced, status, price, cost, duration_minutes, position, created_at, updated_at, client_id, client:clients(id, name, color, payment_type, agreed_price, monthly_fee, balance), editors:project_editors(role, cost, editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))";
+  "id, project_code, title, client_name, phase, cobrado, pagado, invoiced, status, price, cost, duration_minutes, position, finalized, finalized_at, archived, archived_at, created_at, updated_at, client_id, client:clients(id, name, color, payment_type, agreed_price, monthly_fee, balance), editors:project_editors(role, cost, editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))";
 
 export const DEFAULT_PER_PAGE = 20;
 
 export async function fetchProjects(
-  opts: { query?: string } = {}
+  opts: {
+    query?: string;
+    /** Incluir proyectos archivados (borrado lógico). Por defecto se ocultan. */
+    includeArchived?: boolean;
+    /** Incluir proyectos finalizados. Por defecto sí (el kanban los excluye). */
+    includeFinalized?: boolean;
+  } = {}
 ): Promise<ProjectWithRelations[]> {
+  const { query, includeArchived = false, includeFinalized = true } = opts;
   const supabase = await createClient();
   let q = supabase.from("projects").select(PROJECT_SELECT);
 
-  if (opts.query && opts.query.length > 0) {
-    const safe = opts.query.replace(/[(),]/g, " ").trim();
+  if (!includeArchived) q = q.eq("archived", false);
+  if (!includeFinalized) q = q.eq("finalized", false);
+
+  if (query && query.length > 0) {
+    const safe = query.replace(/[(),]/g, " ").trim();
     if (safe.length > 0) {
       q = q.or(
         `title.ilike.%${safe}%,client_name.ilike.%${safe}%,project_code.ilike.%${safe}%`

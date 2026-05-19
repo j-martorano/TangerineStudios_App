@@ -99,6 +99,7 @@ function revalidateAll() {
   revalidatePath("/");
   revalidatePath("/kanban");
   revalidatePath("/projects");
+  revalidatePath("/finanzas");
   revalidatePath("/clients");
   revalidatePath("/editors");
 }
@@ -308,9 +309,49 @@ export async function changeInvoiced(
   return { ok: true };
 }
 
-export async function deleteProject(id: string): Promise<ActionResult> {
+/**
+ * Archiva o desarchiva un proyecto (borrado lógico). Los proyectos nunca se
+ * borran de verdad: archivar los saca de las vistas activas pero quedan en el
+ * registro.
+ */
+export async function setProjectArchived(
+  id: string,
+  archived: boolean
+): Promise<ActionResult> {
+  if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
+
   const supabase = await createClient();
-  const { error } = await supabase.from("projects").delete().eq("id", id);
+  const { error } = await supabase
+    .from("projects")
+    .update({
+      archived,
+      archived_at: archived ? new Date().toISOString() : null,
+    })
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true };
+}
+
+/**
+ * Marca un proyecto como finalizado (o lo reabre). Al finalizarlo se guarda
+ * `finalized_at`: ese es el mes en el que el proyecto entra a Finanzas.
+ */
+export async function setProjectFinalized(
+  id: string,
+  finalized: boolean
+): Promise<ActionResult> {
+  if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("projects")
+    .update({
+      finalized,
+      finalized_at: finalized ? new Date().toISOString() : null,
+    })
+    .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
   revalidateAll();

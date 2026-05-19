@@ -20,7 +20,7 @@ export default async function KanbanPage({
   const query = params.q?.trim() || undefined;
 
   const [projects, editors, clients] = await Promise.all([
-    fetchProjects({ query }),
+    fetchProjects({ query, includeFinalized: false }),
     fetchEditors(),
     fetchClients(),
   ]);
