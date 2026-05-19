@@ -20,6 +20,10 @@ import {
   EditorPaymentMethods,
   type EditorMethodValue,
 } from "./editor-payment-methods";
+import {
+  EditorTiersEditor,
+  type TierDraft,
+} from "./editor-tiers-editor";
 
 import { createEditor, updateEditor } from "@/lib/editors/actions";
 import { createClient } from "@/lib/clients/actions";
@@ -31,6 +35,7 @@ import type {
   ClientMini,
   EditorPaymentType,
   EditorRow,
+  PaymentTier,
 } from "@/lib/projects/types";
 import type {
   EditorPaymentMethod,
@@ -42,6 +47,7 @@ type Props = {
   editor?: EditorRow & {
     clients?: ClientMini[];
     payment_methods?: EditorPaymentMethod[];
+    tiers?: PaymentTier[];
   };
   availableClients: ClientMini[];
   paymentMethodsCatalog: PaymentMethod[];
@@ -69,13 +75,21 @@ export function EditorForm({
   );
   const [docsUrl, setDocsUrl] = useState(editor?.docs_url ?? "");
   const [paymentType, setPaymentType] = useState<EditorPaymentType>(
-    editor?.payment_type ?? "por_rate"
+    editor?.payment_type ?? "por_minuto"
   );
   const [rate, setRate] = useState<string>(
     editor?.rate != null ? String(editor.rate) : ""
   );
-  const [monthlyFee, setMonthlyFee] = useState<string>(
-    editor?.monthly_fee != null ? String(editor.monthly_fee) : ""
+  const [flatAmount, setFlatAmount] = useState<string>(
+    editor?.flat_amount != null ? String(editor.flat_amount) : ""
+  );
+  const [tiers, setTiers] = useState<TierDraft[]>(
+    () =>
+      editor?.tiers?.map((t) => ({
+        min: String(t.min_minutes),
+        max: String(t.max_minutes),
+        amount: String(t.amount),
+      })) ?? []
   );
   const [clientIds, setClientIds] = useState<string[]>(
     editor?.clients?.map((c) => c.id) ?? []
@@ -92,13 +106,45 @@ export function EditorForm({
 
     const parsedRate = rate === "" ? null : Number(rate);
     if (parsedRate !== null && Number.isNaN(parsedRate)) {
-      toast.error("Rate inválido");
+      toast.error("Rate por minuto inválido");
       return;
     }
-    const parsedMonthly = monthlyFee === "" ? null : Number(monthlyFee);
-    if (parsedMonthly !== null && Number.isNaN(parsedMonthly)) {
-      toast.error("Salario mensual inválido");
+    const parsedFlat = flatAmount === "" ? null : Number(flatAmount);
+    if (parsedFlat !== null && Number.isNaN(parsedFlat)) {
+      toast.error("Monto FLAT inválido");
       return;
+    }
+
+    let parsedTiers:
+      | { min_minutes: number; max_minutes: number; amount: number }[]
+      | undefined;
+    if (paymentType === "flat_variable") {
+      if (tiers.length === 0) {
+        toast.error("Agregá al menos un tramo de minutos");
+        return;
+      }
+      parsedTiers = [];
+      for (const t of tiers) {
+        const min = Number(t.min);
+        const max = Number(t.max);
+        const amount = Number(t.amount);
+        if (
+          t.min === "" ||
+          t.max === "" ||
+          t.amount === "" ||
+          Number.isNaN(min) ||
+          Number.isNaN(max) ||
+          Number.isNaN(amount)
+        ) {
+          toast.error("Completá todos los campos de cada tramo");
+          return;
+        }
+        if (max <= min) {
+          toast.error("En cada tramo, «Hasta» debe ser mayor que «Desde»");
+          return;
+        }
+        parsedTiers.push({ min_minutes: min, max_minutes: max, amount });
+      }
     }
 
     const payload = {
@@ -108,8 +154,9 @@ export function EditorForm({
       discord_id: discordId.trim() || null,
       docs_url: docsUrl.trim() || null,
       payment_type: paymentType,
-      rate: paymentType === "por_rate" ? parsedRate : null,
-      monthly_fee: paymentType === "mensual" ? parsedMonthly : null,
+      rate: paymentType === "por_minuto" ? parsedRate : null,
+      flat_amount: paymentType === "flat" ? parsedFlat : null,
+      tiers: parsedTiers,
       client_ids: clientIds,
       payment_methods: methods.map((m) => ({
         method_id: m.method_id,
@@ -178,66 +225,73 @@ export function EditorForm({
           />
         </Field>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field
-            label="Tipo de pago"
-            hint="Define cómo se calcula su costo en los proyectos."
+        <Field
+          label="Tipo de pago"
+          hint="Define cómo se calcula su costo en los proyectos."
+        >
+          <Select
+            value={paymentType}
+            onValueChange={(v) => v && setPaymentType(v as EditorPaymentType)}
           >
-            <Select
-              value={paymentType}
-              onValueChange={(v) =>
-                v && setPaymentType(v as EditorPaymentType)
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue>
-                  {(v: string | null) =>
-                    v ? EDITOR_PAYMENT_TYPE_LABEL[v as EditorPaymentType] : ""
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {EDITOR_PAYMENT_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {EDITOR_PAYMENT_TYPE_LABEL[t]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                {(v: string | null) =>
+                  v ? EDITOR_PAYMENT_TYPE_LABEL[v as EditorPaymentType] : ""
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {EDITOR_PAYMENT_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {EDITOR_PAYMENT_TYPE_LABEL[t]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
 
-          {paymentType === "por_rate" ? (
-            <Field
-              label="Rate"
-              hint="Precio por minuto de video editado."
-            >
-              <Input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                value={rate}
-                onChange={(e) => setRate(e.target.value)}
-                placeholder="0"
-              />
-            </Field>
-          ) : (
-            <Field
-              label="Salario mensual"
-              hint="Monto fijo mensual (no aporta al costo individual de los proyectos)."
-            >
-              <Input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                value={monthlyFee}
-                onChange={(e) => setMonthlyFee(e.target.value)}
-                placeholder="0"
-              />
-            </Field>
-          )}
-        </div>
+        {paymentType === "por_minuto" ? (
+          <Field
+            label="Rate por minuto"
+            hint="Monto en USD por cada minuto final de video. Costo = rate × duración."
+          >
+            <Input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.01"
+              value={rate}
+              onChange={(e) => setRate(e.target.value)}
+              placeholder="0"
+            />
+          </Field>
+        ) : null}
+
+        {paymentType === "flat" ? (
+          <Field
+            label="Monto FLAT"
+            hint="Monto fijo en USD por proyecto, sin importar la duración del video."
+          >
+            <Input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.01"
+              value={flatAmount}
+              onChange={(e) => setFlatAmount(e.target.value)}
+              placeholder="0"
+            />
+          </Field>
+        ) : null}
+
+        {paymentType === "flat_variable" ? (
+          <Field
+            label="Tramos de minutos"
+            hint="Cada tramo paga un monto fijo. El video toma el tramo en el que cae su duración (el inicio del rango se incluye); si queda fuera de todos, usa el más cercano."
+          >
+            <EditorTiersEditor value={tiers} onChange={setTiers} />
+          </Field>
+        ) : null}
 
         <Field
           label="Clientes asignados"

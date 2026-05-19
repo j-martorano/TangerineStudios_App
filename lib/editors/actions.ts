@@ -24,17 +24,37 @@ const editorInputSchema = z.object({
   docs_url: z
     .union([z.string().url("URL inválida"), z.literal(""), z.null()])
     .default(null),
-  payment_type: editorPaymentTypeEnum.default("por_rate"),
+  payment_type: editorPaymentTypeEnum.default("por_minuto"),
   rate: z
     .number()
-    .nonnegative("El rate no puede ser negativo")
+    .nonnegative("El rate por minuto no puede ser negativo")
     .nullable()
     .default(null),
-  monthly_fee: z
+  flat_amount: z
     .number()
-    .nonnegative("El salario mensual no puede ser negativo")
+    .nonnegative("El monto FLAT no puede ser negativo")
     .nullable()
     .default(null),
+  /** Tramos de FLAT variable. Si está definido, se sincroniza la tabla. */
+  tiers: z
+    .array(
+      z
+        .object({
+          min_minutes: z
+            .number()
+            .nonnegative("Los minutos no pueden ser negativos"),
+          max_minutes: z
+            .number()
+            .positive("El máximo de minutos debe ser mayor a 0"),
+          amount: z
+            .number()
+            .nonnegative("El monto del tramo no puede ser negativo"),
+        })
+        .refine((t) => t.max_minutes > t.min_minutes, {
+          message: "En cada tramo el máximo debe ser mayor al mínimo",
+        })
+    )
+    .optional(),
   /** IDs de clientes asignados. Si está definido, se sincroniza la pivot client_editors. */
   client_ids: z.array(z.string()).optional(),
   /** Métodos de pago del editor + info. Si está definido, se sincroniza la pivot. */
@@ -128,6 +148,38 @@ async function syncEditorPaymentMethods(
   return { ok: true };
 }
 
+async function syncEditorPaymentTiers(
+  editorId: string,
+  tiers:
+    | { min_minutes: number; max_minutes: number; amount: number }[]
+    | undefined
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (tiers === undefined) return { ok: true };
+  const supabase = await createSupabaseClient();
+
+  const { error: delErr } = await supabase
+    .from("editor_payment_tiers")
+    .delete()
+    .eq("editor_id", editorId);
+  if (delErr) return { ok: false, error: delErr.message };
+
+  if (tiers.length === 0) return { ok: true };
+
+  const { error: insErr } = await supabase
+    .from("editor_payment_tiers")
+    .insert(
+      tiers.map((t) => ({
+        editor_id: editorId,
+        min_minutes: t.min_minutes,
+        max_minutes: t.max_minutes,
+        amount: t.amount,
+      }))
+    );
+  if (insErr) return { ok: false, error: insErr.message };
+
+  return { ok: true };
+}
+
 export async function createEditor(
   input: EditorInput
 ): Promise<EditorCreateResult> {
@@ -144,11 +196,12 @@ export async function createEditor(
       discord_id: normalizeText(parsed.data.discord_id),
       docs_url: normalizeText(parsed.data.docs_url),
       payment_type: parsed.data.payment_type,
-      rate: parsed.data.payment_type === "por_rate" ? parsed.data.rate : null,
-      monthly_fee:
-        parsed.data.payment_type === "mensual" ? parsed.data.monthly_fee : null,
+      rate:
+        parsed.data.payment_type === "por_minuto" ? parsed.data.rate : null,
+      flat_amount:
+        parsed.data.payment_type === "flat" ? parsed.data.flat_amount : null,
     })
-    .select("id, name, payment_type, rate, monthly_fee")
+    .select("id, name, payment_type, rate, flat_amount")
     .single();
 
   if (error) {
@@ -167,8 +220,14 @@ export async function createEditor(
   );
   if (!syncPm.ok) return { ok: false, error: syncPm.error };
 
+  const syncTiers = await syncEditorPaymentTiers(
+    data.id,
+    parsed.data.payment_type === "flat_variable" ? parsed.data.tiers : []
+  );
+  if (!syncTiers.ok) return { ok: false, error: syncTiers.error };
+
   revalidateAll();
-  return { ok: true, editor: data as EditorMini };
+  return { ok: true, editor: { ...data, tiers: [] } as EditorMini };
 }
 
 export async function updateEditor(
@@ -188,9 +247,10 @@ export async function updateEditor(
       discord_id: normalizeText(parsed.data.discord_id),
       docs_url: normalizeText(parsed.data.docs_url),
       payment_type: parsed.data.payment_type,
-      rate: parsed.data.payment_type === "por_rate" ? parsed.data.rate : null,
-      monthly_fee:
-        parsed.data.payment_type === "mensual" ? parsed.data.monthly_fee : null,
+      rate:
+        parsed.data.payment_type === "por_minuto" ? parsed.data.rate : null,
+      flat_amount:
+        parsed.data.payment_type === "flat" ? parsed.data.flat_amount : null,
     })
     .eq("id", id);
 
@@ -209,6 +269,12 @@ export async function updateEditor(
     parsed.data.payment_methods
   );
   if (!syncPm.ok) return { ok: false, error: syncPm.error };
+
+  const syncTiers = await syncEditorPaymentTiers(
+    id,
+    parsed.data.payment_type === "flat_variable" ? parsed.data.tiers : []
+  );
+  if (!syncTiers.ok) return { ok: false, error: syncTiers.error };
 
   revalidateAll();
   return { ok: true };

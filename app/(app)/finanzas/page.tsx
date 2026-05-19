@@ -85,7 +85,6 @@ function build(
 ): BuildResult {
   const byKey = new Map<string, MonthBucket>();
   const seenMonthlyClients = new Map<string, Set<string>>();
-  const seenMonthlyEditors = new Map<string, Set<string>>();
   const mensualItems: MensualItem[] = [];
   const projectItems: ProjectSettleItem[] = [];
 
@@ -104,7 +103,6 @@ function build(
         mensualCount: 0,
       });
       seenMonthlyClients.set(key, new Set());
-      seenMonthlyEditors.set(key, new Set());
     }
     return byKey.get(key)!;
   }
@@ -146,34 +144,6 @@ function build(
       });
     }
 
-    // ============ Editor mensual (pagamos monthly_fee una vez/mes) ============
-    for (const entry of p.editors) {
-      const editor = entry.editor;
-      if (!editor) continue;
-      if (editor.payment_type !== "mensual") continue;
-      if (editor.monthly_fee == null) continue;
-      if (seenMonthlyEditors.get(key)!.has(editor.id)) continue;
-      seenMonthlyEditors.get(key)!.add(editor.id);
-      const fee = Number(editor.monthly_fee);
-      const settled = settledKeys.has(
-        settlementKey(key, "editor_pago", editor.id)
-      );
-      if (settled) {
-        bucket.paid += fee;
-      } else {
-        bucket.pendingPay += fee;
-      }
-      mensualItems.push({
-        yearMonth: key,
-        monthLabel: bucket.label,
-        partyType: "editor_pago",
-        partyId: editor.id,
-        partyName: editor.name,
-        amount: fee,
-        settled,
-      });
-    }
-
     // ============ Cobros por proyecto (por_proyecto + por_rate) ============
     // Incluimos cualquier proyecto que NO sea mensual (incluso sin cliente
     // linkeado), aunque el monto todavía no sea calculable.
@@ -200,11 +170,9 @@ function build(
       });
     }
 
-    // ============ Pagos por proyecto (suma editores por_rate × duración) ============
-    const hasPorRateEditor = p.editors.some(
-      (e) => e.editor?.payment_type === "por_rate"
-    );
-    if (hasPorRateEditor) {
+    // ============ Pagos por proyecto (todos los editores aportan al costo) ============
+    const hasEditor = p.editors.some((e) => e.editor != null);
+    if (hasEditor) {
       const cost = computeCost(p);
       const pagadoSettled = p.pagado === "pago_total";
       if (cost != null) {

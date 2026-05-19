@@ -153,16 +153,51 @@ export type Database = {
           },
         ]
       }
+      editor_payment_tiers: {
+        Row: {
+          amount: number
+          created_at: string
+          editor_id: string
+          id: string
+          max_minutes: number
+          min_minutes: number
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          editor_id: string
+          id?: string
+          max_minutes: number
+          min_minutes: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          editor_id?: string
+          id?: string
+          max_minutes?: number
+          min_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editor_payment_tiers_editor_id_fkey"
+            columns: ["editor_id"]
+            isOneToOne: false
+            referencedRelation: "editors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       editors: {
         Row: {
           created_at: string
           discord_id: string | null
           docs_url: string | null
           email: string | null
+          flat_amount: number | null
           id: string
-          monthly_fee: number | null
           name: string
-          payment_type: Database["public"]["Enums"]["editor_payment_type"]
+          payment_type: Database["public"]["Enums"]["editor_payment_model"]
           phone: string | null
           rate: number | null
         }
@@ -171,10 +206,10 @@ export type Database = {
           discord_id?: string | null
           docs_url?: string | null
           email?: string | null
+          flat_amount?: number | null
           id?: string
-          monthly_fee?: number | null
           name: string
-          payment_type?: Database["public"]["Enums"]["editor_payment_type"]
+          payment_type?: Database["public"]["Enums"]["editor_payment_model"]
           phone?: string | null
           rate?: number | null
         }
@@ -183,10 +218,10 @@ export type Database = {
           discord_id?: string | null
           docs_url?: string | null
           email?: string | null
+          flat_amount?: number | null
           id?: string
-          monthly_fee?: number | null
           name?: string
-          payment_type?: Database["public"]["Enums"]["editor_payment_type"]
+          payment_type?: Database["public"]["Enums"]["editor_payment_model"]
           phone?: string | null
           rate?: number | null
         }
@@ -369,7 +404,7 @@ export type Database = {
     }
     Enums: {
       cobrado_status: "si" | "no" | "parcial"
-      editor_payment_type: "por_rate" | "mensual"
+      editor_payment_model: "flat" | "flat_variable" | "por_minuto"
       editor_role: "primary" | "secondary"
       invoiced_status: "si" | "no" | "parcial"
       pagado_status: "pago_total" | "parcial" | "sin_pagar"
@@ -513,7 +548,7 @@ export const Constants = {
   public: {
     Enums: {
       cobrado_status: ["si", "no", "parcial"],
-      editor_payment_type: ["por_rate", "mensual"],
+      editor_payment_model: ["flat", "flat_variable", "por_minuto"],
       editor_role: ["primary", "secondary"],
       invoiced_status: ["si", "no", "parcial"],
       pagado_status: ["pago_total", "parcial", "sin_pagar"],

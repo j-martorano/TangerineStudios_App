@@ -6,7 +6,7 @@ import type {
 } from "./types";
 
 const PROJECT_SELECT =
-  "id, project_code, title, client_name, phase, cobrado, pagado, invoiced, status, price, cost, duration_minutes, position, created_at, updated_at, client_id, client:clients(id, name, color, payment_type, agreed_price, monthly_fee, balance), editors:project_editors(role, cost, editor:editors(id, name, payment_type, rate, monthly_fee))";
+  "id, project_code, title, client_name, phase, cobrado, pagado, invoiced, status, price, cost, duration_minutes, position, created_at, updated_at, client_id, client:clients(id, name, color, payment_type, agreed_price, monthly_fee, balance), editors:project_editors(role, cost, editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))";
 
 export const DEFAULT_PER_PAGE = 20;
 
@@ -80,23 +80,26 @@ export async function fetchEditors(): Promise<EditorMini[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("editors")
-    .select("id, name, payment_type, rate, monthly_fee")
+    .select(
+      "id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)"
+    )
     .order("name");
   if (error) throw new Error(error.message);
-  return (data ?? []) as EditorMini[];
+  return (data ?? []) as unknown as EditorMini[];
 }
 
-import type { EditorRow } from "./types";
+import type { EditorRow, PaymentTier } from "./types";
 import type { EditorPaymentMethod } from "@/lib/payment-methods/queries";
 
 export type EditorWithCount = EditorRow & {
   project_count: number;
   clients: ClientMini[];
   payment_methods: EditorPaymentMethod[];
+  tiers: PaymentTier[];
 };
 
 const EDITOR_FULL_SELECT =
-  "id, name, email, phone, discord_id, docs_url, payment_type, rate, monthly_fee, created_at, project_editors(count), client_editors(client:clients(id, name, color, payment_type, agreed_price, monthly_fee, balance)), editor_payment_methods(method_id, info, method:payment_methods(id, name))";
+  "id, name, email, phone, discord_id, docs_url, payment_type, rate, flat_amount, created_at, project_editors(count), client_editors(client:clients(id, name, color, payment_type, agreed_price, monthly_fee, balance)), editor_payment_methods(method_id, info, method:payment_methods(id, name)), editor_payment_tiers(min_minutes, max_minutes, amount)";
 
 import type { EditorPaymentType } from "./types";
 
@@ -109,7 +112,7 @@ function mapEditor(e: {
   docs_url: string | null;
   payment_type: EditorPaymentType;
   rate: number | null;
-  monthly_fee: number | null;
+  flat_amount: number | null;
   created_at: string;
   project_editors?: { count: number }[] | null;
   client_editors?: { client: ClientMini | null }[] | null;
@@ -119,6 +122,9 @@ function mapEditor(e: {
         info: string | null;
         method: { id: string; name: string } | null;
       }[]
+    | null;
+  editor_payment_tiers?:
+    | { min_minutes: number; max_minutes: number; amount: number }[]
     | null;
 }): EditorWithCount {
   return {
@@ -130,7 +136,7 @@ function mapEditor(e: {
     docs_url: e.docs_url,
     payment_type: e.payment_type,
     rate: e.rate,
-    monthly_fee: e.monthly_fee,
+    flat_amount: e.flat_amount,
     created_at: e.created_at,
     project_count: e.project_editors?.[0]?.count ?? 0,
     clients: (e.client_editors ?? [])
@@ -144,6 +150,13 @@ function mapEditor(e: {
         info: pm.info,
       }))
       .sort((a, b) => a.name.localeCompare(b.name)),
+    tiers: (e.editor_payment_tiers ?? [])
+      .map((t) => ({
+        min_minutes: Number(t.min_minutes),
+        max_minutes: Number(t.max_minutes),
+        amount: Number(t.amount),
+      }))
+      .sort((a, b) => a.min_minutes - b.min_minutes),
   };
 }
 
@@ -205,7 +218,7 @@ export type ClientWithCount = ClientRow & {
 };
 
 const CLIENT_FULL_SELECT =
-  "id, name, color, payment_type, balance, agreed_price, monthly_fee, billing_info, email, phone, docs_url, created_at, projects(count), client_editors(editor:editors(id, name, payment_type, rate, monthly_fee))";
+  "id, name, color, payment_type, balance, agreed_price, monthly_fee, billing_info, email, phone, docs_url, created_at, projects(count), client_editors(editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))";
 
 export async function fetchClientsWithCount(): Promise<ClientWithCount[]> {
   const supabase = await createClient();

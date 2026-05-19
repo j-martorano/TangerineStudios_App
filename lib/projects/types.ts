@@ -8,7 +8,14 @@ export type EditorRole = Database["public"]["Enums"]["editor_role"];
 
 export type PaymentType = Database["public"]["Enums"]["payment_type"];
 export type EditorPaymentType =
-  Database["public"]["Enums"]["editor_payment_type"];
+  Database["public"]["Enums"]["editor_payment_model"];
+
+/** Tramo de FLAT variable: si la duración cae en [min, max), se cobra `amount`. */
+export type PaymentTier = {
+  min_minutes: number;
+  max_minutes: number;
+  amount: number;
+};
 
 export type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
 
@@ -17,8 +24,11 @@ export type EditorRow = Database["public"]["Tables"]["editors"]["Row"];
 
 export type EditorMini = Pick<
   EditorRow,
-  "id" | "name" | "payment_type" | "rate" | "monthly_fee"
->;
+  "id" | "name" | "payment_type" | "rate" | "flat_amount"
+> & {
+  /** Tramos de FLAT variable. Vacío para flat / por_minuto. */
+  tiers: PaymentTier[];
+};
 export type ClientMini = Pick<
   ClientRow,
   | "id"
@@ -67,11 +77,16 @@ export const PAYMENT_TYPE_LABEL: Record<PaymentType, string> = {
   mensual: "Mensual fijo",
 };
 
-export const EDITOR_PAYMENT_TYPES: EditorPaymentType[] = ["por_rate", "mensual"];
+export const EDITOR_PAYMENT_TYPES: EditorPaymentType[] = [
+  "flat",
+  "flat_variable",
+  "por_minuto",
+];
 
 export const EDITOR_PAYMENT_TYPE_LABEL: Record<EditorPaymentType, string> = {
-  por_rate: "Por rate × duración",
-  mensual: "Mensual fijo",
+  flat: "FLAT — fijo por proyecto",
+  flat_variable: "FLAT variable — por rango de minutos",
+  por_minuto: "Por minuto",
 };
 
 // Helpers para extraer editor principal / segundo desde el array.

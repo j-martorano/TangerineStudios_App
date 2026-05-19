@@ -1,8 +1,10 @@
 import type {
   ClientMini,
   CobradoStatus,
+  EditorMini,
   InvoicedStatus,
   PagadoStatus,
+  PaymentTier,
   ProjectEditorAssignment,
   ProjectPhase,
 } from "./types";
@@ -34,22 +36,63 @@ export function computePrice(p: ProjectForCalc): number | null {
   return null;
 }
 
+/**
+ * Monto del tramo FLAT variable en el que cae `duration`.
+ * Selección por límite inferior inclusivo: gana el último tramo cuyo
+ * `min_minutes` sea ≤ duration. Si la duración queda por debajo del primer
+ * tramo se usa el primero; por encima del último, el último (tramo más
+ * cercano). Devuelve null si el editor no tiene tramos cargados.
+ */
+function tierAmount(
+  tiers: PaymentTier[],
+  duration: number
+): number | null {
+  if (tiers.length === 0) return null;
+  const sorted = [...tiers].sort(
+    (a, b) => Number(a.min_minutes) - Number(b.min_minutes)
+  );
+  let chosen = sorted[0];
+  for (const tier of sorted) {
+    if (duration >= Number(tier.min_minutes)) chosen = tier;
+    else break;
+  }
+  return Number(chosen.amount);
+}
+
+/** Aporte de un editor al costo del proyecto según su modelo de pago. */
+function editorCost(
+  editor: EditorMini,
+  duration: number | null
+): number | null {
+  switch (editor.payment_type) {
+    case "flat":
+      return editor.flat_amount == null ? null : Number(editor.flat_amount);
+    case "por_minuto":
+      if (editor.rate == null || duration == null) return null;
+      return Number(editor.rate) * duration;
+    case "flat_variable":
+      if (duration == null) return null;
+      return tierAmount(editor.tiers ?? [], duration);
+    default:
+      return null;
+  }
+}
+
 // Costo calculado del proyecto: suma de aportes de cada editor según su
-// payment_type:
-//   - por_rate : editor.rate * duration_minutes
-//   - mensual  : 0 (salario fijo a nivel mes, no aporta al cost del proyecto)
-// Si falta duration o rate para un editor por_rate, ese editor aporta null
-// (no se suma, pero tampoco rompe el total).
+// modelo de pago (flat / flat_variable / por_minuto). Si a un editor le
+// faltan datos para calcular su aporte, ese editor aporta null (no se suma,
+// pero tampoco rompe el total).
 export function computeCost(p: ProjectForCalc): number | null {
-  const duration = p.duration_minutes == null ? null : Number(p.duration_minutes);
+  const duration =
+    p.duration_minutes == null ? null : Number(p.duration_minutes);
   let total = 0;
   let anyContribution = false;
   for (const entry of p.editors) {
     const editor = entry.editor;
     if (!editor) continue;
-    if (editor.payment_type === "mensual") continue; // no aporta al proyecto
-    if (editor.rate == null || duration == null) continue;
-    total += Number(editor.rate) * duration;
+    const cost = editorCost(editor, duration);
+    if (cost == null) continue;
+    total += cost;
     anyContribution = true;
   }
   return anyContribution ? total : null;
