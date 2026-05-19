@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { PlusIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -21,11 +22,9 @@ import {
   INVOICED_STATUSES,
   PAGADO_STATUSES,
   PROJECT_PHASES,
-  getPrimaryEditor,
-  getSecondaryEditor,
 } from "@/lib/projects/types";
 import type {
-  ClientMini,
+  ClientForProject,
   CobradoStatus,
   EditorMini,
   InvoicedStatus,
@@ -45,15 +44,20 @@ import {
 } from "@/lib/projects/format";
 import { createProject, updateProject } from "@/lib/projects/actions";
 
-const NO_EDITOR = "__none__";
-
 type Props = {
   mode: "create" | "edit";
   editors: EditorMini[];
-  clients: ClientMini[];
+  clients: ClientForProject[];
   project?: ProjectWithRelations;
   onSuccess?: () => void;
 };
+
+// Minutos como número legible ("45 min", "−5 min"). A diferencia de
+// formatDuration, no colapsa negativos a "—".
+function fmtMin(n: number): string {
+  const rounded = Number.isInteger(n) ? n : Number(n.toFixed(1));
+  return `${rounded} min`;
+}
 
 export function ProjectForm({
   mode,
@@ -62,9 +66,6 @@ export function ProjectForm({
   project,
   onSuccess,
 }: Props) {
-  const initialPrimary = project ? getPrimaryEditor(project) : null;
-  const initialSecondary = project ? getSecondaryEditor(project) : null;
-
   const [title, setTitle] = useState(project?.title ?? "");
   const [clientId, setClientId] = useState<string | null>(
     project?.client?.id ?? null
@@ -87,16 +88,28 @@ export function ProjectForm({
   const [durationMinutes, setDurationMinutes] = useState<string>(
     project?.duration_minutes != null ? String(project.duration_minutes) : ""
   );
-  const [primaryEditorId, setPrimaryEditorId] = useState<string>(
-    initialPrimary?.editor?.id ?? NO_EDITOR
-  );
-  const [hasSecondary, setHasSecondary] = useState<boolean>(
-    initialSecondary != null
-  );
-  const [secondaryEditorId, setSecondaryEditorId] = useState<string>(
-    initialSecondary?.editor?.id ?? NO_EDITOR
+  const [editorIds, setEditorIds] = useState<string[]>(
+    () =>
+      project?.editors
+        ?.map((e) => e.editor?.id)
+        .filter((id): id is string => Boolean(id)) ?? []
   );
   const [pending, startTransition] = useTransition();
+
+  const editorById = new Map(editors.map((ed) => [ed.id, ed.name]));
+
+  function addEditor() {
+    const next = editors.find((ed) => !editorIds.includes(ed.id));
+    if (next) setEditorIds([...editorIds, next.id]);
+  }
+
+  function changeEditor(index: number, id: string) {
+    setEditorIds(editorIds.map((eid, i) => (i === index ? id : eid)));
+  }
+
+  function removeEditor(index: number) {
+    setEditorIds(editorIds.filter((_, i) => i !== index));
+  }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -107,8 +120,7 @@ export function ProjectForm({
       return;
     }
 
-    const parsedPrice =
-      manualPrice === "" ? null : Number(manualPrice);
+    const parsedPrice = manualPrice === "" ? null : Number(manualPrice);
     if (parsedPrice !== null && Number.isNaN(parsedPrice)) {
       toast.error("Precio inválido");
       return;
@@ -121,20 +133,7 @@ export function ProjectForm({
       return;
     }
 
-    const primaryId =
-      primaryEditorId === NO_EDITOR ? null : primaryEditorId;
-    const secondaryId =
-      !hasSecondary || secondaryEditorId === NO_EDITOR
-        ? null
-        : secondaryEditorId;
-
-    if (secondaryId && secondaryId === primaryId) {
-      toast.error("El segundo editor no puede ser el mismo que el principal");
-      return;
-    }
-
     // El precio sólo se guarda cuando el cliente es 'por_proyecto' (manual).
-    // Para 'por_rate' y 'mensual' se calcula on-read desde rate o monthly_fee.
     const selectedClient = clients.find((c) => c.id === clientId) ?? null;
     const priceToStore =
       selectedClient?.payment_type === "por_proyecto" ? parsedPrice : null;
@@ -149,9 +148,7 @@ export function ProjectForm({
       price: priceToStore,
       cost: null,
       duration_minutes: parsedDuration,
-      primary_editor_id: primaryId,
-      secondary_editor_id: secondaryId,
-      secondary_editor_cost: null,
+      editor_ids: editorIds,
     };
 
     startTransition(async () => {
@@ -171,7 +168,12 @@ export function ProjectForm({
     });
   }
 
-  const editorById = new Map(editors.map((ed) => [ed.id, ed.name]));
+  const selectedClient = clients.find((c) => c.id === clientId) ?? null;
+  const parsedDur = durationMinutes === "" ? null : Number(durationMinutes);
+  const validDur =
+    parsedDur != null && !Number.isNaN(parsedDur) && parsedDur > 0
+      ? parsedDur
+      : null;
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -199,6 +201,51 @@ export function ProjectForm({
             onChange={(id) => setClientId(id)}
           />
         </div>
+
+        {/* Saldo de minutos del cliente mensual. */}
+        {selectedClient?.payment_type === "mensual" ? (
+          <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-xs">
+            {selectedClient.minute_balance != null ? (
+              <>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">
+                    Saldo de minutos del cliente
+                  </span>
+                  <span
+                    className={`font-medium tabular-nums ${
+                      selectedClient.minute_balance < 0
+                        ? "text-destructive"
+                        : ""
+                    }`}
+                  >
+                    {fmtMin(selectedClient.minute_balance)}
+                  </span>
+                </div>
+                {mode === "create" && validDur != null ? (
+                  <div className="mt-1 flex justify-between gap-3">
+                    <span className="text-muted-foreground">
+                      Quedaría tras este video ({fmtMin(validDur)})
+                    </span>
+                    <span
+                      className={`font-medium tabular-nums ${
+                        selectedClient.minute_balance - validDur < 0
+                          ? "text-destructive"
+                          : ""
+                      }`}
+                    >
+                      {fmtMin(selectedClient.minute_balance - validDur)}
+                    </span>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <span className="text-muted-foreground">
+                Sin saldo cargado. Registrá pagos del cliente para acreditar
+                minutos.
+              </span>
+            )}
+          </div>
+        ) : null}
 
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -243,125 +290,98 @@ export function ProjectForm({
             </div>
           </div>
 
-          {(() => {
-            const selectedClient =
-              clients.find((c) => c.id === clientId) ?? null;
-            if (selectedClient?.payment_type !== "por_proyecto") return null;
-            return (
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="price">
-                  Precio{" "}
-                  <span className="text-xs text-muted-foreground">
-                    (manual, USD)
-                  </span>
-                </Label>
-                <Input
-                  id="price"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={manualPrice}
-                  onChange={(e) => setManualPrice(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-            );
-          })()}
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="primary_editor_id">Editor principal</Label>
-          <Select
-            value={primaryEditorId}
-            onValueChange={(v) => setPrimaryEditorId(v ?? NO_EDITOR)}
-          >
-            <SelectTrigger id="primary_editor_id" className="w-full">
-              <SelectValue>
-                {(v: string | null) => {
-                  if (!v || v === NO_EDITOR) return "Sin asignar";
-                  return editorById.get(v) ?? "—";
-                }}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_EDITOR}>Sin asignar</SelectItem>
-              {editors.map((ed) => (
-                <SelectItem key={ed.id} value={ed.id}>
-                  {ed.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-muted/30 p-3">
-          <label className="flex cursor-pointer items-center gap-2 text-sm select-none">
-            <input
-              type="checkbox"
-              checked={hasSecondary}
-              onChange={(e) => setHasSecondary(e.target.checked)}
-              className="size-4 cursor-pointer accent-primary"
-            />
-            <span>Segundo editor</span>
-          </label>
-
-          {hasSecondary ? (
-            <div className="mt-1 flex flex-col gap-2">
-              <Label htmlFor="secondary_editor_id" className="text-xs">
-                Editor secundario
+          {selectedClient?.payment_type === "por_proyecto" ? (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="price">
+                Precio{" "}
+                <span className="text-xs text-muted-foreground">
+                  (manual, USD)
+                </span>
               </Label>
-              <Select
-                value={secondaryEditorId}
-                onValueChange={(v) => setSecondaryEditorId(v ?? NO_EDITOR)}
-              >
-                <SelectTrigger
-                  id="secondary_editor_id"
-                  className="w-full"
-                >
-                  <SelectValue>
-                    {(v: string | null) => {
-                      if (!v || v === NO_EDITOR) return "Sin asignar";
-                      return editorById.get(v) ?? "—";
-                    }}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_EDITOR}>Sin asignar</SelectItem>
-                  {editors
-                    .filter((ed) => ed.id !== primaryEditorId)
-                    .map((ed) => (
-                      <SelectItem key={ed.id} value={ed.id}>
-                        {ed.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="price"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={manualPrice}
+                onChange={(e) => setManualPrice(e.target.value)}
+                placeholder="0"
+              />
             </div>
           ) : null}
         </div>
 
-        {/* Preview de precio / costo / ganancia con la lógica nueva. */}
+        {/* Editores — sin límite de cantidad. */}
+        <div className="flex flex-col gap-2">
+          <Label>Editores</Label>
+          {editorIds.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {editorIds.map((eid, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Select
+                    value={eid}
+                    onValueChange={(v) => v && changeEditor(i, v)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue>
+                        {(v: string | null) =>
+                          v ? (editorById.get(v) ?? "—") : "—"
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {editors
+                        .filter(
+                          (ed) => ed.id === eid || !editorIds.includes(ed.id)
+                        )
+                        .map((ed) => (
+                          <SelectItem key={ed.id} value={ed.id}>
+                            {ed.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => removeEditor(i)}
+                    aria-label="Quitar editor"
+                  >
+                    <XIcon className="size-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs italic text-muted-foreground">
+              Sin editores asignados.
+            </p>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addEditor}
+            disabled={editors.length === 0 || editorIds.length >= editors.length}
+            className="w-fit"
+          >
+            <PlusIcon className="size-4" />
+            Agregar editor
+          </Button>
+        </div>
+
+        {/* Preview de precio / costo / ganancia. */}
         {(() => {
-          const selectedClient =
-            clients.find((c) => c.id === clientId) ?? null;
-          const parsedDur =
-            durationMinutes === "" ? null : Number(durationMinutes);
           const parsedPrice =
             manualPrice === "" ? null : Number(manualPrice);
-          const primary = editors.find((ed) => ed.id === primaryEditorId) ?? null;
-          const secondary = hasSecondary
-            ? editors.find((ed) => ed.id === secondaryEditorId) ?? null
-            : null;
-          const editorEntries = [
-            primary ? { role: "primary" as const, cost: null, editor: primary } : null,
-            secondary
-              ? { role: "secondary" as const, cost: null, editor: secondary }
-              : null,
-          ].filter((e): e is NonNullable<typeof e> => e != null);
+          const editorEntries = editorIds
+            .map((id) => editors.find((ed) => ed.id === id) ?? null)
+            .filter((ed): ed is EditorMini => ed != null)
+            .map((ed) => ({ cost: null, editor: ed }));
           const preview = {
-            duration_minutes:
-              parsedDur != null && !Number.isNaN(parsedDur) ? parsedDur : null,
+            duration_minutes: validDur,
             price:
               selectedClient?.payment_type === "por_proyecto" &&
               parsedPrice != null &&

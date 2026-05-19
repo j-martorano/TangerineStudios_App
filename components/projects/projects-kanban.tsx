@@ -28,13 +28,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { KanbanCardActions } from "./kanban-card-actions";
 
-import {
-  PROJECT_PHASES,
-  getPrimaryEditor,
-  getSecondaryEditor,
-} from "@/lib/projects/types";
+import { PROJECT_PHASES, editorNames } from "@/lib/projects/types";
 import type {
-  ClientMini,
+  ClientForProject,
   EditorMini,
   ProjectPhase,
   ProjectWithRelations,
@@ -50,7 +46,7 @@ import { reorderProjects } from "@/lib/projects/actions";
 type Props = {
   projects: ProjectWithRelations[];
   editors: EditorMini[];
-  clients: ClientMini[];
+  clients: ClientForProject[];
 };
 
 // Tinte de fondo de la card con el color del cliente (~12% de opacidad).
@@ -397,7 +393,7 @@ function KanbanColumn({
   phase: ProjectPhase;
   items: ProjectWithRelations[];
   editors: EditorMini[];
-  clients: ClientMini[];
+  clients: ClientForProject[];
 }) {
   const { isOver, setNodeRef } = useDroppableColumn(phase);
   const itemIds = useMemo(() => items.map((p) => p.id), [items]);
@@ -457,7 +453,7 @@ function SortableCard({
 }: {
   project: ProjectWithRelations;
   editors: EditorMini[];
-  clients: ClientMini[];
+  clients: ClientForProject[];
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: project.id });
@@ -492,7 +488,7 @@ function CardView({
 }: {
   project: ProjectWithRelations;
   editors?: EditorMini[];
-  clients?: ClientMini[];
+  clients?: ClientForProject[];
   dragging?: boolean;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
@@ -548,14 +544,7 @@ function CardView({
                 })()}
           </span>
           <span className="truncate text-muted-foreground">
-            {(() => {
-              const primary = getPrimaryEditor(project);
-              const secondary = getSecondaryEditor(project);
-              const names = [primary?.editor?.name, secondary?.editor?.name]
-                .filter(Boolean)
-                .join(" + ");
-              return names || "—";
-            })()}
+            {editorNames(project)}
           </span>
         </div>
       </CardContent>

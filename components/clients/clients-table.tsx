@@ -39,7 +39,7 @@ export function ClientsTable({
           <TableHead className="w-10"></TableHead>
           <TableHead>Nombre</TableHead>
           <TableHead>Tipo</TableHead>
-          <TableHead className="text-right">Saldo</TableHead>
+          <TableHead className="text-right">Saldo minutos</TableHead>
           <TableHead>Editores</TableHead>
           <TableHead>Contacto</TableHead>
           <TableHead>Docs</TableHead>
@@ -64,7 +64,15 @@ export function ClientsTable({
               </Badge>
             </TableCell>
             <TableCell className="text-right tabular-nums">
-              {c.payment_type === "mensual" ? formatBalance(c.balance) : "—"}
+              {c.payment_type === "mensual" && c.minute_balance != null ? (
+                <span
+                  className={c.minute_balance < 0 ? "text-destructive" : ""}
+                >
+                  {formatMinutes(c.minute_balance)}
+                </span>
+              ) : (
+                "—"
+              )}
             </TableCell>
             <TableCell>
               {c.editors.length > 0 ? (
@@ -123,8 +131,7 @@ export function ClientsTable({
   );
 }
 
-function formatBalance(value: number): string {
-  if (value === 0) return "0";
-  const sign = value > 0 ? "+" : "";
-  return `${sign}${value.toLocaleString("es-AR")}`;
+function formatMinutes(value: number): string {
+  const rounded = Number.isInteger(value) ? value : Number(value.toFixed(1));
+  return `${rounded} min`;
 }

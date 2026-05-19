@@ -25,12 +25,9 @@ import {
   formatPrice,
 } from "@/lib/projects/format";
 import { monthToneFromKey } from "@/lib/projects/month-colors";
-import {
-  getPrimaryEditor,
-  getSecondaryEditor,
-} from "@/lib/projects/types";
+import { editorNames } from "@/lib/projects/types";
 import type {
-  ClientMini,
+  ClientForProject,
   EditorMini,
   ProjectWithRelations,
 } from "@/lib/projects/types";
@@ -103,7 +100,7 @@ function groupByMonth(
 type Props = {
   projects: ProjectWithRelations[];
   editors: EditorMini[];
-  clients: ClientMini[];
+  clients: ClientForProject[];
 };
 
 export function ProjectsTable({ projects, editors, clients }: Props) {
@@ -225,20 +222,7 @@ export function ProjectsTable({ projects, editors, clients }: Props) {
                     <TableCell className="tabular-nums">
                       {formatDuration(p.duration_minutes)}
                     </TableCell>
-                    <TableCell>
-                      {(() => {
-                        const primary = getPrimaryEditor(p);
-                        const secondary = getSecondaryEditor(p);
-                        if (!primary && !secondary) return "—";
-                        const names = [
-                          primary?.editor?.name,
-                          secondary?.editor?.name,
-                        ]
-                          .filter(Boolean)
-                          .join(" + ");
-                        return names || "—";
-                      })()}
-                    </TableCell>
+                    <TableCell>{editorNames(p)}</TableCell>
                     <TableCell>
                       <QuickPaymentBadge
                         kind="cobrado"

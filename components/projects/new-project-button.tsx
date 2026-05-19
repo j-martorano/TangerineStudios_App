@@ -14,14 +14,14 @@ import {
 } from "@/components/ui/dialog";
 
 import { ProjectForm } from "./project-form";
-import type { ClientMini, EditorMini } from "@/lib/projects/types";
+import type { ClientForProject, EditorMini } from "@/lib/projects/types";
 
 export function NewProjectButton({
   editors,
   clients,
 }: {
   editors: EditorMini[];
-  clients: ClientMini[];
+  clients: ClientForProject[];
 }) {
   const [open, setOpen] = useState(false);
 

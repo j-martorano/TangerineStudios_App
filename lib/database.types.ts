@@ -72,48 +72,83 @@ export type Database = {
           },
         ]
       }
+      client_payments: {
+        Row: {
+          amount: number
+          client_id: string
+          created_at: string
+          id: string
+          minutes_credited: number
+          note: string | null
+          paid_at: string
+        }
+        Insert: {
+          amount: number
+          client_id: string
+          created_at?: string
+          id?: string
+          minutes_credited: number
+          note?: string | null
+          paid_at?: string
+        }
+        Update: {
+          amount?: number
+          client_id?: string
+          created_at?: string
+          id?: string
+          minutes_credited?: number
+          note?: string | null
+          paid_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_payments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           agreed_price: number | null
-          balance: number
           billing_info: string | null
           color: string
           created_at: string
           docs_url: string | null
           email: string | null
           id: string
-          monthly_fee: number | null
           name: string
           payment_type: Database["public"]["Enums"]["payment_type"]
           phone: string | null
+          retainer_discount_pct: number
         }
         Insert: {
           agreed_price?: number | null
-          balance?: number
           billing_info?: string | null
           color?: string
           created_at?: string
           docs_url?: string | null
           email?: string | null
           id?: string
-          monthly_fee?: number | null
           name: string
           payment_type?: Database["public"]["Enums"]["payment_type"]
           phone?: string | null
+          retainer_discount_pct?: number
         }
         Update: {
           agreed_price?: number | null
-          balance?: number
           billing_info?: string | null
           color?: string
           created_at?: string
           docs_url?: string | null
           email?: string | null
           id?: string
-          monthly_fee?: number | null
           name?: string
           payment_type?: Database["public"]["Enums"]["payment_type"]
           phone?: string | null
+          retainer_discount_pct?: number
         }
         Relationships: []
       }
@@ -296,21 +331,18 @@ export type Database = {
           created_at: string
           editor_id: string
           project_id: string
-          role: Database["public"]["Enums"]["editor_role"]
         }
         Insert: {
           cost?: number | null
           created_at?: string
           editor_id: string
           project_id: string
-          role: Database["public"]["Enums"]["editor_role"]
         }
         Update: {
           cost?: number | null
           created_at?: string
           editor_id?: string
           project_id?: string
-          role?: Database["public"]["Enums"]["editor_role"]
         }
         Relationships: [
           {
@@ -417,7 +449,6 @@ export type Database = {
     Enums: {
       cobrado_status: "si" | "no" | "parcial"
       editor_payment_model: "flat" | "flat_variable" | "por_minuto"
-      editor_role: "primary" | "secondary"
       invoiced_status: "si" | "no" | "parcial"
       pagado_status: "pago_total" | "parcial" | "sin_pagar"
       payment_type: "por_rate" | "mensual" | "por_proyecto"
@@ -561,7 +592,6 @@ export const Constants = {
     Enums: {
       cobrado_status: ["si", "no", "parcial"],
       editor_payment_model: ["flat", "flat_variable", "por_minuto"],
-      editor_role: ["primary", "secondary"],
       invoiced_status: ["si", "no", "parcial"],
       pagado_status: ["pago_total", "parcial", "sin_pagar"],
       payment_type: ["por_rate", "mensual", "por_proyecto"],

@@ -4,7 +4,6 @@ export type ProjectPhase = Database["public"]["Enums"]["project_phase"];
 export type CobradoStatus = Database["public"]["Enums"]["cobrado_status"];
 export type PagadoStatus = Database["public"]["Enums"]["pagado_status"];
 export type InvoicedStatus = Database["public"]["Enums"]["invoiced_status"];
-export type EditorRole = Database["public"]["Enums"]["editor_role"];
 
 export type PaymentType = Database["public"]["Enums"]["payment_type"];
 export type EditorPaymentType =
@@ -36,12 +35,27 @@ export type ClientMini = Pick<
   | "color"
   | "payment_type"
   | "agreed_price"
-  | "monthly_fee"
-  | "balance"
+  | "retainer_discount_pct"
 >;
 
+/**
+ * Cliente con el saldo de minutos calculado. Sólo tiene sentido para clientes
+ * mensuales (los demás traen `minute_balance: null`).
+ */
+export type ClientForProject = ClientMini & {
+  minute_balance: number | null;
+};
+
+/** Pago de un cliente mensual: acredita `minutes_credited` minutos. */
+export type ClientPayment = {
+  id: string;
+  amount: number;
+  minutes_credited: number;
+  paid_at: string;
+  note: string | null;
+};
+
 export type ProjectEditorAssignment = {
-  role: EditorRole;
   cost: number | null;
   editor: EditorMini | null;
 };
@@ -89,17 +103,13 @@ export const EDITOR_PAYMENT_TYPE_LABEL: Record<EditorPaymentType, string> = {
   por_minuto: "Por minuto",
 };
 
-// Helpers para extraer editor principal / segundo desde el array.
-export function getPrimaryEditor(
-  p: ProjectWithRelations
-): ProjectEditorAssignment | null {
-  return p.editors.find((e) => e.role === "primary") ?? null;
-}
-
-export function getSecondaryEditor(
-  p: ProjectWithRelations
-): ProjectEditorAssignment | null {
-  return p.editors.find((e) => e.role === "secondary") ?? null;
+// Nombres de los editores de un proyecto, en orden alfabético, unidos con " + ".
+export function editorNames(p: ProjectWithRelations): string {
+  const names = p.editors
+    .map((e) => e.editor?.name)
+    .filter((n): n is string => Boolean(n))
+    .sort((a, b) => a.localeCompare(b));
+  return names.length > 0 ? names.join(" + ") : "—";
 }
 
 // Alias retrocompat para no romper código que aún usa el nombre viejo.

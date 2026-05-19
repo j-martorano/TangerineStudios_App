@@ -39,7 +39,7 @@ import {
   setProjectFinalized,
 } from "@/lib/projects/actions";
 import type {
-  ClientMini,
+  ClientForProject,
   EditorMini,
   ProjectWithRelations,
 } from "@/lib/projects/types";
@@ -47,7 +47,7 @@ import type {
 type Props = {
   project: ProjectWithRelations;
   editors: EditorMini[];
-  clients: ClientMini[];
+  clients: ClientForProject[];
 };
 
 export function KanbanCardActions({ project, editors, clients }: Props) {

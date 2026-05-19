@@ -12,6 +12,8 @@ const paymentTypeEnum = z.enum(
 );
 
 const hexColorRegex = /^#[0-9a-fA-F]{6}$/;
+const uuidRegex =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const clientInputSchema = z.object({
   name: z
@@ -24,9 +26,14 @@ const clientInputSchema = z.object({
     .regex(hexColorRegex, "Color inválido (esperado #RRGGBB)")
     .optional(),
   payment_type: paymentTypeEnum.default("por_proyecto"),
-  balance: z.number().default(0),
+  /** Rate por minuto — usado por clientes por_rate y mensuales. */
   agreed_price: z.number().nonnegative().nullable().default(null),
-  monthly_fee: z.number().nonnegative().nullable().default(null),
+  /** % de descuento del retainer (sólo aplica a clientes mensuales). */
+  retainer_discount_pct: z
+    .number()
+    .min(0, "El descuento no puede ser negativo")
+    .max(100, "El descuento no puede superar 100%")
+    .default(10),
   billing_info: z.string().nullable().default(null),
   email: z.string().email("Email inválido").nullable().or(z.literal("")).default(null),
   phone: z.string().nullable().default(null),
@@ -52,6 +59,7 @@ function revalidateAll() {
   revalidatePath("/clients");
   revalidatePath("/projects");
   revalidatePath("/kanban");
+  revalidatePath("/finanzas");
   revalidatePath("/editors");
 }
 
@@ -107,15 +115,16 @@ export async function createClient(
       name: parsed.data.name,
       color: parsed.data.color ?? randomClientColor(),
       payment_type: parsed.data.payment_type,
-      balance: parsed.data.balance,
       agreed_price: parsed.data.agreed_price,
-      monthly_fee: parsed.data.monthly_fee,
+      retainer_discount_pct: parsed.data.retainer_discount_pct,
       billing_info: parsed.data.billing_info,
       email: normalizeText(parsed.data.email),
       phone: normalizeText(parsed.data.phone),
       docs_url: normalizeUrl(parsed.data.docs_url),
     })
-    .select("id, name, color, payment_type, agreed_price, monthly_fee, balance")
+    .select(
+      "id, name, color, payment_type, agreed_price, retainer_discount_pct"
+    )
     .single();
 
   if (error) {
@@ -146,9 +155,8 @@ export async function updateClient(
       name: parsed.data.name,
       ...(parsed.data.color ? { color: parsed.data.color } : {}),
       payment_type: parsed.data.payment_type,
-      balance: parsed.data.balance,
       agreed_price: parsed.data.agreed_price,
-      monthly_fee: parsed.data.monthly_fee,
+      retainer_discount_pct: parsed.data.retainer_discount_pct,
       billing_info: parsed.data.billing_info,
       email: normalizeText(parsed.data.email),
       phone: normalizeText(parsed.data.phone),
@@ -175,6 +183,100 @@ export async function deleteClient(id: string): Promise<ClientActionResult> {
   const { error } = await supabase.from("clients").delete().eq("id", id);
 
   if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true };
+}
+
+// =========================================================================
+// Pagos de clientes mensuales
+// =========================================================================
+
+const paymentSchema = z.object({
+  client_id: z.string().regex(uuidRegex, "Cliente inválido"),
+  amount: z.number().positive("El monto debe ser mayor a 0"),
+  paid_at: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
+  note: z.string().nullable().default(null),
+});
+
+export type ClientPaymentResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/**
+ * Tasa efectiva por minuto de un cliente mensual: el rate con el descuento
+ * de retainer aplicado.
+ */
+function effectiveRate(
+  rate: number | null,
+  discountPct: number
+): number | null {
+  if (rate == null || rate <= 0) return null;
+  const eff = rate * (1 - discountPct / 100);
+  return eff > 0 ? eff : null;
+}
+
+/**
+ * Registra un pago de un cliente mensual. El monto se convierte a minutos
+ * usando el rate efectivo (rate − descuento de retainer) del momento.
+ */
+export async function registerClientPayment(input: {
+  client_id: string;
+  amount: number;
+  paid_at: string;
+  note?: string | null;
+}): Promise<ClientPaymentResult> {
+  const parsed = paymentSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+
+  const supabase = await createSupabaseClient();
+  const { data: client, error: clientErr } = await supabase
+    .from("clients")
+    .select("agreed_price, retainer_discount_pct")
+    .eq("id", parsed.data.client_id)
+    .single();
+  if (clientErr || !client) {
+    return { ok: false, error: "Cliente no encontrado" };
+  }
+
+  const eff = effectiveRate(
+    client.agreed_price == null ? null : Number(client.agreed_price),
+    Number(client.retainer_discount_pct)
+  );
+  if (eff == null) {
+    return {
+      ok: false,
+      error: "El cliente no tiene un rate por minuto válido cargado",
+    };
+  }
+
+  const minutes = parsed.data.amount / eff;
+  const { error } = await supabase.from("client_payments").insert({
+    client_id: parsed.data.client_id,
+    amount: parsed.data.amount,
+    minutes_credited: minutes,
+    paid_at: parsed.data.paid_at,
+    note: normalizeText(parsed.data.note),
+  });
+  if (error) return { ok: false, error: error.message };
+
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function deleteClientPayment(
+  id: string
+): Promise<ClientPaymentResult> {
+  if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
+
+  const supabase = await createSupabaseClient();
+  const { error } = await supabase
+    .from("client_payments")
+    .delete()
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
   revalidateAll();
   return { ok: true };
 }

@@ -18,12 +18,14 @@ import {
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 
 import { MultiCombobox } from "@/components/ui/multi-combobox";
+import { ClientPaymentsSection } from "./client-payments-section";
 
 import { createClient, updateClient } from "@/lib/clients/actions";
 import { createEditor } from "@/lib/editors/actions";
 import { contrastColor, randomClientColor } from "@/lib/clients/palette";
 import { PAYMENT_TYPES, PAYMENT_TYPE_LABEL } from "@/lib/projects/types";
 import type {
+  ClientPayment,
   ClientRow,
   EditorMini,
   PaymentType,
@@ -31,7 +33,11 @@ import type {
 
 type Props = {
   mode: "create" | "edit";
-  client?: ClientRow & { editors?: EditorMini[] };
+  client?: ClientRow & {
+    editors?: EditorMini[];
+    minute_balance?: number | null;
+    payments?: ClientPayment[];
+  };
   availableEditors: EditorMini[];
   onSuccess?: () => void;
 };
@@ -50,11 +56,10 @@ export function ClientForm({
   const [agreedPrice, setAgreedPrice] = useState<string>(
     client?.agreed_price != null ? String(client.agreed_price) : ""
   );
-  const [monthlyFee, setMonthlyFee] = useState<string>(
-    client?.monthly_fee != null ? String(client.monthly_fee) : ""
-  );
-  const [balance, setBalance] = useState<string>(
-    client?.balance != null ? String(client.balance) : "0"
+  const [retainerDiscount, setRetainerDiscount] = useState<string>(
+    client?.retainer_discount_pct != null
+      ? String(client.retainer_discount_pct)
+      : "10"
   );
   const [billingInfo, setBillingInfo] = useState(client?.billing_info ?? "");
   const [email, setEmail] = useState(client?.email ?? "");
@@ -79,25 +84,24 @@ export function ClientForm({
       return;
     }
 
-    const parsedMonthly = monthlyFee === "" ? null : Number(monthlyFee);
-    if (parsedMonthly !== null && Number.isNaN(parsedMonthly)) {
-      toast.error("Monto mensual inválido");
+    const parsedDiscount =
+      retainerDiscount === "" ? 10 : Number(retainerDiscount);
+    if (
+      Number.isNaN(parsedDiscount) ||
+      parsedDiscount < 0 ||
+      parsedDiscount > 100
+    ) {
+      toast.error("El descuento de retainer debe ser entre 0 y 100%");
       return;
     }
 
-    const parsedBalance = balance === "" ? 0 : Number(balance);
-    if (Number.isNaN(parsedBalance)) {
-      toast.error("Saldo inválido");
-      return;
-    }
-
+    const usesRate = paymentType === "por_rate" || paymentType === "mensual";
     const payload = {
       name: trimmed,
       color,
       payment_type: paymentType,
-      balance: parsedBalance,
-      agreed_price: paymentType === "por_rate" ? parsedPrice : null,
-      monthly_fee: paymentType === "mensual" ? parsedMonthly : null,
+      agreed_price: usesRate ? parsedPrice : null,
+      retainer_discount_pct: parsedDiscount,
       billing_info: billingInfo.trim() || null,
       email: email.trim() || null,
       phone: phone.trim() || null,
@@ -192,7 +196,7 @@ export function ClientForm({
             </Select>
           </Field>
 
-          {paymentType === "por_rate" ? (
+          {paymentType === "por_rate" || paymentType === "mensual" ? (
             <Field
               label="Rate por minuto"
               hint="Lo que cobramos por minuto de video editado."
@@ -207,21 +211,6 @@ export function ClientForm({
                 placeholder="0"
               />
             </Field>
-          ) : paymentType === "mensual" ? (
-            <Field
-              label="Monto mensual"
-              hint="Lo que factura este cliente por mes (se ve en Finanzas)."
-            >
-              <Input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                value={monthlyFee}
-                onChange={(e) => setMonthlyFee(e.target.value)}
-                placeholder="0"
-              />
-            </Field>
           ) : (
             <Field
               label="Precio por proyecto"
@@ -233,19 +222,45 @@ export function ClientForm({
         </div>
 
         {paymentType === "mensual" ? (
-          <Field
-            label="Saldo"
-            hint="Positivo: a favor del cliente. Negativo: en contra."
-          >
-            <Input
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              value={balance}
-              onChange={(e) => setBalance(e.target.value)}
-              placeholder="0"
-            />
-          </Field>
+          <>
+            <Field
+              label="Descuento de retainer (%)"
+              hint="Descuento sobre el rate por ser cliente mensual (retainer). Default 10%."
+            >
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={100}
+                step="1"
+                value={retainerDiscount}
+                onChange={(e) => setRetainerDiscount(e.target.value)}
+                placeholder="10"
+              />
+            </Field>
+
+            {mode === "edit" && client ? (
+              <Field
+                label="Pagos y saldo de minutos"
+                hint={
+                  client.minute_balance != null
+                    ? `Saldo de minutos actual: ${client.minute_balance} min`
+                    : "Registrá pagos para acreditar minutos."
+                }
+              >
+                <ClientPaymentsSection
+                  clientId={client.id}
+                  rate={client.agreed_price}
+                  discountPct={client.retainer_discount_pct}
+                  payments={client.payments ?? []}
+                />
+              </Field>
+            ) : (
+              <p className="text-xs italic text-muted-foreground">
+                Guardá el cliente para registrar pagos.
+              </p>
+            )}
+          </>
         ) : null}
 
         <Field

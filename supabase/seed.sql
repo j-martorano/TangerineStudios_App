@@ -25,13 +25,13 @@ insert into projects (id, title, client_name, phase, cobrado, pagado, invoiced, 
 on conflict (id) do nothing;
 
 -- ============================================================
--- Asignación de editores (primary; el secondary es opcional y queda vacío en
--- los seeds — se puede agregar manualmente desde la UI).
+-- Asignación de editores. Sin límite de cantidad por proyecto; se pueden
+-- agregar más manualmente desde la UI.
 -- ============================================================
-insert into project_editors (project_id, editor_id, role, cost) values
-  ('22222222-2222-2222-2222-222222222201', '11111111-1111-1111-1111-111111111101', 'primary', null),
-  ('22222222-2222-2222-2222-222222222202', '11111111-1111-1111-1111-111111111102', 'primary', null),
-  ('22222222-2222-2222-2222-222222222203', '11111111-1111-1111-1111-111111111101', 'primary', null),
-  ('22222222-2222-2222-2222-222222222204', '11111111-1111-1111-1111-111111111103', 'primary', null),
-  ('22222222-2222-2222-2222-222222222205', '11111111-1111-1111-1111-111111111102', 'primary', null)
-on conflict (project_id, role) do nothing;
+insert into project_editors (project_id, editor_id, cost) values
+  ('22222222-2222-2222-2222-222222222201', '11111111-1111-1111-1111-111111111101', null),
+  ('22222222-2222-2222-2222-222222222202', '11111111-1111-1111-1111-111111111102', null),
+  ('22222222-2222-2222-2222-222222222203', '11111111-1111-1111-1111-111111111101', null),
+  ('22222222-2222-2222-2222-222222222204', '11111111-1111-1111-1111-111111111103', null),
+  ('22222222-2222-2222-2222-222222222205', '11111111-1111-1111-1111-111111111102', null)
+on conflict (project_id, editor_id) do nothing;

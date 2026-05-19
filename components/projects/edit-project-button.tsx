@@ -14,7 +14,7 @@ import {
 
 import { ProjectForm } from "./project-form";
 import type {
-  ClientMini,
+  ClientForProject,
   EditorMini,
   ProjectWithRelations,
 } from "@/lib/projects/types";
@@ -22,7 +22,7 @@ import type {
 type Props = {
   project: ProjectWithRelations;
   editors: EditorMini[];
-  clients: ClientMini[];
+  clients: ClientForProject[];
   variant?: "icon" | "ghost-icon";
   /** Si el proyecto está finalizado, la edición queda bloqueada. */
   disabled?: boolean;

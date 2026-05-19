@@ -1,9 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchProjects } from "@/lib/projects/queries";
 import {
+  fetchClientPayments,
   fetchFixedServices,
-  fetchSettlements,
-  settlementKey,
 } from "@/lib/finanzas/queries";
 import { FixedServicesSection } from "@/components/finanzas/fixed-services-section";
 import {
@@ -15,7 +14,7 @@ import {
 } from "@/lib/projects/format";
 import { monthToneFromKey } from "@/lib/projects/month-colors";
 import type { ProjectWithRelations } from "@/lib/projects/types";
-import { MonthlySettleButton } from "@/components/finanzas/monthly-settle-button";
+import type { FinanzasPayment } from "@/lib/finanzas/queries";
 import { ProjectSettleButton } from "@/components/finanzas/project-settle-button";
 
 export const dynamic = "force-dynamic";
@@ -37,18 +36,17 @@ type MonthBucket = {
   pendingPay: number;
   profit: number;
   servicesCost: number;
-  mensualCount: number;
 };
 
-type MensualItem = {
+type PaymentItem = {
   yearMonth: string;
   monthLabel: string;
-  partyType: "client_cobro" | "editor_pago";
-  partyId: string;
-  partyName: string;
-  partyColor?: string;
+  clientName: string;
+  clientColor: string | null;
   amount: number;
-  settled: boolean;
+  minutesCredited: number;
+  note: string | null;
+  paidAt: string;
 };
 
 type ProjectSettleItem = {
@@ -76,17 +74,16 @@ function monthLabel(iso: string): string {
 
 type BuildResult = {
   buckets: MonthBucket[];
-  mensualItems: MensualItem[];
+  paymentItems: PaymentItem[];
   projectItems: ProjectSettleItem[];
 };
 
 function build(
   projects: ProjectWithRelations[],
-  settledKeys: Set<string>
+  payments: FinanzasPayment[]
 ): BuildResult {
   const byKey = new Map<string, MonthBucket>();
-  const seenMonthlyClients = new Map<string, Set<string>>();
-  const mensualItems: MensualItem[] = [];
+  const paymentItems: PaymentItem[] = [];
   const projectItems: ProjectSettleItem[] = [];
 
   function ensureBucket(key: string, iso: string): MonthBucket {
@@ -101,16 +98,31 @@ function build(
         pendingPay: 0,
         profit: 0,
         servicesCost: 0,
-        mensualCount: 0,
       });
-      seenMonthlyClients.set(key, new Set());
     }
     return byKey.get(key)!;
   }
 
+  // ====== Pagos de clientes mensuales — ingreso del mes en que se pagaron ======
+  for (const pay of payments) {
+    const key = monthKey(pay.paid_at);
+    const bucket = ensureBucket(key, pay.paid_at);
+    bucket.collected += pay.amount;
+    bucket.profit += pay.amount;
+    paymentItems.push({
+      yearMonth: key,
+      monthLabel: bucket.label,
+      clientName: pay.clientName,
+      clientColor: pay.clientColor,
+      amount: pay.amount,
+      minutesCredited: pay.minutes_credited,
+      note: pay.note,
+      paidAt: pay.paid_at,
+    });
+  }
+
+  // ====== Proyectos finalizados — entran en el mes en que se finalizaron ======
   for (const p of projects) {
-    // Un proyecto entra a Finanzas sólo cuando está finalizado, y lo hace en
-    // el mes en que se finalizó (finalized_at).
     if (!p.finalized) continue;
     const monthIso = p.finalized_at ?? p.created_at;
     const key = monthKey(monthIso);
@@ -118,49 +130,16 @@ function build(
     bucket.projects.push(p);
 
     const client = p.client;
-    const isClientMensual = client?.payment_type === "mensual";
-    if (isClientMensual) bucket.mensualCount += 1;
+    const isMensual = client?.payment_type === "mensual";
 
-    // ============ Cliente mensual (cobramos monthly_fee una vez/mes) ============
-    if (
-      client?.payment_type === "mensual" &&
-      client.monthly_fee != null &&
-      !seenMonthlyClients.get(key)!.has(client.id)
-    ) {
-      seenMonthlyClients.get(key)!.add(client.id);
-      const fee = Number(client.monthly_fee);
-      const settled = settledKeys.has(
-        settlementKey(key, "client_cobro", client.id)
-      );
-      if (settled) {
-        bucket.collected += fee;
-      } else {
-        bucket.pendingCollect += fee;
-      }
-      mensualItems.push({
-        yearMonth: key,
-        monthLabel: bucket.label,
-        partyType: "client_cobro",
-        partyId: client.id,
-        partyName: client.name,
-        partyColor: client.color,
-        amount: fee,
-        settled,
-      });
-    }
-
-    // ============ Cobros por proyecto (por_proyecto + por_rate) ============
-    // Incluimos cualquier proyecto que NO sea mensual (incluso sin cliente
-    // linkeado), aunque el monto todavía no sea calculable.
-    if (!client || client.payment_type !== "mensual") {
+    // Cobros por proyecto — sólo clientes NO mensuales (los mensuales cobran
+    // vía pagos). Incluye proyectos sin cliente linkeado.
+    if (!isMensual) {
       const price = computePrice(p);
       const cobradoSettled = p.cobrado === "si";
       if (price != null) {
-        if (cobradoSettled) {
-          bucket.collected += price;
-        } else {
-          bucket.pendingCollect += price;
-        }
+        if (cobradoSettled) bucket.collected += price;
+        else bucket.pendingCollect += price;
       }
       projectItems.push({
         yearMonth: key,
@@ -175,17 +154,14 @@ function build(
       });
     }
 
-    // ============ Pagos por proyecto (todos los editores aportan al costo) ============
+    // Pagos por proyecto — todos los editores aportan al costo.
     const hasEditor = p.editors.some((e) => e.editor != null);
     if (hasEditor) {
       const cost = computeCost(p);
       const pagadoSettled = p.pagado === "pago_total";
       if (cost != null) {
-        if (pagadoSettled) {
-          bucket.paid += cost;
-        } else {
-          bucket.pendingPay += cost;
-        }
+        if (pagadoSettled) bucket.paid += cost;
+        else bucket.pendingPay += cost;
       }
       projectItems.push({
         yearMonth: key,
@@ -200,10 +176,14 @@ function build(
       });
     }
 
-    // ============ Ganancia ============
-    const profit = computeProfit(p);
-    if (profit != null) {
-      bucket.profit += profit;
+    // Ganancia: para clientes no mensuales, precio − costo. Para mensuales,
+    // sólo resta el costo de edición (el ingreso son los pagos del retainer).
+    if (isMensual) {
+      const cost = computeCost(p);
+      if (cost != null) bucket.profit -= cost;
+    } else {
+      const profit = computeProfit(p);
+      if (profit != null) bucket.profit += profit;
     }
   }
 
@@ -211,20 +191,21 @@ function build(
     b.key.localeCompare(a.key)
   );
 
-  // Pendientes primero (settled=false), después saldados. Dentro de cada
-  // grupo, por mes desc y luego por monto desc.
-  function cmp(
-    a: { settled: boolean; yearMonth: string; amount: number | null },
-    b: { settled: boolean; yearMonth: string; amount: number | null }
-  ): number {
-    if (a.settled !== b.settled) return a.settled ? 1 : -1;
-    if (a.yearMonth !== b.yearMonth) return b.yearMonth.localeCompare(a.yearMonth);
-    return (b.amount ?? 0) - (a.amount ?? 0);
-  }
-  mensualItems.sort(cmp);
-  projectItems.sort(cmp);
+  paymentItems.sort((a, b) => {
+    if (a.yearMonth !== b.yearMonth)
+      return b.yearMonth.localeCompare(a.yearMonth);
+    return b.paidAt.localeCompare(a.paidAt);
+  });
 
-  return { buckets, mensualItems, projectItems };
+  // Pendientes primero, después saldados; dentro de cada grupo por mes y monto.
+  projectItems.sort((a, b) => {
+    if (a.settled !== b.settled) return a.settled ? 1 : -1;
+    if (a.yearMonth !== b.yearMonth)
+      return b.yearMonth.localeCompare(a.yearMonth);
+    return (b.amount ?? 0) - (a.amount ?? 0);
+  });
+
+  return { buckets, paymentItems, projectItems };
 }
 
 function sumAcrossBuckets(
@@ -240,15 +221,12 @@ function sumAcrossBuckets(
 }
 
 export default async function FinanzasPage() {
-  const [projects, settledKeys, fixedServices] = await Promise.all([
+  const [projects, payments, fixedServices] = await Promise.all([
     fetchProjects(),
-    fetchSettlements(),
+    fetchClientPayments(),
     fetchFixedServices(),
   ]);
-  const { buckets, mensualItems, projectItems } = build(
-    projects,
-    settledKeys
-  );
+  const { buckets, paymentItems, projectItems } = build(projects, payments);
 
   // Servicios fijos activos: su costo mensual se resta de la ganancia de
   // cada mes con actividad.
@@ -299,7 +277,7 @@ export default async function FinanzasPage() {
         />
       </section>
 
-      <MensualesSection items={mensualItems} />
+      <PagosSection items={paymentItems} />
       <ProjectsSection items={projectItems} />
       <FixedServicesSection services={fixedServices} />
 
@@ -309,7 +287,7 @@ export default async function FinanzasPage() {
         </h2>
         {buckets.length === 0 ? (
           <p className="text-sm italic text-muted-foreground">
-            No hay proyectos cargados todavía.
+            No hay actividad cargada todavía.
           </p>
         ) : (
           <div className="flex flex-col gap-3">
@@ -354,62 +332,57 @@ function TotalCard({
   );
 }
 
-function MensualesSection({ items }: { items: MensualItem[] }) {
-  const pendientes = items.filter((i) => !i.settled).length;
+function fmtMin(n: number): string {
+  const rounded = Number.isInteger(n) ? n : Number(n.toFixed(1));
+  return `${rounded} min`;
+}
+
+function PagosSection({ items }: { items: PaymentItem[] }) {
+  const total = items.reduce((sum, i) => sum + i.amount, 0);
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
         <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Mensuales
+          Pagos de clientes mensuales
         </h2>
         <span className="text-xs text-muted-foreground">
-          {pendientes} pendiente{pendientes === 1 ? "" : "s"} · {items.length}{" "}
-          total
+          {items.length} pago{items.length === 1 ? "" : "s"} ·{" "}
+          {formatPrice(total)}
         </span>
       </div>
       {items.length === 0 ? (
         <p className="text-sm italic text-muted-foreground">
-          No hay clientes ni editores mensuales activos.
+          No hay pagos de clientes mensuales registrados. Cargalos desde la
+          ficha del cliente.
         </p>
       ) : (
         <Card>
           <CardContent className="divide-y divide-border/40 p-0">
-            {items.map((it) => (
+            {items.map((it, i) => (
               <div
-                key={`${it.yearMonth}-${it.partyType}-${it.partyId}`}
-                className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 ${
-                  it.settled ? "opacity-60" : ""
-                }`}
+                key={`${it.paidAt}-${it.clientName}-${i}`}
+                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
               >
                 <div className="flex items-center gap-3">
-                  {it.partyColor ? (
+                  {it.clientColor ? (
                     <span
                       className="size-3 shrink-0 rounded-full"
-                      style={{ backgroundColor: it.partyColor }}
+                      style={{ backgroundColor: it.clientColor }}
                     />
                   ) : null}
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium">{it.partyName}</span>
+                    <span className="text-sm font-medium">
+                      {it.clientName}
+                    </span>
                     <span className="text-xs text-muted-foreground capitalize">
-                      {it.monthLabel} ·{" "}
-                      {it.partyType === "client_cobro"
-                        ? "cobrar (cliente)"
-                        : "pagar (editor)"}
+                      {it.monthLabel} · {fmtMin(it.minutesCredited)}
+                      {it.note ? ` · ${it.note}` : ""}
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold tabular-nums">
-                    {formatPrice(it.amount)}
-                  </span>
-                  <MonthlySettleButton
-                    yearMonth={it.yearMonth}
-                    partyType={it.partyType}
-                    partyId={it.partyId}
-                    settled={it.settled}
-                    description={`${it.partyName} — ${it.monthLabel}`}
-                  />
-                </div>
+                <span className="text-sm font-semibold tabular-nums">
+                  {formatPrice(it.amount)}
+                </span>
               </div>
             ))}
           </CardContent>
@@ -436,7 +409,7 @@ function ProjectsSection({ items }: { items: ProjectSettleItem[] }) {
         />
         <ProjectList
           title="Pagos"
-          subtitle="editores (rate × duración)"
+          subtitle="editores"
           items={pagarItems}
         />
       </div>
@@ -466,7 +439,7 @@ function ProjectList({
       <CardContent className="divide-y divide-border/40 p-0">
         {items.length === 0 ? (
           <p className="px-4 py-6 text-center text-xs italic text-muted-foreground">
-            No hay proyectos con monto computable.
+            No hay proyectos finalizados con monto computable.
           </p>
         ) : (
           items.map((it) => (
@@ -523,11 +496,9 @@ function MonthCard({ bucket }: { bucket: MonthBucket }) {
           {bucket.label}
         </CardTitle>
         <span className="text-xs text-muted-foreground">
-          {bucket.projects.length} proyecto
+          {bucket.projects.length} video
+          {bucket.projects.length === 1 ? "" : "s"} finalizado
           {bucket.projects.length === 1 ? "" : "s"}
-          {bucket.mensualCount > 0
-            ? ` · ${bucket.mensualCount} mensual${bucket.mensualCount === 1 ? "" : "es"}`
-            : ""}
         </span>
       </CardHeader>
       <CardContent>
@@ -584,7 +555,13 @@ function MonthCard({ bucket }: { bucket: MonthBucket }) {
                       <span className="text-muted-foreground">
                         {formatDuration(p.duration_minutes)}
                       </span>
-                      <span>{price != null ? formatPrice(price) : "—"}</span>
+                      <span>
+                        {p.client?.payment_type === "mensual"
+                          ? "Mensual"
+                          : price != null
+                            ? formatPrice(price)
+                            : "—"}
+                      </span>
                       <span
                         className={
                           profit != null && profit < 0

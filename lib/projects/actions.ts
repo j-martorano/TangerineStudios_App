@@ -65,30 +65,10 @@ const projectInputSchema = z
       .number()
       .nonnegative("La duración no puede ser negativa")
       .nullable(),
-    primary_editor_id: z
-      .string()
-      .regex(uuidRegex, "Editor inválido")
-      .nullable(),
-    secondary_editor_id: z
-      .string()
-      .regex(uuidRegex, "Editor secundario inválido")
-      .nullable(),
-    secondary_editor_cost: z
-      .number()
-      .nonnegative("El costo no puede ser negativo")
-      .nullable(),
-  })
-  .refine(
-    (d) =>
-      !d.secondary_editor_id || d.secondary_editor_id !== d.primary_editor_id,
-    {
-      message: "El segundo editor no puede ser el mismo que el principal",
-      path: ["secondary_editor_id"],
-    }
-  )
-  .refine((d) => !d.secondary_editor_cost || d.secondary_editor_id, {
-    message: "Hay un costo pero ningún segundo editor asignado",
-    path: ["secondary_editor_cost"],
+    /** IDs de los editores asignados al proyecto (sin límite de cantidad). */
+    editor_ids: z
+      .array(z.string().regex(uuidRegex, "Editor inválido"))
+      .default([]),
   });
 
 export type ProjectInput = z.input<typeof projectInputSchema>;
@@ -108,37 +88,22 @@ function firstError(err: z.ZodError): string {
   return err.issues[0]?.message ?? "Datos inválidos";
 }
 
-type EditorRow = {
+type ProjectEditorRow = {
   project_id: string;
   editor_id: string;
-  role: "primary" | "secondary";
   cost: number | null;
 };
 
 function buildEditorRows(
   projectId: string,
-  primary: string | null,
-  secondary: string | null,
-  secondaryCost: number | null
-): EditorRow[] {
-  const rows: EditorRow[] = [];
-  if (primary) {
-    rows.push({
-      project_id: projectId,
-      editor_id: primary,
-      role: "primary",
-      cost: null,
-    });
-  }
-  if (secondary) {
-    rows.push({
-      project_id: projectId,
-      editor_id: secondary,
-      role: "secondary",
-      cost: secondaryCost,
-    });
-  }
-  return rows;
+  editorIds: string[]
+): ProjectEditorRow[] {
+  // Dedup por las dudas: la PK del pivot es (project_id, editor_id).
+  return [...new Set(editorIds)].map((editorId) => ({
+    project_id: projectId,
+    editor_id: editorId,
+    cost: null,
+  }));
 }
 
 export async function createProject(
@@ -147,12 +112,7 @@ export async function createProject(
   const parsed = projectInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
-  const {
-    primary_editor_id,
-    secondary_editor_id,
-    secondary_editor_cost,
-    ...projectData
-  } = parsed.data;
+  const { editor_ids, ...projectData } = parsed.data;
 
   const supabase = await createClient();
   const clientName = await getClientName(projectData.client_id);
@@ -169,12 +129,7 @@ export async function createProject(
     return { ok: false, error: error?.message ?? "Error al crear proyecto" };
   }
 
-  const editorRows = buildEditorRows(
-    created.id,
-    primary_editor_id,
-    secondary_editor_id,
-    secondary_editor_cost
-  );
+  const editorRows = buildEditorRows(created.id, editor_ids);
 
   if (editorRows.length > 0) {
     const { error: editorError } = await supabase
@@ -194,12 +149,7 @@ export async function updateProject(
   const parsed = projectInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
-  const {
-    primary_editor_id,
-    secondary_editor_id,
-    secondary_editor_cost,
-    ...projectData
-  } = parsed.data;
+  const { editor_ids, ...projectData } = parsed.data;
 
   const supabase = await createClient();
   const clientName = await getClientName(projectData.client_id);
@@ -218,12 +168,7 @@ export async function updateProject(
     .eq("project_id", id);
   if (deleteError) return { ok: false, error: deleteError.message };
 
-  const editorRows = buildEditorRows(
-    id,
-    primary_editor_id,
-    secondary_editor_id,
-    secondary_editor_cost
-  );
+  const editorRows = buildEditorRows(id, editor_ids);
 
   if (editorRows.length > 0) {
     const { error: insertError } = await supabase
