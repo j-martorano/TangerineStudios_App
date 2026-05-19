@@ -7,6 +7,7 @@ import {
   fetchClients,
   fetchEditorsList,
 } from "@/lib/projects/queries";
+import { fetchPaymentMethods } from "@/lib/payment-methods/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +22,12 @@ export default async function EditorsPage({
   const query = params.q?.trim() || undefined;
   const page = Math.max(1, Number(params.page) || 1);
 
-  const [{ editors, total }, availableClients] = await Promise.all([
-    fetchEditorsList({ query, page }),
-    fetchClients(),
-  ]);
+  const [{ editors, total }, availableClients, paymentMethodsCatalog] =
+    await Promise.all([
+      fetchEditorsList({ query, page }),
+      fetchClients(),
+      fetchPaymentMethods(),
+    ]);
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 md:p-8">
@@ -35,7 +38,10 @@ export default async function EditorsPage({
             {total} editor{total === 1 ? "" : "es"}
           </p>
         </div>
-        <NewEditorButton availableClients={availableClients} />
+        <NewEditorButton
+          availableClients={availableClients}
+          paymentMethodsCatalog={paymentMethodsCatalog}
+        />
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -43,7 +49,11 @@ export default async function EditorsPage({
       </div>
 
       <div className="rounded-xl border bg-card p-2">
-        <EditorsTable editors={editors} availableClients={availableClients} />
+        <EditorsTable
+          editors={editors}
+          availableClients={availableClients}
+          paymentMethodsCatalog={paymentMethodsCatalog}
+        />
       </div>
 
       <DataPagination

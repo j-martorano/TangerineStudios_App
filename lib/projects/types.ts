@@ -6,7 +6,6 @@ export type PagadoStatus = Database["public"]["Enums"]["pagado_status"];
 export type InvoicedStatus = Database["public"]["Enums"]["invoiced_status"];
 export type EditorRole = Database["public"]["Enums"]["editor_role"];
 
-export type CurrencyCode = Database["public"]["Enums"]["currency_code"];
 export type PaymentType = Database["public"]["Enums"]["payment_type"];
 export type EditorPaymentType =
   Database["public"]["Enums"]["editor_payment_type"];
@@ -55,8 +54,6 @@ export const PAGADO_STATUSES: PagadoStatus[] = [
   "pago_total",
 ];
 export const INVOICED_STATUSES: InvoicedStatus[] = ["no", "parcial", "si"];
-
-export const CURRENCIES: CurrencyCode[] = ["ARS", "USD", "EUR"];
 
 export const PAYMENT_TYPES: PaymentType[] = [
   "por_proyecto",

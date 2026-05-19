@@ -11,16 +11,19 @@ import {
 
 import { EditEditorButton } from "./edit-editor-button";
 import { DeleteEditorButton } from "./delete-editor-button";
+import { PaymentMethodChips } from "./payment-method-chips";
 import type { EditorWithCount } from "@/lib/projects/queries";
 import type { ClientMini } from "@/lib/projects/types";
-import { formatDate } from "@/lib/projects/format";
+import type { PaymentMethod } from "@/lib/payment-methods/queries";
 
 export function EditorsTable({
   editors,
   availableClients,
+  paymentMethodsCatalog,
 }: {
   editors: EditorWithCount[];
   availableClients: ClientMini[];
+  paymentMethodsCatalog: PaymentMethod[];
 }) {
   if (editors.length === 0) {
     return (
@@ -38,7 +41,7 @@ export function EditorsTable({
           <TableHead>Clientes</TableHead>
           <TableHead>Contacto</TableHead>
           <TableHead>Discord</TableHead>
-          <TableHead>Banco</TableHead>
+          <TableHead>Métodos de pago</TableHead>
           <TableHead>Docs</TableHead>
           <TableHead className="text-right">Proyectos</TableHead>
           <TableHead className="w-24 text-right">Acciones</TableHead>
@@ -74,8 +77,8 @@ export function EditorsTable({
             <TableCell className="font-mono text-xs text-muted-foreground">
               {e.discord_id ?? "—"}
             </TableCell>
-            <TableCell className="max-w-[20ch] truncate text-muted-foreground">
-              {e.bank_info ?? "—"}
+            <TableCell>
+              <PaymentMethodChips methods={e.payment_methods} />
             </TableCell>
             <TableCell>
               {e.docs_url ? (
@@ -100,6 +103,7 @@ export function EditorsTable({
                 <EditEditorButton
                   editor={e}
                   availableClients={availableClients}
+                  paymentMethodsCatalog={paymentMethodsCatalog}
                 />
                 <DeleteEditorButton
                   id={e.id}

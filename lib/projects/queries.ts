@@ -6,7 +6,7 @@ import type {
 } from "./types";
 
 const PROJECT_SELECT =
-  "id, project_code, title, client_name, phase, cobrado, pagado, invoiced, status, price, cost, currency, duration_minutes, position, created_at, updated_at, client_id, client:clients(id, name, color, payment_type, agreed_price, monthly_fee, balance), editors:project_editors(role, cost, editor:editors(id, name, payment_type, rate, monthly_fee))";
+  "id, project_code, title, client_name, phase, cobrado, pagado, invoiced, status, price, cost, duration_minutes, position, created_at, updated_at, client_id, client:clients(id, name, color, payment_type, agreed_price, monthly_fee, balance), editors:project_editors(role, cost, editor:editors(id, name, payment_type, rate, monthly_fee))";
 
 export const DEFAULT_PER_PAGE = 20;
 
@@ -87,14 +87,16 @@ export async function fetchEditors(): Promise<EditorMini[]> {
 }
 
 import type { EditorRow } from "./types";
+import type { EditorPaymentMethod } from "@/lib/payment-methods/queries";
 
 export type EditorWithCount = EditorRow & {
   project_count: number;
   clients: ClientMini[];
+  payment_methods: EditorPaymentMethod[];
 };
 
 const EDITOR_FULL_SELECT =
-  "id, name, email, phone, discord_id, bank_info, docs_url, payment_type, rate, monthly_fee, created_at, project_editors(count), client_editors(client:clients(id, name, color, payment_type, agreed_price, monthly_fee, balance))";
+  "id, name, email, phone, discord_id, docs_url, payment_type, rate, monthly_fee, created_at, project_editors(count), client_editors(client:clients(id, name, color, payment_type, agreed_price, monthly_fee, balance)), editor_payment_methods(method_id, info, method:payment_methods(id, name))";
 
 import type { EditorPaymentType } from "./types";
 
@@ -104,7 +106,6 @@ function mapEditor(e: {
   email: string | null;
   phone: string | null;
   discord_id: string | null;
-  bank_info: string | null;
   docs_url: string | null;
   payment_type: EditorPaymentType;
   rate: number | null;
@@ -112,6 +113,13 @@ function mapEditor(e: {
   created_at: string;
   project_editors?: { count: number }[] | null;
   client_editors?: { client: ClientMini | null }[] | null;
+  editor_payment_methods?:
+    | {
+        method_id: string;
+        info: string | null;
+        method: { id: string; name: string } | null;
+      }[]
+    | null;
 }): EditorWithCount {
   return {
     id: e.id,
@@ -119,7 +127,6 @@ function mapEditor(e: {
     email: e.email,
     phone: e.phone,
     discord_id: e.discord_id,
-    bank_info: e.bank_info,
     docs_url: e.docs_url,
     payment_type: e.payment_type,
     rate: e.rate,
@@ -129,6 +136,14 @@ function mapEditor(e: {
     clients: (e.client_editors ?? [])
       .map((ce) => ce.client)
       .filter((c): c is ClientMini => c != null),
+    payment_methods: (e.editor_payment_methods ?? [])
+      .filter((pm) => pm.method != null)
+      .map((pm) => ({
+        method_id: pm.method_id,
+        name: pm.method!.name,
+        info: pm.info,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
 

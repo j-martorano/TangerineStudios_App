@@ -117,9 +117,44 @@ export type Database = {
         }
         Relationships: []
       }
+      editor_payment_methods: {
+        Row: {
+          created_at: string
+          editor_id: string
+          info: string | null
+          method_id: string
+        }
+        Insert: {
+          created_at?: string
+          editor_id: string
+          info?: string | null
+          method_id: string
+        }
+        Update: {
+          created_at?: string
+          editor_id?: string
+          info?: string | null
+          method_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editor_payment_methods_editor_id_fkey"
+            columns: ["editor_id"]
+            isOneToOne: false
+            referencedRelation: "editors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "editor_payment_methods_method_id_fkey"
+            columns: ["method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       editors: {
         Row: {
-          bank_info: string | null
           created_at: string
           discord_id: string | null
           docs_url: string | null
@@ -132,7 +167,6 @@ export type Database = {
           rate: number | null
         }
         Insert: {
-          bank_info?: string | null
           created_at?: string
           discord_id?: string | null
           docs_url?: string | null
@@ -145,7 +179,6 @@ export type Database = {
           rate?: number | null
         }
         Update: {
-          bank_info?: string | null
           created_at?: string
           discord_id?: string | null
           docs_url?: string | null
@@ -156,6 +189,30 @@ export type Database = {
           payment_type?: Database["public"]["Enums"]["editor_payment_type"]
           phone?: string | null
           rate?: number | null
+        }
+        Relationships: []
+      }
+      fixed_services: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          monthly_cost: number
+          name: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          monthly_cost?: number
+          name: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          monthly_cost?: number
+          name?: string
         }
         Relationships: []
       }
@@ -177,6 +234,24 @@ export type Database = {
           party_type?: Database["public"]["Enums"]["settlement_party_type"]
           settled_at?: string
           year_month?: string
+        }
+        Relationships: []
+      }
+      payment_methods: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }
@@ -226,7 +301,6 @@ export type Database = {
           cobrado: Database["public"]["Enums"]["cobrado_status"]
           cost: number | null
           created_at: string
-          currency: Database["public"]["Enums"]["currency_code"]
           duration_minutes: number | null
           id: string
           invoiced: Database["public"]["Enums"]["invoiced_status"]
@@ -245,7 +319,6 @@ export type Database = {
           cobrado?: Database["public"]["Enums"]["cobrado_status"]
           cost?: number | null
           created_at?: string
-          currency?: Database["public"]["Enums"]["currency_code"]
           duration_minutes?: number | null
           id?: string
           invoiced?: Database["public"]["Enums"]["invoiced_status"]
@@ -264,7 +337,6 @@ export type Database = {
           cobrado?: Database["public"]["Enums"]["cobrado_status"]
           cost?: number | null
           created_at?: string
-          currency?: Database["public"]["Enums"]["currency_code"]
           duration_minutes?: number | null
           id?: string
           invoiced?: Database["public"]["Enums"]["invoiced_status"]
@@ -297,7 +369,6 @@ export type Database = {
     }
     Enums: {
       cobrado_status: "si" | "no" | "parcial"
-      currency_code: "ARS" | "USD" | "EUR"
       editor_payment_type: "por_rate" | "mensual"
       editor_role: "primary" | "secondary"
       invoiced_status: "si" | "no" | "parcial"
@@ -442,7 +513,6 @@ export const Constants = {
   public: {
     Enums: {
       cobrado_status: ["si", "no", "parcial"],
-      currency_code: ["ARS", "USD", "EUR"],
       editor_payment_type: ["por_rate", "mensual"],
       editor_role: ["primary", "secondary"],
       invoiced_status: ["si", "no", "parcial"],

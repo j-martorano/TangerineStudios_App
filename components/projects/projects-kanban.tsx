@@ -53,6 +53,12 @@ type Props = {
   clients: ClientMini[];
 };
 
+// Tinte de fondo de la card con el color del cliente (~12% de opacidad).
+function clientTint(hex: string | null | undefined): string | undefined {
+  if (!hex) return undefined;
+  return `${hex}1f`; // hex de 8 dígitos: #RRGGBB + alpha 0x1f
+}
+
 type ColumnsMap = Record<ProjectPhase, ProjectWithRelations[]>;
 
 function buildColumns(projects: ProjectWithRelations[]): ColumnsMap {
@@ -397,6 +403,7 @@ function CardView({
     <Card
       size="sm"
       className={`relative ${dragging ? "rotate-2 shadow-lg ring-2 ring-primary/40" : ""}`}
+      style={{ backgroundColor: clientTint(project.client?.color) }}
     >
       {editors && clients ? (
         <div className="absolute right-1 top-1 z-10">
@@ -440,9 +447,7 @@ function CardView({
               ? "Mensual"
               : (() => {
                   const price = computePrice(project);
-                  return price != null
-                    ? formatPrice(price, project.currency)
-                    : "—";
+                  return price != null ? formatPrice(price) : "—";
                 })()}
           </span>
           <span className="truncate text-muted-foreground">

@@ -1,17 +1,22 @@
+import Link from "next/link";
+
 import { NewProjectButton } from "@/components/projects/new-project-button";
 import { ProjectsTable } from "@/components/projects/projects-table";
-import { DataPagination } from "@/components/data-pagination";
 import { DataSearch } from "@/components/data-search";
 import {
-  DEFAULT_PER_PAGE,
   fetchClients,
   fetchEditors,
-  fetchProjectsList,
+  fetchProjects,
 } from "@/lib/projects/queries";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ q?: string; page?: string }>;
+type SearchParams = Promise<{ q?: string; year?: string }>;
+
+function projectYear(iso: string | null | undefined): number {
+  if (!iso) return 0;
+  return new Date(iso).getUTCFullYear();
+}
 
 export default async function ProjectsPage({
   searchParams,
@@ -20,13 +25,36 @@ export default async function ProjectsPage({
 }) {
   const params = await searchParams;
   const query = params.q?.trim() || undefined;
-  const page = Math.max(1, Number(params.page) || 1);
 
-  const [{ projects, total }, editors, clients] = await Promise.all([
-    fetchProjectsList({ query, page }),
+  const [projects, editors, clients] = await Promise.all([
+    fetchProjects({ query }),
     fetchEditors(),
     fetchClients(),
   ]);
+
+  // Años con proyectos, del más reciente al más viejo.
+  const years = Array.from(
+    new Set(projects.map((p) => projectYear(p.created_at)))
+  ).sort((a, b) => b - a);
+
+  const currentYear = new Date().getUTCFullYear();
+  const requestedYear = Number(params.year);
+  const selectedYear = years.includes(requestedYear)
+    ? requestedYear
+    : years.includes(currentYear)
+      ? currentYear
+      : (years[0] ?? currentYear);
+
+  const yearProjects = projects.filter(
+    (p) => projectYear(p.created_at) === selectedYear
+  );
+
+  function yearHref(year: number): string {
+    const sp = new URLSearchParams();
+    sp.set("year", String(year));
+    if (query) sp.set("q", query);
+    return `/projects?${sp.toString()}`;
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 md:p-8">
@@ -34,7 +62,7 @@ export default async function ProjectsPage({
         <div className="flex items-baseline gap-4">
           <h1 className="text-2xl font-semibold tracking-tight">Proyectos</h1>
           <p className="text-sm text-muted-foreground">
-            {total} proyecto{total === 1 ? "" : "s"}
+            {projects.length} proyecto{projects.length === 1 ? "" : "s"}
           </p>
         </div>
         <NewProjectButton editors={editors} clients={clients} />
@@ -44,17 +72,34 @@ export default async function ProjectsPage({
         <DataSearch placeholder="Buscar por título o cliente…" />
       </div>
 
-      <div className="rounded-xl border bg-card p-2">
-        <ProjectsTable projects={projects} editors={editors} clients={clients} />
-      </div>
+      {years.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1 border-b">
+          {years.map((year) => {
+            const active = year === selectedYear;
+            return (
+              <Link
+                key={year}
+                href={yearHref(year)}
+                className={`-mb-px rounded-t-lg border border-b-0 px-4 py-1.5 text-sm font-medium tabular-nums transition-colors ${
+                  active
+                    ? "border-border bg-card text-foreground"
+                    : "border-transparent text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                }`}
+              >
+                {year === 0 ? "Sin fecha" : year}
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
 
-      <DataPagination
-        page={page}
-        perPage={DEFAULT_PER_PAGE}
-        total={total}
-        basePath="/projects"
-        searchParams={{ q: query }}
-      />
+      <div className="rounded-xl border bg-card p-2">
+        <ProjectsTable
+          projects={yearProjects}
+          editors={editors}
+          clients={clients}
+        />
+      </div>
     </main>
   );
 }

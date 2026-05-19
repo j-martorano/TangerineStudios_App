@@ -14,11 +14,14 @@ import {
 
 import { EditorForm } from "./editor-form";
 import type { ClientMini } from "@/lib/projects/types";
+import type { PaymentMethod } from "@/lib/payment-methods/queries";
 
 export function NewEditorButton({
   availableClients,
+  paymentMethodsCatalog,
 }: {
   availableClients: ClientMini[];
+  paymentMethodsCatalog: PaymentMethod[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -35,6 +38,7 @@ export function NewEditorButton({
         <EditorForm
           mode="create"
           availableClients={availableClients}
+          paymentMethodsCatalog={paymentMethodsCatalog}
           onSuccess={() => setOpen(false)}
         />
       </DialogContent>

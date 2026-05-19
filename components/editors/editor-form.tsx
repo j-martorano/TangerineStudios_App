@@ -13,10 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 
 import { MultiCombobox } from "@/components/ui/multi-combobox";
+import {
+  EditorPaymentMethods,
+  type EditorMethodValue,
+} from "./editor-payment-methods";
 
 import { createEditor, updateEditor } from "@/lib/editors/actions";
 import { createClient } from "@/lib/clients/actions";
@@ -29,11 +32,19 @@ import type {
   EditorPaymentType,
   EditorRow,
 } from "@/lib/projects/types";
+import type {
+  EditorPaymentMethod,
+  PaymentMethod,
+} from "@/lib/payment-methods/queries";
 
 type Props = {
   mode: "create" | "edit";
-  editor?: EditorRow & { clients?: ClientMini[] };
+  editor?: EditorRow & {
+    clients?: ClientMini[];
+    payment_methods?: EditorPaymentMethod[];
+  };
   availableClients: ClientMini[];
+  paymentMethodsCatalog: PaymentMethod[];
   onSuccess?: () => void;
 };
 
@@ -41,13 +52,21 @@ export function EditorForm({
   mode,
   editor,
   availableClients,
+  paymentMethodsCatalog,
   onSuccess,
 }: Props) {
   const [name, setName] = useState(editor?.name ?? "");
   const [email, setEmail] = useState(editor?.email ?? "");
   const [phone, setPhone] = useState(editor?.phone ?? "");
   const [discordId, setDiscordId] = useState(editor?.discord_id ?? "");
-  const [bankInfo, setBankInfo] = useState(editor?.bank_info ?? "");
+  const [methods, setMethods] = useState<EditorMethodValue[]>(
+    () =>
+      editor?.payment_methods?.map((pm) => ({
+        method_id: pm.method_id,
+        name: pm.name,
+        info: pm.info ?? "",
+      })) ?? []
+  );
   const [docsUrl, setDocsUrl] = useState(editor?.docs_url ?? "");
   const [paymentType, setPaymentType] = useState<EditorPaymentType>(
     editor?.payment_type ?? "por_rate"
@@ -87,12 +106,15 @@ export function EditorForm({
       email: email.trim() || null,
       phone: phone.trim() || null,
       discord_id: discordId.trim() || null,
-      bank_info: bankInfo.trim() || null,
       docs_url: docsUrl.trim() || null,
       payment_type: paymentType,
       rate: paymentType === "por_rate" ? parsedRate : null,
       monthly_fee: paymentType === "mensual" ? parsedMonthly : null,
       client_ids: clientIds,
+      payment_methods: methods.map((m) => ({
+        method_id: m.method_id,
+        info: m.info.trim() || null,
+      })),
     };
 
     startTransition(async () => {
@@ -255,14 +277,13 @@ export function EditorForm({
 
       <Section title="Datos administrativos">
         <Field
-          label="Datos bancarios"
-          hint="CBU/CVU, alias, cuenta o ID equivalente para transferencias."
+          label="Métodos de pago"
+          hint="Un chip por método (Binance, DolarApp, banco…). Escribí para buscar o crear uno nuevo, y guardá la info de cada uno."
         >
-          <Textarea
-            rows={3}
-            value={bankInfo}
-            onChange={(e) => setBankInfo(e.target.value)}
-            placeholder="Banco — CBU 0000…0000 — Alias mi.alias.mp"
+          <EditorPaymentMethods
+            catalog={paymentMethodsCatalog}
+            value={methods}
+            onChange={setMethods}
           />
         </Field>
 

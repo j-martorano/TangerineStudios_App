@@ -18,7 +18,6 @@ import { ClientCombobox } from "@/components/clients/client-combobox";
 
 import {
   COBRADO_STATUSES,
-  CURRENCIES,
   INVOICED_STATUSES,
   PAGADO_STATUSES,
   PROJECT_PHASES,
@@ -28,7 +27,6 @@ import {
 import type {
   ClientMini,
   CobradoStatus,
-  CurrencyCode,
   EditorMini,
   InvoicedStatus,
   PagadoStatus,
@@ -37,7 +35,6 @@ import type {
 } from "@/lib/projects/types";
 import {
   COBRADO_LABEL,
-  CURRENCY_LABEL,
   INVOICED_LABEL,
   PAGADO_LABEL,
   PHASE_LABEL,
@@ -86,9 +83,6 @@ export function ProjectForm({
   );
   const [manualPrice, setManualPrice] = useState<string>(
     project?.price != null ? String(project.price) : ""
-  );
-  const [currency, setCurrency] = useState<CurrencyCode>(
-    project?.currency ?? "ARS"
   );
   const [durationMinutes, setDurationMinutes] = useState<string>(
     project?.duration_minutes != null ? String(project.duration_minutes) : ""
@@ -154,7 +148,6 @@ export function ProjectForm({
       invoiced,
       price: priceToStore,
       cost: null,
-      currency,
       duration_minutes: parsedDuration,
       primary_editor_id: primaryId,
       secondary_editor_id: secondaryId,
@@ -250,54 +243,31 @@ export function ProjectForm({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="currency">Moneda</Label>
-              <Select
-                value={currency}
-                onValueChange={(v) => v && setCurrency(v as CurrencyCode)}
-              >
-                <SelectTrigger id="currency" className="w-full">
-                  <SelectValue>
-                    {(v: string | null) => (v ? v : "")}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {CURRENCIES.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {CURRENCY_LABEL[c]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {(() => {
-              const selectedClient =
-                clients.find((c) => c.id === clientId) ?? null;
-              if (selectedClient?.payment_type !== "por_proyecto") return null;
-              return (
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="price">
-                    Precio{" "}
-                    <span className="text-xs text-muted-foreground">
-                      (manual)
-                    </span>
-                  </Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    step="0.01"
-                    value={manualPrice}
-                    onChange={(e) => setManualPrice(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-              );
-            })()}
-          </div>
+          {(() => {
+            const selectedClient =
+              clients.find((c) => c.id === clientId) ?? null;
+            if (selectedClient?.payment_type !== "por_proyecto") return null;
+            return (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="price">
+                  Precio{" "}
+                  <span className="text-xs text-muted-foreground">
+                    (manual, USD)
+                  </span>
+                </Label>
+                <Input
+                  id="price"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={manualPrice}
+                  onChange={(e) => setManualPrice(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+            );
+          })()}
         </div>
 
         <div className="flex flex-col gap-2">
@@ -413,16 +383,14 @@ export function ProjectForm({
                   {isMensual
                     ? "Mensual"
                     : computedPrice != null
-                      ? formatPrice(computedPrice, currency)
+                      ? formatPrice(computedPrice)
                       : "—"}
                 </span>
               </div>
               <div className="mt-1 flex justify-between gap-3">
                 <span className="text-muted-foreground">Costo (calc.)</span>
                 <span className="font-medium tabular-nums">
-                  {computedCost != null
-                    ? formatPrice(computedCost, currency)
-                    : "—"}
+                  {computedCost != null ? formatPrice(computedCost) : "—"}
                 </span>
               </div>
               <div className="mt-1 flex justify-between gap-3">
@@ -437,7 +405,7 @@ export function ProjectForm({
                   {isMensual
                     ? "—"
                     : computedProfit != null
-                      ? formatPrice(computedProfit, currency)
+                      ? formatPrice(computedProfit)
                       : "—"}
                 </span>
               </div>

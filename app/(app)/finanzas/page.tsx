@@ -1,6 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchProjects } from "@/lib/projects/queries";
-import { fetchSettlements, settlementKey } from "@/lib/finanzas/queries";
+import {
+  fetchFixedServices,
+  fetchSettlements,
+  settlementKey,
+} from "@/lib/finanzas/queries";
+import { FixedServicesSection } from "@/components/finanzas/fixed-services-section";
 import {
   computeCost,
   computePrice,
@@ -8,10 +13,7 @@ import {
   formatPrice,
 } from "@/lib/projects/format";
 import { monthToneFromKey } from "@/lib/projects/month-colors";
-import type {
-  CurrencyCode,
-  ProjectWithRelations,
-} from "@/lib/projects/types";
+import type { ProjectWithRelations } from "@/lib/projects/types";
 import { MonthlySettleButton } from "@/components/finanzas/monthly-settle-button";
 import { ProjectSettleButton } from "@/components/finanzas/project-settle-button";
 
@@ -22,17 +24,18 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat("es-AR", {
   year: "numeric",
 });
 
-type CurrencyTotals = Partial<Record<CurrencyCode, number>>;
+// Todos los montos en USD (moneda única).
 
 type MonthBucket = {
   key: string;
   label: string;
   projects: ProjectWithRelations[];
-  collected: CurrencyTotals;
-  pendingCollect: CurrencyTotals;
-  paid: CurrencyTotals;
-  pendingPay: CurrencyTotals;
-  profit: CurrencyTotals;
+  collected: number;
+  pendingCollect: number;
+  paid: number;
+  pendingPay: number;
+  profit: number;
+  servicesCost: number;
   mensualCount: number;
 };
 
@@ -44,7 +47,6 @@ type MensualItem = {
   partyName: string;
   partyColor?: string;
   amount: number;
-  currency: CurrencyCode;
   settled: boolean;
 };
 
@@ -57,7 +59,6 @@ type ProjectSettleItem = {
   clientName: string;
   field: "cobrado" | "pagado";
   amount: number | null;
-  currency: CurrencyCode;
   settled: boolean;
 };
 
@@ -70,14 +71,6 @@ function monthKey(iso: string): string {
 
 function monthLabel(iso: string): string {
   return MONTH_FORMATTER.format(new Date(iso));
-}
-
-function addToCurrency(
-  totals: CurrencyTotals,
-  currency: CurrencyCode,
-  amount: number
-): CurrencyTotals {
-  return { ...totals, [currency]: (totals[currency] ?? 0) + amount };
 }
 
 type BuildResult = {
@@ -102,11 +95,12 @@ function build(
         key,
         label: monthLabel(iso),
         projects: [],
-        collected: {},
-        pendingCollect: {},
-        paid: {},
-        pendingPay: {},
-        profit: {},
+        collected: 0,
+        pendingCollect: 0,
+        paid: 0,
+        pendingPay: 0,
+        profit: 0,
+        servicesCost: 0,
         mensualCount: 0,
       });
       seenMonthlyClients.set(key, new Set());
@@ -136,13 +130,9 @@ function build(
         settlementKey(key, "client_cobro", client.id)
       );
       if (settled) {
-        bucket.collected = addToCurrency(bucket.collected, p.currency, fee);
+        bucket.collected += fee;
       } else {
-        bucket.pendingCollect = addToCurrency(
-          bucket.pendingCollect,
-          p.currency,
-          fee
-        );
+        bucket.pendingCollect += fee;
       }
       mensualItems.push({
         yearMonth: key,
@@ -152,7 +142,6 @@ function build(
         partyName: client.name,
         partyColor: client.color,
         amount: fee,
-        currency: p.currency,
         settled,
       });
     }
@@ -170,9 +159,9 @@ function build(
         settlementKey(key, "editor_pago", editor.id)
       );
       if (settled) {
-        bucket.paid = addToCurrency(bucket.paid, p.currency, fee);
+        bucket.paid += fee;
       } else {
-        bucket.pendingPay = addToCurrency(bucket.pendingPay, p.currency, fee);
+        bucket.pendingPay += fee;
       }
       mensualItems.push({
         yearMonth: key,
@@ -181,27 +170,21 @@ function build(
         partyId: editor.id,
         partyName: editor.name,
         amount: fee,
-        currency: p.currency,
         settled,
       });
     }
 
     // ============ Cobros por proyecto (por_proyecto + por_rate) ============
     // Incluimos cualquier proyecto que NO sea mensual (incluso sin cliente
-    // linkeado), aunque el monto todavía no sea calculable (falta agreed_price
-    // o duration). Los mensuales van a la sección de Mensuales más arriba.
+    // linkeado), aunque el monto todavía no sea calculable.
     if (!client || client.payment_type !== "mensual") {
       const price = computePrice(p);
       const cobradoSettled = p.cobrado === "si";
       if (price != null) {
         if (cobradoSettled) {
-          bucket.collected = addToCurrency(bucket.collected, p.currency, price);
+          bucket.collected += price;
         } else {
-          bucket.pendingCollect = addToCurrency(
-            bucket.pendingCollect,
-            p.currency,
-            price
-          );
+          bucket.pendingCollect += price;
         }
       }
       projectItems.push({
@@ -213,15 +196,11 @@ function build(
         clientName: client?.name ?? p.client_name ?? "Sin cliente",
         field: "cobrado",
         amount: price,
-        currency: p.currency,
         settled: cobradoSettled,
       });
     }
 
     // ============ Pagos por proyecto (suma editores por_rate × duración) ============
-    // Mostramos el proyecto si tiene al menos un editor por_rate asignado,
-    // aunque rate o duration sean null (caso "falta cargar info"). Los
-    // mensuales puros van a la sección de Mensuales.
     const hasPorRateEditor = p.editors.some(
       (e) => e.editor?.payment_type === "por_rate"
     );
@@ -230,13 +209,9 @@ function build(
       const pagadoSettled = p.pagado === "pago_total";
       if (cost != null) {
         if (pagadoSettled) {
-          bucket.paid = addToCurrency(bucket.paid, p.currency, cost);
+          bucket.paid += cost;
         } else {
-          bucket.pendingPay = addToCurrency(
-            bucket.pendingPay,
-            p.currency,
-            cost
-          );
+          bucket.pendingPay += cost;
         }
       }
       projectItems.push({
@@ -248,7 +223,6 @@ function build(
         clientName: client?.name ?? p.client_name ?? "—",
         field: "pagado",
         amount: cost,
-        currency: p.currency,
         settled: pagadoSettled,
       });
     }
@@ -256,7 +230,7 @@ function build(
     // ============ Ganancia ============
     const profit = computeProfit(p);
     if (profit != null) {
-      bucket.profit = addToCurrency(bucket.profit, p.currency, profit);
+      bucket.profit += profit;
     }
   }
 
@@ -286,36 +260,32 @@ function sumAcrossBuckets(
     MonthBucket,
     "collected" | "pendingCollect" | "paid" | "pendingPay" | "profit"
   >
-): CurrencyTotals {
-  const acc: CurrencyTotals = {};
-  for (const b of buckets) {
-    for (const [c, amount] of Object.entries(b[field]) as [
-      CurrencyCode,
-      number,
-    ][]) {
-      acc[c] = (acc[c] ?? 0) + amount;
-    }
-  }
-  return acc;
-}
-
-function formatTotals(totals: CurrencyTotals): string {
-  const parts: string[] = [];
-  for (const c of ["ARS", "USD", "EUR"] as CurrencyCode[]) {
-    if (totals[c]) parts.push(formatPrice(totals[c]!, c));
-  }
-  return parts.join(" · ") || "—";
+): number {
+  let total = 0;
+  for (const b of buckets) total += b[field];
+  return total;
 }
 
 export default async function FinanzasPage() {
-  const [projects, settledKeys] = await Promise.all([
+  const [projects, settledKeys, fixedServices] = await Promise.all([
     fetchProjects(),
     fetchSettlements(),
+    fetchFixedServices(),
   ]);
   const { buckets, mensualItems, projectItems } = build(
     projects,
     settledKeys
   );
+
+  // Servicios fijos activos: su costo mensual se resta de la ganancia de
+  // cada mes con actividad.
+  const servicesMonthlyTotal = fixedServices
+    .filter((s) => s.active)
+    .reduce((sum, s) => sum + s.monthly_cost, 0);
+  for (const b of buckets) {
+    b.servicesCost = servicesMonthlyTotal;
+    b.profit -= servicesMonthlyTotal;
+  }
 
   const totalCollected = sumAcrossBuckets(buckets, "collected");
   const totalPendingCollect = sumAcrossBuckets(buckets, "pendingCollect");
@@ -335,33 +305,30 @@ export default async function FinanzasPage() {
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <TotalCard
           label="Cobrado"
-          value={formatTotals(totalCollected)}
+          value={formatPrice(totalCollected)}
           tone="positive"
         />
         <TotalCard
           label="Por cobrar"
-          value={formatTotals(totalPendingCollect)}
+          value={formatPrice(totalPendingCollect)}
           tone="warning"
         />
-        <TotalCard
-          label="Pagado"
-          value={formatTotals(totalPaid)}
-          tone="neutral"
-        />
+        <TotalCard label="Pagado" value={formatPrice(totalPaid)} tone="neutral" />
         <TotalCard
           label="Por pagar"
-          value={formatTotals(totalPendingPay)}
+          value={formatPrice(totalPendingPay)}
           tone="warning"
         />
         <TotalCard
           label="Ganancia"
-          value={formatTotals(totalProfit)}
+          value={formatPrice(totalProfit)}
           tone="positive"
         />
       </section>
 
       <MensualesSection items={mensualItems} />
       <ProjectsSection items={projectItems} />
+      <FixedServicesSection services={fixedServices} />
 
       <section className="flex flex-col gap-4">
         <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -460,7 +427,7 @@ function MensualesSection({ items }: { items: MensualItem[] }) {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-semibold tabular-nums">
-                    {formatPrice(it.amount, it.currency)}
+                    {formatPrice(it.amount)}
                   </span>
                   <MonthlySettleButton
                     yearMonth={it.yearMonth}
@@ -549,7 +516,7 @@ function ProjectList({
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold tabular-nums">
-                  {formatPrice(it.amount, it.currency)}
+                  {formatPrice(it.amount)}
                 </span>
                 <ProjectSettleButton
                   projectId={it.projectId}
@@ -579,7 +546,9 @@ function MonthCard({ bucket }: { bucket: MonthBucket }) {
         style={{ backgroundColor: tone.solid }}
       />
       <CardHeader className="flex flex-row items-baseline justify-between gap-2 border-b pb-3">
-        <CardTitle className="capitalize">{bucket.label}</CardTitle>
+        <CardTitle className="uppercase tracking-wide">
+          {bucket.label}
+        </CardTitle>
         <span className="text-xs text-muted-foreground">
           {bucket.projects.length} proyecto
           {bucket.projects.length === 1 ? "" : "s"}
@@ -592,20 +561,26 @@ function MonthCard({ bucket }: { bucket: MonthBucket }) {
         <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
           <MonthRow
             label="Cobrado"
-            primary={formatTotals(bucket.collected)}
+            primary={formatPrice(bucket.collected)}
             secondaryLabel="Por cobrar"
-            secondary={formatTotals(bucket.pendingCollect)}
+            secondary={formatPrice(bucket.pendingCollect)}
           />
           <MonthRow
             label="Pagado"
-            primary={formatTotals(bucket.paid)}
+            primary={formatPrice(bucket.paid)}
             secondaryLabel="Por pagar"
-            secondary={formatTotals(bucket.pendingPay)}
+            secondary={formatPrice(bucket.pendingPay)}
           />
+          {bucket.servicesCost > 0 ? (
+            <MonthRow
+              label="Servicios fijos"
+              primary={`− ${formatPrice(bucket.servicesCost)}`}
+            />
+          ) : null}
           <MonthRow
             label="Ganancia"
-            primary={formatTotals(bucket.profit)}
-            tone="positive"
+            primary={formatPrice(bucket.profit)}
+            tone={bucket.profit < 0 ? undefined : "positive"}
           />
         </div>
       </CardContent>

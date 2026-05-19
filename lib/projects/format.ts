@@ -1,7 +1,6 @@
 import type {
   ClientMini,
   CobradoStatus,
-  CurrencyCode,
   InvoicedStatus,
   PagadoStatus,
   ProjectEditorAssignment,
@@ -122,41 +121,24 @@ export const INVOICED_CLASS: Record<InvoicedStatus, string> = {
   parcial: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
 };
 
-export const CURRENCY_LABEL: Record<CurrencyCode, string> = {
-  ARS: "ARS — Peso argentino",
-  USD: "USD — Dólar",
-  EUR: "EUR — Euro",
-};
-
 const dateFormatter = new Intl.DateTimeFormat("es-AR", {
   day: "2-digit",
   month: "short",
 });
 
-const currencyFormatters = new Map<CurrencyCode, Intl.NumberFormat>();
+// Moneda única: todos los montos en USD.
+const usdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  currencyDisplay: "code",
+  maximumFractionDigits: 0,
+});
 
-function getCurrencyFormatter(currency: CurrencyCode): Intl.NumberFormat {
-  let fmt = currencyFormatters.get(currency);
-  if (!fmt) {
-    fmt = new Intl.NumberFormat("es-AR", {
-      style: "currency",
-      currency,
-      currencyDisplay: "code",
-      maximumFractionDigits: 0,
-    });
-    currencyFormatters.set(currency, fmt);
-  }
-  return fmt;
-}
-
-export function formatPrice(
-  price: number | string | null,
-  currency: CurrencyCode = "ARS"
-): string {
+export function formatPrice(price: number | string | null): string {
   if (price == null) return "—";
   const n = typeof price === "string" ? Number(price) : price;
   if (Number.isNaN(n)) return "—";
-  return getCurrencyFormatter(currency).format(n);
+  return usdFormatter.format(n);
 }
 
 export function formatDate(iso: string): string {

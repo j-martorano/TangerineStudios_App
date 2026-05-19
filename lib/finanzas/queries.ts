@@ -22,3 +22,27 @@ export async function fetchSettlements(): Promise<Set<SettlementKey>> {
     )
   );
 }
+
+export type FixedService = {
+  id: string;
+  name: string;
+  monthly_cost: number;
+  active: boolean;
+  created_at: string;
+};
+
+export async function fetchFixedServices(): Promise<FixedService[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("fixed_services")
+    .select("id, name, monthly_cost, active, created_at")
+    .order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    monthly_cost: Number(s.monthly_cost),
+    active: s.active,
+    created_at: s.created_at,
+  }));
+}

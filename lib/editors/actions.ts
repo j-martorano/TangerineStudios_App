@@ -21,7 +21,6 @@ const editorInputSchema = z.object({
     .default(null),
   phone: z.string().nullable().default(null),
   discord_id: z.string().nullable().default(null),
-  bank_info: z.string().nullable().default(null),
   docs_url: z
     .union([z.string().url("URL inválida"), z.literal(""), z.null()])
     .default(null),
@@ -38,6 +37,15 @@ const editorInputSchema = z.object({
     .default(null),
   /** IDs de clientes asignados. Si está definido, se sincroniza la pivot client_editors. */
   client_ids: z.array(z.string()).optional(),
+  /** Métodos de pago del editor + info. Si está definido, se sincroniza la pivot. */
+  payment_methods: z
+    .array(
+      z.object({
+        method_id: z.string(),
+        info: z.string().nullable().default(null),
+      })
+    )
+    .optional(),
 });
 
 export type EditorInput = z.input<typeof editorInputSchema>;
@@ -91,6 +99,35 @@ async function syncEditorClients(
   return { ok: true };
 }
 
+async function syncEditorPaymentMethods(
+  editorId: string,
+  methods: { method_id: string; info: string | null }[] | undefined
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (methods === undefined) return { ok: true };
+  const supabase = await createSupabaseClient();
+
+  const { error: delErr } = await supabase
+    .from("editor_payment_methods")
+    .delete()
+    .eq("editor_id", editorId);
+  if (delErr) return { ok: false, error: delErr.message };
+
+  if (methods.length === 0) return { ok: true };
+
+  const { error: insErr } = await supabase
+    .from("editor_payment_methods")
+    .insert(
+      methods.map((m) => ({
+        editor_id: editorId,
+        method_id: m.method_id,
+        info: normalizeText(m.info),
+      }))
+    );
+  if (insErr) return { ok: false, error: insErr.message };
+
+  return { ok: true };
+}
+
 export async function createEditor(
   input: EditorInput
 ): Promise<EditorCreateResult> {
@@ -105,7 +142,6 @@ export async function createEditor(
       email: normalizeText(parsed.data.email),
       phone: normalizeText(parsed.data.phone),
       discord_id: normalizeText(parsed.data.discord_id),
-      bank_info: normalizeText(parsed.data.bank_info),
       docs_url: normalizeText(parsed.data.docs_url),
       payment_type: parsed.data.payment_type,
       rate: parsed.data.payment_type === "por_rate" ? parsed.data.rate : null,
@@ -124,6 +160,12 @@ export async function createEditor(
 
   const sync = await syncEditorClients(data.id, parsed.data.client_ids);
   if (!sync.ok) return { ok: false, error: sync.error };
+
+  const syncPm = await syncEditorPaymentMethods(
+    data.id,
+    parsed.data.payment_methods
+  );
+  if (!syncPm.ok) return { ok: false, error: syncPm.error };
 
   revalidateAll();
   return { ok: true, editor: data as EditorMini };
@@ -144,7 +186,6 @@ export async function updateEditor(
       email: normalizeText(parsed.data.email),
       phone: normalizeText(parsed.data.phone),
       discord_id: normalizeText(parsed.data.discord_id),
-      bank_info: normalizeText(parsed.data.bank_info),
       docs_url: normalizeText(parsed.data.docs_url),
       payment_type: parsed.data.payment_type,
       rate: parsed.data.payment_type === "por_rate" ? parsed.data.rate : null,
@@ -162,6 +203,12 @@ export async function updateEditor(
 
   const sync = await syncEditorClients(id, parsed.data.client_ids);
   if (!sync.ok) return { ok: false, error: sync.error };
+
+  const syncPm = await syncEditorPaymentMethods(
+    id,
+    parsed.data.payment_methods
+  );
+  if (!syncPm.ok) return { ok: false, error: syncPm.error };
 
   revalidateAll();
   return { ok: true };

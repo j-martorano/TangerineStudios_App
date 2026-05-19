@@ -4,7 +4,7 @@ import { ArrowRightIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchClients, fetchProjects } from "@/lib/projects/queries";
 import { PROJECT_PHASES } from "@/lib/projects/types";
-import type { CurrencyCode, ProjectPhase } from "@/lib/projects/types";
+import type { ProjectPhase } from "@/lib/projects/types";
 import {
   PHASE_CLASS,
   PHASE_LABEL,
@@ -35,9 +35,9 @@ export default async function DashboardPage() {
   );
 
   // Cobros usan precio calculado (lo que nos debe el cliente).
-  // Pagos usan cost (lo que le debemos al editor).
-  const toCollectByCurrency = sumPriceByCurrency(toCollectProjects);
-  const toPayByCurrency = sumCostByCurrency(toPayProjects);
+  // Pagos usan cost (lo que le debemos al editor). Todo en USD.
+  const toCollectTotal = sumPrice(toCollectProjects);
+  const toPayTotal = sumCost(toPayProjects);
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-6 md:p-8">
@@ -59,14 +59,14 @@ export default async function DashboardPage() {
         <StatCard
           label="Por cobrar"
           value={toCollectProjects.length}
-          hint={summaryByCurrency(toCollectByCurrency)}
+          hint={toCollectTotal > 0 ? formatPrice(toCollectTotal) : "Sin monto"}
           href="/finanzas"
           highlight
         />
         <StatCard
           label="Por pagar"
           value={toPayProjects.length}
-          hint={summaryByCurrency(toPayByCurrency)}
+          hint={toPayTotal > 0 ? formatPrice(toPayTotal) : "Sin monto"}
           href="/finanzas"
         />
         <StatCard
@@ -169,36 +169,20 @@ function countBy<T>(
   return acc;
 }
 
-function sumPriceByCurrency(
-  projects: ProjectWithRelations[]
-): Partial<Record<CurrencyCode, number>> {
-  const acc: Partial<Record<CurrencyCode, number>> = {};
+function sumPrice(projects: ProjectWithRelations[]): number {
+  let total = 0;
   for (const p of projects) {
     const price = computePrice(p);
-    if (price == null) continue;
-    acc[p.currency] = (acc[p.currency] ?? 0) + price;
+    if (price != null) total += price;
   }
-  return acc;
+  return total;
 }
 
-function sumCostByCurrency(
-  projects: ProjectWithRelations[]
-): Partial<Record<CurrencyCode, number>> {
-  const acc: Partial<Record<CurrencyCode, number>> = {};
+function sumCost(projects: ProjectWithRelations[]): number {
+  let total = 0;
   for (const p of projects) {
     const cost = computeCost(p);
-    if (cost == null) continue;
-    acc[p.currency] = (acc[p.currency] ?? 0) + cost;
+    if (cost != null) total += cost;
   }
-  return acc;
-}
-
-function summaryByCurrency(
-  totals: Partial<Record<CurrencyCode, number>>
-): string {
-  const parts: string[] = [];
-  for (const c of ["ARS", "USD", "EUR"] as CurrencyCode[]) {
-    if (totals[c]) parts.push(formatPrice(totals[c]!, c));
-  }
-  return parts.join(" · ") || "Sin monto";
+  return total;
 }

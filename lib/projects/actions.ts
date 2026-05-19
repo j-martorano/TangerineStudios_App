@@ -5,14 +5,12 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
   COBRADO_STATUSES,
-  CURRENCIES,
   INVOICED_STATUSES,
   PAGADO_STATUSES,
   PROJECT_PHASES,
 } from "./types";
 import type {
   CobradoStatus,
-  CurrencyCode,
   InvoicedStatus,
   PagadoStatus,
   ProjectPhase,
@@ -39,7 +37,6 @@ const pagadoEnum = z.enum(
 const invoicedEnum = z.enum(
   INVOICED_STATUSES as [InvoicedStatus, ...InvoicedStatus[]]
 );
-const currencyEnum = z.enum(CURRENCIES as [CurrencyCode, ...CurrencyCode[]]);
 
 const uuidRegex =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -64,7 +61,6 @@ const projectInputSchema = z
       .number()
       .nonnegative("El costo no puede ser negativo")
       .nullable(),
-    currency: currencyEnum,
     duration_minutes: z
       .number()
       .nonnegative("La duración no puede ser negativa")
