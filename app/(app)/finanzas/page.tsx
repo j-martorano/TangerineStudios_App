@@ -4,7 +4,9 @@ import {
   fetchClientPayments,
   fetchFixedServices,
 } from "@/lib/finanzas/queries";
+import { fetchUserPrefs } from "@/lib/settings/queries";
 import { FixedServicesSection } from "@/components/finanzas/fixed-services-section";
+import { FinanzasTabs } from "@/components/finanzas/finanzas-tabs";
 import {
   computeCost,
   computePrice,
@@ -221,10 +223,11 @@ function sumAcrossBuckets(
 }
 
 export default async function FinanzasPage() {
-  const [projects, payments, fixedServices] = await Promise.all([
+  const [projects, payments, fixedServices, prefs] = await Promise.all([
     fetchProjects(),
     fetchClientPayments(),
     fetchFixedServices(),
+    fetchUserPrefs(),
   ]);
   const { buckets, paymentItems, projectItems } = build(projects, payments);
 
@@ -244,8 +247,51 @@ export default async function FinanzasPage() {
   const totalPendingPay = sumAcrossBuckets(buckets, "pendingPay");
   const totalProfit = sumAcrossBuckets(buckets, "profit");
 
+  const resumenSection = (
+    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <TotalCard
+        label="Cobrado"
+        value={formatPrice(totalCollected)}
+        tone="positive"
+      />
+      <TotalCard
+        label="Por cobrar"
+        value={formatPrice(totalPendingCollect)}
+        tone="warning"
+      />
+      <TotalCard
+        label="Pagado"
+        value={formatPrice(totalPaid)}
+        tone="neutral"
+      />
+      <TotalCard
+        label="Por pagar"
+        value={formatPrice(totalPendingPay)}
+        tone="warning"
+      />
+      <TotalCard
+        label="Ganancia"
+        value={formatPrice(totalProfit)}
+        tone="positive"
+      />
+    </section>
+  );
+
+  const porMesSection =
+    buckets.length === 0 ? (
+      <p className="text-sm italic text-muted-foreground">
+        No hay actividad cargada todavía.
+      </p>
+    ) : (
+      <div className="flex flex-col gap-3">
+        {buckets.map((b) => (
+          <MonthCard key={b.key} bucket={b} />
+        ))}
+      </div>
+    );
+
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-6 md:p-8">
+    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 md:p-8">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">Finanzas</h1>
         <p className="text-sm text-muted-foreground">
@@ -253,50 +299,16 @@ export default async function FinanzasPage() {
         </p>
       </header>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <TotalCard
-          label="Cobrado"
-          value={formatPrice(totalCollected)}
-          tone="positive"
-        />
-        <TotalCard
-          label="Por cobrar"
-          value={formatPrice(totalPendingCollect)}
-          tone="warning"
-        />
-        <TotalCard label="Pagado" value={formatPrice(totalPaid)} tone="neutral" />
-        <TotalCard
-          label="Por pagar"
-          value={formatPrice(totalPendingPay)}
-          tone="warning"
-        />
-        <TotalCard
-          label="Ganancia"
-          value={formatPrice(totalProfit)}
-          tone="positive"
-        />
-      </section>
-
-      <PagosSection items={paymentItems} />
-      <ProjectsSection items={projectItems} />
-      <FixedServicesSection services={fixedServices} />
-
-      <section className="flex flex-col gap-4">
-        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Por mes
-        </h2>
-        {buckets.length === 0 ? (
-          <p className="text-sm italic text-muted-foreground">
-            No hay actividad cargada todavía.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {buckets.map((b) => (
-              <MonthCard key={b.key} bucket={b} />
-            ))}
-          </div>
-        )}
-      </section>
+      <FinanzasTabs
+        visibleTabs={prefs.finanzas.tabs}
+        sections={{
+          resumen: resumenSection,
+          por_mes: porMesSection,
+          pagos: <PagosSection items={paymentItems} />,
+          por_proyecto: <ProjectsSection items={projectItems} />,
+          servicios: <FixedServicesSection services={fixedServices} />,
+        }}
+      />
     </main>
   );
 }

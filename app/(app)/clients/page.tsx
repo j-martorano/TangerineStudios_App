@@ -2,11 +2,8 @@ import { ClientsTable } from "@/components/clients/clients-table";
 import { NewClientButton } from "@/components/clients/new-client-button";
 import { DataPagination } from "@/components/data-pagination";
 import { DataSearch } from "@/components/data-search";
-import {
-  DEFAULT_PER_PAGE,
-  fetchClientsList,
-  fetchEditors,
-} from "@/lib/projects/queries";
+import { fetchClientsList, fetchEditors } from "@/lib/projects/queries";
+import { fetchUserPrefs } from "@/lib/settings/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +18,11 @@ export default async function ClientsPage({
   const query = params.q?.trim() || undefined;
   const page = Math.max(1, Number(params.page) || 1);
 
+  const prefs = await fetchUserPrefs();
+  const perPage = prefs.limits.clients_per_page;
+
   const [{ clients, total }, availableEditors] = await Promise.all([
-    fetchClientsList({ query, page }),
+    fetchClientsList({ query, page, perPage }),
     fetchEditors(),
   ]);
 
@@ -43,12 +43,16 @@ export default async function ClientsPage({
       </div>
 
       <div className="rounded-xl border bg-card p-2">
-        <ClientsTable clients={clients} availableEditors={availableEditors} />
+        <ClientsTable
+          clients={clients}
+          availableEditors={availableEditors}
+          visibleColumns={prefs.columns.clients}
+        />
       </div>
 
       <DataPagination
         page={page}
-        perPage={DEFAULT_PER_PAGE}
+        perPage={perPage}
         total={total}
         basePath="/clients"
         searchParams={{ q: query }}

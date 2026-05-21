@@ -15,16 +15,21 @@ import { PaymentMethodChips } from "./payment-method-chips";
 import type { EditorWithCount } from "@/lib/projects/queries";
 import type { ClientMini } from "@/lib/projects/types";
 import type { PaymentMethod } from "@/lib/payment-methods/queries";
+import type { EditorsColumnId } from "@/lib/settings/types";
+
+type Props = {
+  editors: EditorWithCount[];
+  availableClients: ClientMini[];
+  paymentMethodsCatalog: PaymentMethod[];
+  visibleColumns: EditorsColumnId[];
+};
 
 export function EditorsTable({
   editors,
   availableClients,
   paymentMethodsCatalog,
-}: {
-  editors: EditorWithCount[];
-  availableClients: ClientMini[];
-  paymentMethodsCatalog: PaymentMethod[];
-}) {
+  visibleColumns,
+}: Props) {
   if (editors.length === 0) {
     return (
       <p className="px-2 py-6 text-sm text-muted-foreground italic">
@@ -33,85 +38,109 @@ export function EditorsTable({
     );
   }
 
+  const visible = new Set<EditorsColumnId>(visibleColumns);
+
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Nombre</TableHead>
-          <TableHead>Clientes</TableHead>
-          <TableHead>Contacto</TableHead>
-          <TableHead>Discord</TableHead>
-          <TableHead>Métodos de pago</TableHead>
-          <TableHead>Docs</TableHead>
-          <TableHead className="text-right">Proyectos</TableHead>
-          <TableHead className="w-24 text-right">Acciones</TableHead>
+          {visible.has("name") && <TableHead>Nombre</TableHead>}
+          {visible.has("clients") && <TableHead>Clientes</TableHead>}
+          {visible.has("contact") && <TableHead>Contacto</TableHead>}
+          {visible.has("discord") && <TableHead>Discord</TableHead>}
+          {visible.has("payment_methods") && (
+            <TableHead>Métodos de pago</TableHead>
+          )}
+          {visible.has("docs") && <TableHead>Docs</TableHead>}
+          {visible.has("projects") && (
+            <TableHead className="text-right">Proyectos</TableHead>
+          )}
+          {visible.has("actions") && (
+            <TableHead className="w-24 text-right">Acciones</TableHead>
+          )}
         </TableRow>
       </TableHeader>
       <TableBody>
         {editors.map((e) => (
           <TableRow key={e.id}>
-            <TableCell className="font-medium">{e.name}</TableCell>
-            <TableCell>
-              {e.clients.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  {e.clients.map((c) => (
-                    <span
-                      key={c.id}
-                      className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs"
-                    >
+            {visible.has("name") && (
+              <TableCell className="font-medium">{e.name}</TableCell>
+            )}
+            {visible.has("clients") && (
+              <TableCell>
+                {e.clients.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {e.clients.map((c) => (
                       <span
-                        className="size-2 rounded-full"
-                        style={{ backgroundColor: c.color }}
-                      />
-                      {c.name}
-                    </span>
-                  ))}
+                        key={c.id}
+                        className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs"
+                      >
+                        <span
+                          className="size-2 rounded-full"
+                          style={{ backgroundColor: c.color }}
+                        />
+                        {c.name}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
+            )}
+            {visible.has("contact") && (
+              <TableCell className="max-w-[18ch] truncate text-muted-foreground">
+                {e.email ?? e.phone ?? "—"}
+              </TableCell>
+            )}
+            {visible.has("discord") && (
+              <TableCell className="font-mono text-xs text-muted-foreground">
+                {e.discord_id ?? "—"}
+              </TableCell>
+            )}
+            {visible.has("payment_methods") && (
+              <TableCell>
+                <PaymentMethodChips methods={e.payment_methods} />
+              </TableCell>
+            )}
+            {visible.has("docs") && (
+              <TableCell>
+                {e.docs_url ? (
+                  <a
+                    href={e.docs_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Ver
+                    <ExternalLinkIcon className="size-3" />
+                  </a>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
+            )}
+            {visible.has("projects") && (
+              <TableCell className="text-right tabular-nums">
+                {e.project_count}
+              </TableCell>
+            )}
+            {visible.has("actions") && (
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <EditEditorButton
+                    editor={e}
+                    availableClients={availableClients}
+                    paymentMethodsCatalog={paymentMethodsCatalog}
+                  />
+                  <DeleteEditorButton
+                    id={e.id}
+                    name={e.name}
+                    projectCount={e.project_count}
+                  />
                 </div>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              )}
-            </TableCell>
-            <TableCell className="max-w-[18ch] truncate text-muted-foreground">
-              {e.email ?? e.phone ?? "—"}
-            </TableCell>
-            <TableCell className="font-mono text-xs text-muted-foreground">
-              {e.discord_id ?? "—"}
-            </TableCell>
-            <TableCell>
-              <PaymentMethodChips methods={e.payment_methods} />
-            </TableCell>
-            <TableCell>
-              {e.docs_url ? (
-                <a
-                  href={e.docs_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-primary hover:underline"
-                >
-                  Ver
-                  <ExternalLinkIcon className="size-3" />
-                </a>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              )}
-            </TableCell>
-            <TableCell className="text-right tabular-nums">
-              {e.project_count}
-            </TableCell>
-            <TableCell className="text-right">
-              <div className="flex items-center justify-end gap-1">
-                <EditEditorButton
-                  editor={e}
-                  availableClients={availableClients}
-                  paymentMethodsCatalog={paymentMethodsCatalog}
-                />
-                <DeleteEditorButton
-                  id={e.id}
-                  name={e.name}
-                  projectCount={e.project_count}
-                />
-              </div>
-            </TableCell>
+              </TableCell>
+            )}
           </TableRow>
         ))}
       </TableBody>

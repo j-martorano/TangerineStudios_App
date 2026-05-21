@@ -8,6 +8,7 @@ import {
   fetchEditors,
   fetchProjects,
 } from "@/lib/projects/queries";
+import { fetchUserPrefs } from "@/lib/settings/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -27,11 +28,14 @@ export default async function ProjectsPage({
   const query = params.q?.trim() || undefined;
   const showArchived = params.archived === "1";
 
-  const [projects, editors, clients] = await Promise.all([
+  const [projects, editors, clients, prefs] = await Promise.all([
     fetchProjects({ query, includeArchived: showArchived }),
     fetchEditors(),
     fetchClients(),
+    fetchUserPrefs(),
   ]);
+
+  const projectsPerYear = prefs.limits.projects_per_year;
 
   // Años con proyectos, del más reciente al más viejo.
   const years = Array.from(
@@ -46,9 +50,11 @@ export default async function ProjectsPage({
       ? currentYear
       : (years[0] ?? currentYear);
 
-  const yearProjects = projects.filter(
+  const yearProjectsAll = projects.filter(
     (p) => projectYear(p.created_at) === selectedYear
   );
+  const yearProjects = yearProjectsAll.slice(0, projectsPerYear);
+  const yearTrimmed = yearProjectsAll.length - yearProjects.length;
 
   function yearHref(year: number): string {
     const sp = new URLSearchParams();
@@ -122,8 +128,17 @@ export default async function ProjectsPage({
           projects={yearProjects}
           editors={editors}
           clients={clients}
+          visibleColumns={prefs.columns.projects}
         />
       </div>
+
+      {yearTrimmed > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Mostrando los primeros {projectsPerYear} proyectos del año. Hay{" "}
+          {yearTrimmed} más sin mostrar — ajustá «Proyectos por año» en
+          /configuración para verlos.
+        </p>
+      ) : null}
     </main>
   );
 }

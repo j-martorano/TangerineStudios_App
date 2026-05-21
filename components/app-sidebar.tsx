@@ -10,6 +10,7 @@ import {
   FilmIcon,
   LayoutDashboardIcon,
   LogOutIcon,
+  SettingsIcon,
   TableIcon,
   UsersIcon,
   WalletIcon,
@@ -36,6 +37,12 @@ const items = [
   { href: "/clients", label: "Clientes", icon: UsersIcon, exact: false },
   { href: "/editors", label: "Editores", icon: FilmIcon, exact: false },
   { href: "/finanzas", label: "Finanzas", icon: WalletIcon, exact: false },
+  {
+    href: "/configuracion",
+    label: "Configuración",
+    icon: SettingsIcon,
+    exact: false,
+  },
 ];
 
 export function AppSidebar() {

@@ -2,12 +2,9 @@ import { EditorsTable } from "@/components/editors/editors-table";
 import { NewEditorButton } from "@/components/editors/new-editor-button";
 import { DataPagination } from "@/components/data-pagination";
 import { DataSearch } from "@/components/data-search";
-import {
-  DEFAULT_PER_PAGE,
-  fetchClients,
-  fetchEditorsList,
-} from "@/lib/projects/queries";
+import { fetchClients, fetchEditorsList } from "@/lib/projects/queries";
 import { fetchPaymentMethods } from "@/lib/payment-methods/queries";
+import { fetchUserPrefs } from "@/lib/settings/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +19,12 @@ export default async function EditorsPage({
   const query = params.q?.trim() || undefined;
   const page = Math.max(1, Number(params.page) || 1);
 
+  const prefs = await fetchUserPrefs();
+  const perPage = prefs.limits.editors_per_page;
+
   const [{ editors, total }, availableClients, paymentMethodsCatalog] =
     await Promise.all([
-      fetchEditorsList({ query, page }),
+      fetchEditorsList({ query, page, perPage }),
       fetchClients(),
       fetchPaymentMethods(),
     ]);
@@ -53,12 +53,13 @@ export default async function EditorsPage({
           editors={editors}
           availableClients={availableClients}
           paymentMethodsCatalog={paymentMethodsCatalog}
+          visibleColumns={prefs.columns.editors}
         />
       </div>
 
       <DataPagination
         page={page}
-        perPage={DEFAULT_PER_PAGE}
+        perPage={perPage}
         total={total}
         basePath="/editors"
         searchParams={{ q: query }}
