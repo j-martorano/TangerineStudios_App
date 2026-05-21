@@ -82,7 +82,10 @@ export function QuickDurationEditor({
   const btnClass = `inline-flex shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50 ${
     compact ? "size-5" : "size-6"
   }`;
-  const inputClass = `text-center tabular-nums bg-transparent focus:outline-none focus:ring-1 focus:ring-primary rounded ${
+  // Sacamos las flechas nativas del input number en Chrome/Safari/Firefox.
+  const noSpinner =
+    "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0";
+  const inputClass = `text-center tabular-nums bg-transparent focus:outline-none focus:ring-1 focus:ring-primary rounded ${noSpinner} ${
     compact
       ? "h-5 w-10 text-xs border-0"
       : "h-7 w-14 text-xs border border-border/60"
