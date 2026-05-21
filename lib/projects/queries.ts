@@ -128,8 +128,15 @@ export async function fetchProjects(
     }
   }
 
+  // Tiebreaker estable por created_at para que el orden no cambie entre
+  // refetches cuando varios proyectos comparten phase + position (típico del
+  // seed con position=0 en todos).
   const [{ data, error }, pairs, tiers] = await Promise.all([
-    q.order("phase").order("position"),
+    q
+      .order("phase")
+      .order("position")
+      .order("created_at", { ascending: true })
+      .order("id"),
     fetchPairConfigMap(),
     fetchPairTiersMap(),
   ]);
