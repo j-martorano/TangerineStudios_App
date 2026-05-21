@@ -8,6 +8,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { ArchiveProjectButton } from "./archive-project-button";
 import { EditProjectButton } from "./edit-project-button";
 import { FinalizeToggle } from "./finalize-toggle";
+import { QuickDurationEditor } from "./quick-duration-editor";
 import { QuickPhaseBadge } from "./quick-phase-badge";
 import { QuickPaymentBadge } from "./quick-payment-badge";
 
@@ -16,7 +17,6 @@ import {
   computePrice,
   computeProfit,
   formatDate,
-  formatDuration,
   formatPrice,
 } from "@/lib/projects/format";
 import { editorNames } from "@/lib/projects/types";
@@ -178,7 +178,13 @@ function renderValue(
       );
     }
     case "duration":
-      return formatDuration(p.duration_minutes);
+      return (
+        <QuickDurationEditor
+          id={p.id}
+          value={p.duration_minutes}
+          disabled={locked}
+        />
+      );
     case "editor":
       return editorNames(p);
     case "cobrado":

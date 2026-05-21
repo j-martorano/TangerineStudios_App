@@ -249,6 +249,29 @@ export async function changePagado(
   return { ok: true };
 }
 
+export async function changeProjectDuration(
+  id: string,
+  minutes: number | null
+): Promise<ActionResult> {
+  if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
+  if (
+    minutes !== null &&
+    (Number.isNaN(minutes) || minutes < 0)
+  ) {
+    return { ok: false, error: "Duración inválida" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("projects")
+    .update({ duration_minutes: minutes })
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true };
+}
+
 export async function changeInvoiced(
   id: string,
   invoiced: InvoicedStatus

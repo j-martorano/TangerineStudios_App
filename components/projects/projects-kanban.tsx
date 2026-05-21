@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { KanbanCardActions } from "./kanban-card-actions";
+import { QuickDurationEditor } from "./quick-duration-editor";
 
 import { PROJECT_PHASES, editorNames } from "@/lib/projects/types";
 import type {
@@ -540,6 +541,16 @@ function CardView({
           <span className="truncate">{project.client_name ?? "—"}</span>
         )}
         <span className="truncate">{editorNames(project)}</span>
+        <div className="flex items-center justify-between gap-2 pt-1 text-foreground">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Duración
+          </span>
+          <QuickDurationEditor
+            id={project.id}
+            value={project.duration_minutes}
+            size="compact"
+          />
+        </div>
         {(() => {
           const isMensual = project.client?.payment_type === "mensual";
           const price = isMensual ? null : computePrice(project);
