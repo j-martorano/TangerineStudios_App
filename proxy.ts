@@ -7,8 +7,10 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all paths except Next internals y favicon. La lógica fina
-    // (skip /branding/, login, etc.) la maneja el helper updateSession.
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    // Match all paths except Next internals, favicon y assets públicos
+    // estáticos (logo, paleta, etc. dentro de /branding). Sin esto el
+    // middleware redirigía cada GET a /branding/Logo.png a /login para
+    // visitantes no autenticados, dejando la página de login sin imagen.
+    "/((?!_next/static|_next/image|favicon.ico|branding/).*)",
   ],
 };
