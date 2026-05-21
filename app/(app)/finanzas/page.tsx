@@ -9,6 +9,14 @@ import { FixedServicesSection } from "@/components/finanzas/fixed-services-secti
 import { FinanzasTabs } from "@/components/finanzas/finanzas-tabs";
 import { MonthCard } from "@/components/finanzas/month-card";
 import {
+  MonthlyBarsChart,
+  type MonthlyDatum,
+} from "@/components/finanzas/monthly-bars-chart";
+import {
+  ClientIncomeDonut,
+  type ClientIncomeDatum,
+} from "@/components/finanzas/client-income-donut";
+import {
   RegisterRetainerPaymentDialog,
   type RetainerClient,
 } from "@/components/finanzas/register-retainer-payment-dialog";
@@ -270,39 +278,131 @@ export default async function FinanzasPage() {
   const totalPendingPay = sumAcrossBuckets(buckets, "pendingPay");
   const totalProfit = sumAcrossBuckets(buckets, "profit");
 
+  // Datos para los gráficos del Resumen.
+  const SHORT_MONTH = new Intl.DateTimeFormat("es-AR", { month: "short" });
+  function shortMonthLabel(key: string): string {
+    const [y, m] = key.split("-").map(Number);
+    const d = new Date(Date.UTC(y, m - 1, 1));
+    return `${SHORT_MONTH.format(d).replace(".", "")} ${y % 100}`;
+  }
+
+  const sortedBuckets = [...buckets].sort((a, b) => a.key.localeCompare(b.key));
+  const last12 = sortedBuckets.slice(-12);
+  const monthlyData: MonthlyDatum[] = last12.map((b) => ({
+    month: shortMonthLabel(b.key),
+    cobrado: Math.round(b.collected),
+    pagado: Math.round(b.paid),
+    ganancia: Math.round(b.profit),
+  }));
+
+  // Ingresos por cliente: pagos retainer + proyectos finalizados cobrados
+  // (no mensuales). Top 5 + "Otros".
+  const incomeByClient = new Map<
+    string,
+    { color: string; total: number }
+  >();
+  for (const pay of payments) {
+    const existing = incomeByClient.get(pay.clientName);
+    if (existing) existing.total += pay.amount;
+    else
+      incomeByClient.set(pay.clientName, {
+        color: pay.clientColor ?? "#888888",
+        total: pay.amount,
+      });
+  }
+  for (const p of projects) {
+    if (!p.finalized) continue;
+    if (p.cobrado !== "si") continue;
+    if (p.client?.payment_type === "mensual") continue;
+    const price = computePrice(p);
+    if (price == null) continue;
+    const name = p.client?.name ?? p.client_name ?? "Sin cliente";
+    const color = p.client?.color ?? "#888888";
+    const existing = incomeByClient.get(name);
+    if (existing) existing.total += price;
+    else incomeByClient.set(name, { color, total: price });
+  }
+  const rankedClients = [...incomeByClient.entries()]
+    .map(([name, { color, total }]) => ({ name, color, value: total }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value);
+  const TOP_CLIENTS = 5;
+  const clientIncomeData: ClientIncomeDatum[] = rankedClients.slice(
+    0,
+    TOP_CLIENTS
+  );
+  if (rankedClients.length > TOP_CLIENTS) {
+    const rest = rankedClients.slice(TOP_CLIENTS);
+    clientIncomeData.push({
+      name: "Otros",
+      color: "#94a3b8",
+      value: rest.reduce((s, r) => s + r.value, 0),
+    });
+  }
+
   const resumenSection = (
-    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
-      <TotalCard
-        label="Cobrado"
-        value={formatPrice(totalCollected)}
-        tone="positive"
-      />
-      <TotalCard
-        label="Por cobrar"
-        value={formatPrice(totalPendingCollect)}
-        tone="warning"
-      />
-      <TotalCard
-        label="Pagado"
-        value={formatPrice(totalPaid)}
-        tone="neutral"
-      />
-      <TotalCard
-        label="Por pagar"
-        value={formatPrice(totalPendingPay)}
-        tone="warning"
-      />
-      <TotalCard
-        label="Servicios / mes"
-        value={formatPrice(servicesMonthlyTotal)}
-        tone="neutral"
-      />
-      <TotalCard
-        label="Ganancia"
-        value={formatPrice(totalProfit)}
-        tone="positive"
-      />
-    </section>
+    <div className="flex flex-col gap-6">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <TotalCard
+          label="Cobrado"
+          value={formatPrice(totalCollected)}
+          tone="positive"
+        />
+        <TotalCard
+          label="Por cobrar"
+          value={formatPrice(totalPendingCollect)}
+          tone="warning"
+        />
+        <TotalCard
+          label="Pagado"
+          value={formatPrice(totalPaid)}
+          tone="neutral"
+        />
+        <TotalCard
+          label="Por pagar"
+          value={formatPrice(totalPendingPay)}
+          tone="warning"
+        />
+        <TotalCard
+          label="Servicios / mes"
+          value={formatPrice(servicesMonthlyTotal)}
+          tone="neutral"
+        />
+        <TotalCard
+          label="Ganancia"
+          value={formatPrice(totalProfit)}
+          tone="positive"
+        />
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">
+              Cobrado / Pagado / Ganancia por mes
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Últimos {monthlyData.length} mes
+              {monthlyData.length === 1 ? "" : "es"} con actividad.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <MonthlyBarsChart data={monthlyData} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Ingresos por cliente</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Acumulado de pagos retainer + cobros por proyecto.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ClientIncomeDonut data={clientIncomeData} />
+          </CardContent>
+        </Card>
+      </section>
+    </div>
   );
 
   const now = new Date();
