@@ -13,6 +13,8 @@ type Props = {
   visibleTabs: FinanzasTabId[];
   /** JSX por pestaña. */
   sections: Record<FinanzasTabId, React.ReactNode>;
+  /** Tab inicial al cargar la página (ej. desde `?tab=por_proyecto`). */
+  initialTab?: FinanzasTabId | null;
 };
 
 /**
@@ -20,13 +22,15 @@ type Props = {
  * decide cada usuario desde /configuracion (sus preferencias). Si tiene todas
  * destildadas hacemos fallback a todas para no dejar la página vacía.
  */
-export function FinanzasTabs({ visibleTabs, sections }: Props) {
+export function FinanzasTabs({ visibleTabs, sections, initialTab }: Props) {
   const tabs: FinanzasTabId[] =
     visibleTabs.length > 0
       ? visibleTabs
       : [...(FINANZAS_TABS as readonly FinanzasTabId[])];
 
-  const [tab, setTab] = useState<FinanzasTabId>(tabs[0]);
+  const startTab =
+    initialTab && tabs.includes(initialTab) ? initialTab : tabs[0];
+  const [tab, setTab] = useState<FinanzasTabId>(startTab);
   const active = tabs.includes(tab) ? tab : tabs[0];
 
   return (

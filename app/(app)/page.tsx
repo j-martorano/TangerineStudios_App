@@ -197,7 +197,7 @@ export default async function DashboardPage({
           }
           delta={moneyDelta(pendingCobroTotal, previousPendingCobro)}
           items={projectItems(pendingCobroProjects.slice(0, 3), "price")}
-          href="/finanzas"
+          href="/finanzas?tab=por_proyecto"
           hrefLabel="Ver en Finanzas"
           highlight={pendingCobroTotal > 0}
         />
@@ -215,7 +215,7 @@ export default async function DashboardPage({
           }
           delta={moneyDelta(pendingPagoTotal, previousPendingPago)}
           items={projectItems(pendingPagoProjects.slice(0, 3), "cost")}
-          href="/finanzas"
+          href="/finanzas?tab=por_proyecto"
           hrefLabel="Ver en Finanzas"
         />
         <StatCard

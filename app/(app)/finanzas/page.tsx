@@ -242,7 +242,32 @@ function sumAcrossBuckets(
   return total;
 }
 
-export default async function FinanzasPage() {
+type SearchParams = Promise<{ tab?: string }>;
+
+const ALLOWED_TABS = new Set([
+  "resumen",
+  "por_mes",
+  "pagos",
+  "por_proyecto",
+  "servicios",
+]);
+
+export default async function FinanzasPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const params = await searchParams;
+  const initialTab =
+    params.tab && ALLOWED_TABS.has(params.tab)
+      ? (params.tab as
+          | "resumen"
+          | "por_mes"
+          | "pagos"
+          | "por_proyecto"
+          | "servicios")
+      : null;
+
   const [projects, payments, fixedServices, prefs, clients] =
     await Promise.all([
       fetchProjects(),
@@ -448,6 +473,7 @@ export default async function FinanzasPage() {
 
       <FinanzasTabs
         visibleTabs={prefs.finanzas.tabs}
+        initialTab={initialTab}
         sections={{
           resumen: resumenSection,
           por_mes: porMesSection,
