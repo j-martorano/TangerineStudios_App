@@ -65,9 +65,21 @@ const projectInputSchema = z
       .number()
       .nonnegative("La duración no puede ser negativa")
       .nullable(),
-    /** IDs de los editores asignados al proyecto (sin límite de cantidad). */
-    editor_ids: z
-      .array(z.string().regex(uuidRegex, "Editor inválido"))
+    /**
+     * Editores asignados al proyecto. Cada uno puede tener un `cost` manual
+     * (override del cálculo) o null para usar el modelo de pago del editor.
+     */
+    editors: z
+      .array(
+        z.object({
+          id: z.string().regex(uuidRegex, "Editor inválido"),
+          cost: z
+            .number()
+            .nonnegative("El costo no puede ser negativo")
+            .nullable()
+            .default(null),
+        })
+      )
       .default([]),
   });
 
@@ -96,13 +108,15 @@ type ProjectEditorRow = {
 
 function buildEditorRows(
   projectId: string,
-  editorIds: string[]
+  editors: { id: string; cost: number | null }[]
 ): ProjectEditorRow[] {
   // Dedup por las dudas: la PK del pivot es (project_id, editor_id).
-  return [...new Set(editorIds)].map((editorId) => ({
+  const byId = new Map<string, { id: string; cost: number | null }>();
+  for (const e of editors) if (!byId.has(e.id)) byId.set(e.id, e);
+  return [...byId.values()].map((e) => ({
     project_id: projectId,
-    editor_id: editorId,
-    cost: null,
+    editor_id: e.id,
+    cost: e.cost,
   }));
 }
 
@@ -112,7 +126,7 @@ export async function createProject(
   const parsed = projectInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
-  const { editor_ids, ...projectData } = parsed.data;
+  const { editors, ...projectData } = parsed.data;
 
   const supabase = await createClient();
   const clientName = await getClientName(projectData.client_id);
@@ -129,7 +143,7 @@ export async function createProject(
     return { ok: false, error: error?.message ?? "Error al crear proyecto" };
   }
 
-  const editorRows = buildEditorRows(created.id, editor_ids);
+  const editorRows = buildEditorRows(created.id, editors);
 
   if (editorRows.length > 0) {
     const { error: editorError } = await supabase
@@ -149,7 +163,7 @@ export async function updateProject(
   const parsed = projectInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
-  const { editor_ids, ...projectData } = parsed.data;
+  const { editors, ...projectData } = parsed.data;
 
   const supabase = await createClient();
   const clientName = await getClientName(projectData.client_id);
@@ -168,7 +182,7 @@ export async function updateProject(
     .eq("project_id", id);
   if (deleteError) return { ok: false, error: deleteError.message };
 
-  const editorRows = buildEditorRows(id, editor_ids);
+  const editorRows = buildEditorRows(id, editors);
 
   if (editorRows.length > 0) {
     const { error: insertError } = await supabase

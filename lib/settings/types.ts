@@ -104,7 +104,7 @@ export type FinanzasTabId = (typeof FINANZAS_TABS)[number];
 export const FINANZAS_TAB_LABEL: Record<FinanzasTabId, string> = {
   resumen: "Resumen",
   por_mes: "Por mes",
-  pagos: "Pagos FLAT",
+  pagos: "Pagos retainer",
   por_proyecto: "Por proyecto",
   servicios: "Servicios fijos",
 };

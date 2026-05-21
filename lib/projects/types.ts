@@ -86,9 +86,9 @@ export const PAYMENT_TYPES: PaymentType[] = [
 ];
 
 export const PAYMENT_TYPE_LABEL: Record<PaymentType, string> = {
-  por_proyecto: "Precio por proyecto (manual)",
-  por_rate: "Por rate × duración",
-  mensual: "FLAT",
+  por_proyecto: "FLAT — precio fijo por proyecto",
+  por_rate: "Por minuto",
+  mensual: "RETAINER — paquete mensual con minutos",
 };
 
 export const EDITOR_PAYMENT_TYPES: EditorPaymentType[] = [

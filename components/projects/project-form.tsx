@@ -88,27 +88,44 @@ export function ProjectForm({
   const [durationMinutes, setDurationMinutes] = useState<string>(
     project?.duration_minutes != null ? String(project.duration_minutes) : ""
   );
-  const [editorIds, setEditorIds] = useState<string[]>(
+  const [manualCost, setManualCost] = useState<string>(
+    project?.cost != null ? String(project.cost) : ""
+  );
+  type EditorEntry = { id: string; costDraft: string };
+  const [editorEntries, setEditorEntries] = useState<EditorEntry[]>(
     () =>
       project?.editors
-        ?.map((e) => e.editor?.id)
-        .filter((id): id is string => Boolean(id)) ?? []
+        ?.filter((e) => e.editor != null)
+        .map((e) => ({
+          id: e.editor!.id,
+          costDraft: e.cost != null ? String(e.cost) : "",
+        })) ?? []
   );
   const [pending, startTransition] = useTransition();
 
   const editorById = new Map(editors.map((ed) => [ed.id, ed.name]));
+  const editorIds = editorEntries.map((e) => e.id);
 
   function addEditor() {
     const next = editors.find((ed) => !editorIds.includes(ed.id));
-    if (next) setEditorIds([...editorIds, next.id]);
+    if (next)
+      setEditorEntries([...editorEntries, { id: next.id, costDraft: "" }]);
   }
 
   function changeEditor(index: number, id: string) {
-    setEditorIds(editorIds.map((eid, i) => (i === index ? id : eid)));
+    setEditorEntries(
+      editorEntries.map((e, i) => (i === index ? { ...e, id } : e))
+    );
+  }
+
+  function changeEditorCost(index: number, costDraft: string) {
+    setEditorEntries(
+      editorEntries.map((e, i) => (i === index ? { ...e, costDraft } : e))
+    );
   }
 
   function removeEditor(index: number) {
-    setEditorIds(editorIds.filter((_, i) => i !== index));
+    setEditorEntries(editorEntries.filter((_, i) => i !== index));
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -133,6 +150,29 @@ export function ProjectForm({
       return;
     }
 
+    const parsedCost = manualCost === "" ? null : Number(manualCost);
+    if (parsedCost !== null && (Number.isNaN(parsedCost) || parsedCost < 0)) {
+      toast.error("Cost total inválido");
+      return;
+    }
+
+    const editorPayload: { id: string; cost: number | null }[] = [];
+    for (const entry of editorEntries) {
+      const costStr = entry.costDraft.trim();
+      let cost: number | null = null;
+      if (costStr !== "") {
+        const n = Number(costStr);
+        if (Number.isNaN(n) || n < 0) {
+          toast.error(
+            `Costo manual inválido para ${editorById.get(entry.id) ?? "editor"}`
+          );
+          return;
+        }
+        cost = n;
+      }
+      editorPayload.push({ id: entry.id, cost });
+    }
+
     // El precio sólo se guarda cuando el cliente es 'por_proyecto' (manual).
     const selectedClient = clients.find((c) => c.id === clientId) ?? null;
     const priceToStore =
@@ -146,9 +186,9 @@ export function ProjectForm({
       pagado,
       invoiced,
       price: priceToStore,
-      cost: null,
+      cost: parsedCost,
       duration_minutes: parsedDuration,
-      editor_ids: editorIds,
+      editors: editorPayload,
     };
 
     startTransition(async () => {
@@ -315,12 +355,20 @@ export function ProjectForm({
         {/* Editores — sin límite de cantidad. */}
         <div className="flex flex-col gap-2">
           <Label>Editores</Label>
-          {editorIds.length > 0 ? (
+          {editorEntries.length > 0 ? (
             <div className="flex flex-col gap-2">
-              {editorIds.map((eid, i) => (
-                <div key={i} className="flex items-center gap-2">
+              <div className="grid grid-cols-[1fr_140px_auto] gap-2 px-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                <span>Editor</span>
+                <span>Costo manual (USD)</span>
+                <span className="w-8" />
+              </div>
+              {editorEntries.map((entry, i) => (
+                <div
+                  key={i}
+                  className="grid grid-cols-[1fr_140px_auto] items-center gap-2"
+                >
                   <Select
-                    value={eid}
+                    value={entry.id}
                     onValueChange={(v) => v && changeEditor(i, v)}
                   >
                     <SelectTrigger className="w-full">
@@ -333,7 +381,8 @@ export function ProjectForm({
                     <SelectContent>
                       {editors
                         .filter(
-                          (ed) => ed.id === eid || !editorIds.includes(ed.id)
+                          (ed) =>
+                            ed.id === entry.id || !editorIds.includes(ed.id)
                         )
                         .map((ed) => (
                           <SelectItem key={ed.id} value={ed.id}>
@@ -342,6 +391,17 @@ export function ProjectForm({
                         ))}
                     </SelectContent>
                   </Select>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    value={entry.costDraft}
+                    onChange={(e) => changeEditorCost(i, e.target.value)}
+                    placeholder="auto"
+                    className="h-9 text-right tabular-nums"
+                    aria-label={`Costo manual del editor ${i + 1}`}
+                  />
                   <Button
                     type="button"
                     variant="ghost"
@@ -353,6 +413,10 @@ export function ProjectForm({
                   </Button>
                 </div>
               ))}
+              <p className="text-xs text-muted-foreground">
+                Dejá el costo vacío para usar el cálculo automático del modelo
+                de pago del editor.
+              </p>
             </div>
           ) : (
             <p className="text-xs italic text-muted-foreground">
@@ -372,15 +436,59 @@ export function ProjectForm({
           </Button>
         </div>
 
+        {/* Cost total del proyecto — override opcional que sobrescribe la
+            suma calculada de los editores. */}
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="manual_cost">
+            Cost total del proyecto{" "}
+            <span className="text-xs text-muted-foreground">
+              (override opcional, USD)
+            </span>
+          </Label>
+          <Input
+            id="manual_cost"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            value={manualCost}
+            onChange={(e) => setManualCost(e.target.value)}
+            placeholder="Vacío = se calcula desde los editores"
+          />
+          <p className="text-xs text-muted-foreground">
+            Si cargás un monto, sobrescribe la suma calculada de los costos
+            por editor. Útil para casos especiales que no encajan en ningún
+            modelo.
+          </p>
+        </div>
+
         {/* Preview de precio / costo / ganancia. */}
         {(() => {
           const parsedPrice =
             manualPrice === "" ? null : Number(manualPrice);
-          const editorEntries = editorIds
-            .map((id) => editors.find((ed) => ed.id === id) ?? null)
-            .filter((ed): ed is EditorMini => ed != null)
-            .map((ed) => ({ cost: null, editor: ed }));
+          const parsedManualCost =
+            manualCost === "" ? null : Number(manualCost);
+          const previewEditors = editorEntries
+            .map((entry) => {
+              const editor = editors.find((ed) => ed.id === entry.id) ?? null;
+              if (!editor) return null;
+              const costStr = entry.costDraft.trim();
+              const cost =
+                costStr === ""
+                  ? null
+                  : Number.isNaN(Number(costStr))
+                    ? null
+                    : Number(costStr);
+              return { cost, editor };
+            })
+            .filter((e): e is { cost: number | null; editor: EditorMini } =>
+              e != null
+            );
           const preview = {
+            cost:
+              parsedManualCost != null && !Number.isNaN(parsedManualCost)
+                ? parsedManualCost
+                : null,
             duration_minutes: validDur,
             price:
               selectedClient?.payment_type === "por_proyecto" &&
@@ -389,7 +497,7 @@ export function ProjectForm({
                 ? parsedPrice
                 : null,
             client: selectedClient,
-            editors: editorEntries,
+            editors: previewEditors,
           };
           const computedPrice = computePrice(preview);
           const computedCost = computeCost(preview);
@@ -401,7 +509,7 @@ export function ProjectForm({
                 <span className="text-muted-foreground">Precio (calc.)</span>
                 <span className="font-medium tabular-nums">
                   {isMensual
-                    ? "FLAT"
+                    ? "RETAINER"
                     : computedPrice != null
                       ? formatPrice(computedPrice)
                       : "—"}

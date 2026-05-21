@@ -161,7 +161,7 @@ function renderValue(
     case "phase":
       return <QuickPhaseBadge id={p.id} phase={p.phase} disabled={locked} />;
     case "price":
-      if (p.client?.payment_type === "mensual") return "FLAT";
+      if (p.client?.payment_type === "mensual") return "RETAINER";
       const price = computePrice(p);
       return price != null ? formatPrice(price) : "—";
     case "cost": {

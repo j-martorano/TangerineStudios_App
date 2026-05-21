@@ -371,7 +371,7 @@ function PagosSection({ items }: { items: PaymentItem[] }) {
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
         <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Pagos de clientes FLAT
+          Pagos de clientes retainer
         </h2>
         <span className="text-xs text-muted-foreground">
           {items.length} pago{items.length === 1 ? "" : "s"} ·{" "}
@@ -574,7 +574,7 @@ function MonthCard({ bucket }: { bucket: MonthBucket }) {
                 const cost = computeCost(p);
                 const profit = computeProfit(p);
                 const cobradoStr = isMensual
-                  ? "FLAT"
+                  ? "RETAINER"
                   : price != null
                     ? formatPrice(price)
                     : "—";

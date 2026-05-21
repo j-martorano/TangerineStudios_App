@@ -557,7 +557,7 @@ function CardView({
                 label="Precio"
                 value={
                   isMensual
-                    ? "FLAT"
+                    ? "RETAINER"
                     : price != null
                       ? formatPrice(price)
                       : "—"

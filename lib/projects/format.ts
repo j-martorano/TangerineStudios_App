@@ -10,6 +10,8 @@ import type {
 } from "./types";
 
 type ProjectForCalc = {
+  /** Override total del costo del proyecto (independiente de los editores). */
+  cost: number | null;
   duration_minutes: number | null;
   price: number | null; // override manual; usado sólo para client.payment_type='por_proyecto'
   client: ClientMini | null;
@@ -78,19 +80,30 @@ function editorCost(
   }
 }
 
-// Costo calculado del proyecto: suma de aportes de cada editor según su
-// modelo de pago (flat / flat_variable / por_minuto). Si a un editor le
-// faltan datos para calcular su aporte, ese editor aporta null (no se suma,
-// pero tampoco rompe el total).
+/**
+ * Costo calculado del proyecto. Cascada:
+ *   1. Si el proyecto tiene `cost` cargado → ese es el total (override manual).
+ *   2. Si no, sumamos el aporte de cada editor:
+ *      a. Si la asignación tiene `cost` manual → ese valor.
+ *      b. Si no, se calcula desde el modelo de pago del editor.
+ * Si ningún editor aporta nada calculable, devolvemos null.
+ */
 export function computeCost(p: ProjectForCalc): number | null {
+  if (p.cost != null) return Number(p.cost);
+
   const duration =
     p.duration_minutes == null ? null : Number(p.duration_minutes);
   let total = 0;
   let anyContribution = false;
   for (const entry of p.editors) {
-    const editor = entry.editor;
-    if (!editor) continue;
-    const cost = editorCost(editor, duration);
+    let cost: number | null;
+    if (entry.cost != null) {
+      cost = Number(entry.cost);
+    } else if (entry.editor) {
+      cost = editorCost(entry.editor, duration);
+    } else {
+      cost = null;
+    }
     if (cost == null) continue;
     total += cost;
     anyContribution = true;
