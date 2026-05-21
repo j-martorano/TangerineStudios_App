@@ -55,8 +55,34 @@ const editorInputSchema = z.object({
         })
     )
     .optional(),
-  /** IDs de clientes asignados. Si está definido, se sincroniza la pivot client_editors. */
-  client_ids: z.array(z.string()).optional(),
+  /**
+   * Pares cliente-editor con su config de pago. Si está definido, se
+   * sincroniza la pivot client_editors + sus tramos. Cada par puede
+   * sobrescribir el modelo global del editor.
+   */
+  client_pairs: z
+    .array(
+      z.object({
+        client_id: z.string(),
+        payment_type: editorPaymentTypeEnum.nullable().default(null),
+        rate: z.number().nonnegative().nullable().default(null),
+        flat_amount: z.number().nonnegative().nullable().default(null),
+        tiers: z
+          .array(
+            z
+              .object({
+                min_minutes: z.number().nonnegative(),
+                max_minutes: z.number().positive(),
+                amount: z.number().nonnegative(),
+              })
+              .refine((t) => t.max_minutes > t.min_minutes, {
+                message: "En cada tramo el máximo debe ser mayor al mínimo",
+              })
+          )
+          .optional(),
+      })
+    )
+    .optional(),
   /** Métodos de pago del editor + info. Si está definido, se sincroniza la pivot. */
   payment_methods: z
     .array(
@@ -96,11 +122,23 @@ function normalizeText(value: string | null | undefined): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
-async function syncEditorClients(
+type ClientPairInput = {
+  client_id: string;
+  payment_type: EditorPaymentType | null;
+  rate: number | null;
+  flat_amount: number | null;
+  tiers?: { min_minutes: number; max_minutes: number; amount: number }[];
+};
+
+/**
+ * Sincroniza los pares cliente-editor para un editor: borra los existentes
+ * (que arrastra los tramos por cascade) e inserta los nuevos con su config.
+ */
+async function syncEditorClientPairs(
   editorId: string,
-  clientIds: string[] | undefined
+  pairs: ClientPairInput[] | undefined
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (clientIds === undefined) return { ok: true };
+  if (pairs === undefined) return { ok: true };
   const supabase = await createSupabaseClient();
 
   const { error: delErr } = await supabase
@@ -109,12 +147,44 @@ async function syncEditorClients(
     .eq("editor_id", editorId);
   if (delErr) return { ok: false, error: delErr.message };
 
-  if (clientIds.length === 0) return { ok: true };
+  if (pairs.length === 0) return { ok: true };
 
-  const { error: insErr } = await supabase
-    .from("client_editors")
-    .insert(clientIds.map((cid) => ({ client_id: cid, editor_id: editorId })));
+  // Dedup por client_id (la PK es composite).
+  const byClient = new Map<string, ClientPairInput>();
+  for (const p of pairs) if (!byClient.has(p.client_id)) byClient.set(p.client_id, p);
+  const unique = [...byClient.values()];
+
+  const { error: insErr } = await supabase.from("client_editors").insert(
+    unique.map((p) => ({
+      client_id: p.client_id,
+      editor_id: editorId,
+      payment_type: p.payment_type,
+      rate: p.payment_type === "por_minuto" ? p.rate : null,
+      flat_amount: p.payment_type === "flat" ? p.flat_amount : null,
+    }))
+  );
   if (insErr) return { ok: false, error: insErr.message };
+
+  // Tramos por par para los flat_variable.
+  const tierRows = unique
+    .filter(
+      (p) => p.payment_type === "flat_variable" && p.tiers && p.tiers.length > 0
+    )
+    .flatMap((p) =>
+      p.tiers!.map((t) => ({
+        client_id: p.client_id,
+        editor_id: editorId,
+        min_minutes: t.min_minutes,
+        max_minutes: t.max_minutes,
+        amount: t.amount,
+      }))
+    );
+  if (tierRows.length > 0) {
+    const { error: tErr } = await supabase
+      .from("client_editor_payment_tiers")
+      .insert(tierRows);
+    if (tErr) return { ok: false, error: tErr.message };
+  }
 
   return { ok: true };
 }
@@ -211,7 +281,7 @@ export async function createEditor(
     return { ok: false, error: error.message };
   }
 
-  const sync = await syncEditorClients(data.id, parsed.data.client_ids);
+  const sync = await syncEditorClientPairs(data.id, parsed.data.client_pairs);
   if (!sync.ok) return { ok: false, error: sync.error };
 
   const syncPm = await syncEditorPaymentMethods(
@@ -261,7 +331,7 @@ export async function updateEditor(
     return { ok: false, error: error.message };
   }
 
-  const sync = await syncEditorClients(id, parsed.data.client_ids);
+  const sync = await syncEditorClientPairs(id, parsed.data.client_pairs);
   if (!sync.ok) return { ok: false, error: sync.error };
 
   const syncPm = await syncEditorPaymentMethods(

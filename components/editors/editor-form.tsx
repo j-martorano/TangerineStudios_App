@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/select";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 
-import { MultiCombobox } from "@/components/ui/multi-combobox";
 import {
   EditorPaymentMethods,
   type EditorMethodValue,
@@ -24,14 +23,18 @@ import {
   EditorTiersEditor,
   type TierDraft,
 } from "./editor-tiers-editor";
+import {
+  EditorClientPairs,
+  type ClientPairDraft,
+} from "./editor-client-pairs";
 
 import { createEditor, updateEditor } from "@/lib/editors/actions";
-import { createClient } from "@/lib/clients/actions";
 import {
   EDITOR_PAYMENT_TYPES,
   EDITOR_PAYMENT_TYPE_LABEL,
 } from "@/lib/projects/types";
 import type {
+  ClientEditorPair,
   ClientMini,
   EditorPaymentType,
   EditorRow,
@@ -46,6 +49,7 @@ type Props = {
   mode: "create" | "edit";
   editor?: EditorRow & {
     clients?: ClientMini[];
+    client_pairs?: ClientEditorPair[];
     payment_methods?: EditorPaymentMethod[];
     tiers?: PaymentTier[];
   };
@@ -91,8 +95,19 @@ export function EditorForm({
         amount: String(t.amount),
       })) ?? []
   );
-  const [clientIds, setClientIds] = useState<string[]>(
-    editor?.clients?.map((c) => c.id) ?? []
+  const [clientPairs, setClientPairs] = useState<ClientPairDraft[]>(
+    () =>
+      editor?.client_pairs?.map((p) => ({
+        client_id: p.client.id,
+        payment_type: p.payment_type,
+        rate: p.rate != null ? String(p.rate) : "",
+        flat_amount: p.flat_amount != null ? String(p.flat_amount) : "",
+        tiers: p.tiers.map((t) => ({
+          min: String(t.min_minutes),
+          max: String(t.max_minutes),
+          amount: String(t.amount),
+        })),
+      })) ?? []
   );
   const [pending, startTransition] = useTransition();
 
@@ -147,6 +162,78 @@ export function EditorForm({
       }
     }
 
+    // Parsear los pares cliente-editor y validar.
+    const parsedPairs: {
+      client_id: string;
+      payment_type: EditorPaymentType | null;
+      rate: number | null;
+      flat_amount: number | null;
+      tiers?: { min_minutes: number; max_minutes: number; amount: number }[];
+    }[] = [];
+    for (const pair of clientPairs) {
+      const pp = pair.payment_type;
+      let pairRate: number | null = null;
+      let pairFlat: number | null = null;
+      let pairTiers:
+        | { min_minutes: number; max_minutes: number; amount: number }[]
+        | undefined;
+
+      if (pp === "por_minuto") {
+        if (pair.rate === "") {
+          toast.error("Cargá el rate por minuto para todos los clientes con ese modelo");
+          return;
+        }
+        const n = Number(pair.rate);
+        if (Number.isNaN(n) || n < 0) {
+          toast.error("Rate por minuto inválido en uno de los clientes");
+          return;
+        }
+        pairRate = n;
+      } else if (pp === "flat") {
+        if (pair.flat_amount === "") {
+          toast.error("Cargá el monto FLAT para todos los clientes con ese modelo");
+          return;
+        }
+        const n = Number(pair.flat_amount);
+        if (Number.isNaN(n) || n < 0) {
+          toast.error("Monto FLAT inválido en uno de los clientes");
+          return;
+        }
+        pairFlat = n;
+      } else if (pp === "flat_variable") {
+        if (pair.tiers.length === 0) {
+          toast.error("Agregá al menos un tramo para FLAT variable en cada cliente");
+          return;
+        }
+        pairTiers = [];
+        for (const t of pair.tiers) {
+          const min = Number(t.min);
+          const max = Number(t.max);
+          const amount = Number(t.amount);
+          if (
+            t.min === "" || t.max === "" || t.amount === "" ||
+            Number.isNaN(min) || Number.isNaN(max) || Number.isNaN(amount)
+          ) {
+            toast.error("Completá todos los campos de cada tramo");
+            return;
+          }
+          if (max <= min) {
+            toast.error("En cada tramo «Hasta» debe ser mayor que «Desde»");
+            return;
+          }
+          pairTiers.push({ min_minutes: min, max_minutes: max, amount });
+        }
+      }
+
+      parsedPairs.push({
+        client_id: pair.client_id,
+        payment_type: pp,
+        rate: pairRate,
+        flat_amount: pairFlat,
+        tiers: pairTiers,
+      });
+    }
+
     const payload = {
       name: trimmed,
       email: email.trim() || null,
@@ -157,7 +244,7 @@ export function EditorForm({
       rate: paymentType === "por_minuto" ? parsedRate : null,
       flat_amount: paymentType === "flat" ? parsedFlat : null,
       tiers: parsedTiers,
-      client_ids: clientIds,
+      client_pairs: parsedPairs,
       payment_methods: methods.map((m) => ({
         method_id: m.method_id,
         info: m.info.trim() || null,
@@ -295,36 +382,12 @@ export function EditorForm({
 
         <Field
           label="Clientes asignados"
-          hint="Si no aparece el cliente en la lista, escribilo y elegí «Crear»."
+          hint="Cada cliente puede tener su propia config de pago para este editor. Si dejás «Usar el global», se aplica el modelo del editor."
         >
-          <MultiCombobox
-            items={availableClients}
-            selected={clientIds}
-            onChange={setClientIds}
-            placeholder="Sin clientes asignados"
-            emptyText="No hay clientes cargados"
-            onCreate={async (name) => {
-              const result = await createClient({ name });
-              return result.ok ? result.client : null;
-            }}
-            renderTag={(c) => (
-              <span className="flex items-center gap-1">
-                <span
-                  className="size-2 rounded-full"
-                  style={{ backgroundColor: c.color }}
-                />
-                {c.name}
-              </span>
-            )}
-            renderOption={(c) => (
-              <span className="flex items-center gap-2">
-                <span
-                  className="size-2.5 rounded-full"
-                  style={{ backgroundColor: c.color }}
-                />
-                {c.name}
-              </span>
-            )}
+          <EditorClientPairs
+            availableClients={availableClients}
+            value={clientPairs}
+            onChange={setClientPairs}
           />
         </Field>
       </Section>

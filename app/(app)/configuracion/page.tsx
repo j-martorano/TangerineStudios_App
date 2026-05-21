@@ -1,18 +1,21 @@
 import { fetchUserPrefs } from "@/lib/settings/queries";
 import { fetchPaymentMethods } from "@/lib/payment-methods/queries";
 import { fetchFixedServices } from "@/lib/finanzas/queries";
+import { isSeedActive } from "@/lib/seed/actions";
 
 import { PrefsClient } from "@/components/configuracion/prefs-client";
 import { PaymentMethodsManager } from "@/components/configuracion/payment-methods-manager";
+import { SeedSection } from "@/components/configuracion/seed-section";
 import { FixedServicesSection } from "@/components/finanzas/fixed-services-section";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConfiguracionPage() {
-  const [prefs, paymentMethods, fixedServices] = await Promise.all([
+  const [prefs, paymentMethods, fixedServices, seedActive] = await Promise.all([
     fetchUserPrefs(),
     fetchPaymentMethods(),
     fetchFixedServices(),
+    isSeedActive(),
   ]);
 
   return (
@@ -28,6 +31,19 @@ export default async function ConfiguracionPage() {
       </header>
 
       <PrefsClient initialPrefs={prefs} />
+
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-base font-semibold tracking-tight">
+            Datos de prueba
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Cargá un set de datos representativo para probar todos los
+            comportamientos sin tocar la data real. Es reversible en un click.
+          </p>
+        </div>
+        <SeedSection initialActive={seedActive} />
+      </section>
 
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">

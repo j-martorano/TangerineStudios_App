@@ -55,6 +55,19 @@ export type ClientPayment = {
   note: string | null;
 };
 
+/**
+ * Config de pago del par cliente-editor. Cada par puede tener su propia
+ * payment_type, rate, flat_amount, y para flat_variable, sus propios tramos.
+ * Si payment_type es null, el par usa el modelo global del editor.
+ */
+export type ClientEditorPair = {
+  client: ClientMini;
+  payment_type: EditorPaymentType | null;
+  rate: number | null;
+  flat_amount: number | null;
+  tiers: PaymentTier[];
+};
+
 export type ProjectEditorAssignment = {
   cost: number | null;
   editor: EditorMini | null;

@@ -1,16 +1,107 @@
 import { createClient } from "@/lib/supabase/server";
 import type {
+  ClientEditorPair,
   ClientForProject,
   ClientMini,
   ClientPayment,
   EditorMini,
+  EditorPaymentType,
+  EditorRow,
+  PaymentTier,
   ProjectWithRelations,
 } from "./types";
+import type { EditorPaymentMethod } from "@/lib/payment-methods/queries";
 
 const PROJECT_SELECT =
   "id, project_code, title, client_name, phase, cobrado, pagado, invoiced, status, price, cost, duration_minutes, position, finalized, finalized_at, archived, archived_at, created_at, updated_at, client_id, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct), editors:project_editors(cost, editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))";
 
 export const DEFAULT_PER_PAGE = 20;
+
+// ---- Helpers de config por par cliente-editor ----
+
+type PairConfigRow = {
+  payment_type: EditorPaymentType | null;
+  rate: number | null;
+  flat_amount: number | null;
+};
+
+function pairKey(clientId: string, editorId: string): string {
+  return `${clientId}|${editorId}`;
+}
+
+async function fetchPairConfigMap(): Promise<Map<string, PairConfigRow>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("client_editors")
+    .select("client_id, editor_id, payment_type, rate, flat_amount");
+  const map = new Map<string, PairConfigRow>();
+  for (const r of data ?? []) {
+    map.set(pairKey(r.client_id, r.editor_id), {
+      payment_type: r.payment_type,
+      rate: r.rate,
+      flat_amount: r.flat_amount,
+    });
+  }
+  return map;
+}
+
+async function fetchPairTiersMap(): Promise<Map<string, PaymentTier[]>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("client_editor_payment_tiers")
+    .select("client_id, editor_id, min_minutes, max_minutes, amount");
+  const map = new Map<string, PaymentTier[]>();
+  for (const r of data ?? []) {
+    const key = pairKey(r.client_id, r.editor_id);
+    const arr = map.get(key) ?? [];
+    arr.push({
+      min_minutes: Number(r.min_minutes),
+      max_minutes: Number(r.max_minutes),
+      amount: Number(r.amount),
+    });
+    map.set(key, arr);
+  }
+  // Ordenamos por min_minutes para que tierAmount sea consistente.
+  for (const arr of map.values()) {
+    arr.sort((a, b) => a.min_minutes - b.min_minutes);
+  }
+  return map;
+}
+
+/**
+ * Aplica la config del par cliente-editor (si existe) al editor embebido en
+ * un proyecto. Si el par define payment_type, el editor "efectivo" usado
+ * por computeCost adopta esa config en vez de la global del editor.
+ */
+function applyPairOverrides(
+  projects: ProjectWithRelations[],
+  pairs: Map<string, PairConfigRow>,
+  tiers: Map<string, PaymentTier[]>
+): ProjectWithRelations[] {
+  for (const p of projects) {
+    if (!p.client_id) continue;
+    for (const entry of p.editors) {
+      if (!entry.editor) continue;
+      const key = pairKey(p.client_id, entry.editor.id);
+      const pair = pairs.get(key);
+      if (!pair?.payment_type) continue;
+      const effectiveTiers =
+        pair.payment_type === "flat_variable"
+          ? (tiers.get(key) ?? [])
+          : [];
+      entry.editor = {
+        ...entry.editor,
+        payment_type: pair.payment_type,
+        rate: pair.rate,
+        flat_amount: pair.flat_amount,
+        tiers: effectiveTiers,
+      };
+    }
+  }
+  return projects;
+}
+
+// ---- Proyectos ----
 
 export async function fetchProjects(
   opts: {
@@ -37,9 +128,14 @@ export async function fetchProjects(
     }
   }
 
-  const { data, error } = await q.order("phase").order("position");
+  const [{ data, error }, pairs, tiers] = await Promise.all([
+    q.order("phase").order("position"),
+    fetchPairConfigMap(),
+    fetchPairTiersMap(),
+  ]);
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as ProjectWithRelations[];
+  const projects = (data ?? []) as unknown as ProjectWithRelations[];
+  return applyPairOverrides(projects, pairs, tiers);
 }
 
 export type ProjectsListOptions = {
@@ -64,7 +160,6 @@ export async function fetchProjectsList(
     .select(PROJECT_SELECT, { count: "exact" });
 
   if (query && query.length > 0) {
-    // Escapar comas, paréntesis y comillas que rompen la sintaxis de Supabase .or()
     const safe = query.replace(/[(),]/g, " ").trim();
     if (safe.length > 0) {
       q = q.or(
@@ -76,17 +171,22 @@ export async function fetchProjectsList(
   const from = (page - 1) * perPage;
   const to = from + perPage - 1;
 
-  const { data, error, count } = await q
-    .order("updated_at", { ascending: false })
-    .range(from, to);
+  const [{ data, error, count }, pairs, tiers] = await Promise.all([
+    q.order("updated_at", { ascending: false }).range(from, to),
+    fetchPairConfigMap(),
+    fetchPairTiersMap(),
+  ]);
 
   if (error) throw new Error(error.message);
 
+  const projects = (data ?? []) as unknown as ProjectWithRelations[];
   return {
-    projects: (data ?? []) as unknown as ProjectWithRelations[],
+    projects: applyPairOverrides(projects, pairs, tiers),
     total: count ?? 0,
   };
 }
+
+// ---- Editores ----
 
 export async function fetchEditors(): Promise<EditorMini[]> {
   const supabase = await createClient();
@@ -100,45 +200,63 @@ export async function fetchEditors(): Promise<EditorMini[]> {
   return (data ?? []) as unknown as EditorMini[];
 }
 
-import type { EditorRow, PaymentTier } from "./types";
-import type { EditorPaymentMethod } from "@/lib/payment-methods/queries";
-
 export type EditorWithCount = EditorRow & {
   project_count: number;
   clients: ClientMini[];
+  client_pairs: ClientEditorPair[];
   payment_methods: EditorPaymentMethod[];
   tiers: PaymentTier[];
 };
 
 const EDITOR_FULL_SELECT =
-  "id, name, email, phone, discord_id, docs_url, payment_type, rate, flat_amount, created_at, project_editors(count), client_editors(client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct)), editor_payment_methods(method_id, info, method:payment_methods(id, name)), editor_payment_tiers(min_minutes, max_minutes, amount)";
+  "id, name, email, phone, discord_id, docs_url, payment_type, rate, flat_amount, created_at, project_editors(count), client_editors(payment_type, rate, flat_amount, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct)), editor_payment_methods(method_id, info, method:payment_methods(id, name)), editor_payment_tiers(min_minutes, max_minutes, amount)";
 
-import type { EditorPaymentType } from "./types";
+function mapEditor(
+  e: {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    discord_id: string | null;
+    docs_url: string | null;
+    payment_type: EditorPaymentType;
+    rate: number | null;
+    flat_amount: number | null;
+    created_at: string;
+    project_editors?: { count: number }[] | null;
+    client_editors?:
+      | {
+          payment_type: EditorPaymentType | null;
+          rate: number | null;
+          flat_amount: number | null;
+          client: ClientMini | null;
+        }[]
+      | null;
+    editor_payment_methods?:
+      | {
+          method_id: string;
+          info: string | null;
+          method: { id: string; name: string } | null;
+        }[]
+      | null;
+    editor_payment_tiers?:
+      | { min_minutes: number; max_minutes: number; amount: number }[]
+      | null;
+  },
+  pairTiersByEditor: Map<string, Map<string, PaymentTier[]>>
+): EditorWithCount {
+  const editorTiers = pairTiersByEditor.get(e.id) ?? new Map();
+  const client_pairs: ClientEditorPair[] = (e.client_editors ?? [])
+    .filter((ce) => ce.client != null)
+    .map((ce) => ({
+      client: ce.client!,
+      payment_type: ce.payment_type,
+      rate: ce.rate,
+      flat_amount: ce.flat_amount,
+      tiers: editorTiers.get(ce.client!.id) ?? [],
+    }))
+    .sort((a, b) => a.client.name.localeCompare(b.client.name));
 
-function mapEditor(e: {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  discord_id: string | null;
-  docs_url: string | null;
-  payment_type: EditorPaymentType;
-  rate: number | null;
-  flat_amount: number | null;
-  created_at: string;
-  project_editors?: { count: number }[] | null;
-  client_editors?: { client: ClientMini | null }[] | null;
-  editor_payment_methods?:
-    | {
-        method_id: string;
-        info: string | null;
-        method: { id: string; name: string } | null;
-      }[]
-    | null;
-  editor_payment_tiers?:
-    | { min_minutes: number; max_minutes: number; amount: number }[]
-    | null;
-}): EditorWithCount {
   return {
     id: e.id,
     name: e.name,
@@ -151,9 +269,8 @@ function mapEditor(e: {
     flat_amount: e.flat_amount,
     created_at: e.created_at,
     project_count: e.project_editors?.[0]?.count ?? 0,
-    clients: (e.client_editors ?? [])
-      .map((ce) => ce.client)
-      .filter((c): c is ClientMini => c != null),
+    clients: client_pairs.map((p) => p.client),
+    client_pairs,
     payment_methods: (e.editor_payment_methods ?? [])
       .filter((pm) => pm.method != null)
       .map((pm) => ({
@@ -170,6 +287,42 @@ function mapEditor(e: {
       }))
       .sort((a, b) => a.min_minutes - b.min_minutes),
   };
+}
+
+/**
+ * Devuelve un mapa editor_id → (client_id → tiers) con todos los tramos
+ * por par para los editores indicados.
+ */
+async function fetchPairTiersByEditor(
+  editorIds: string[]
+): Promise<Map<string, Map<string, PaymentTier[]>>> {
+  const result = new Map<string, Map<string, PaymentTier[]>>();
+  if (editorIds.length === 0) return result;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("client_editor_payment_tiers")
+    .select("client_id, editor_id, min_minutes, max_minutes, amount")
+    .in("editor_id", editorIds);
+  for (const r of data ?? []) {
+    let editorMap = result.get(r.editor_id);
+    if (!editorMap) {
+      editorMap = new Map();
+      result.set(r.editor_id, editorMap);
+    }
+    const arr = editorMap.get(r.client_id) ?? [];
+    arr.push({
+      min_minutes: Number(r.min_minutes),
+      max_minutes: Number(r.max_minutes),
+      amount: Number(r.amount),
+    });
+    editorMap.set(r.client_id, arr);
+  }
+  for (const editorMap of result.values()) {
+    for (const arr of editorMap.values()) {
+      arr.sort((a, b) => a.min_minutes - b.min_minutes);
+    }
+  }
+  return result;
 }
 
 export type EditorsListOptions = {
@@ -206,11 +359,16 @@ export async function fetchEditorsList(
   const { data, error, count } = await q.order("name").range(from, to);
   if (error) throw new Error(error.message);
 
+  const editorIds = (data ?? []).map((e) => e.id);
+  const pairTiers = await fetchPairTiersByEditor(editorIds);
+
   return {
-    editors: (data ?? []).map((e) => mapEditor(e)),
+    editors: (data ?? []).map((e) => mapEditor(e, pairTiers)),
     total: count ?? 0,
   };
 }
+
+// ---- Clientes ----
 
 // Suma de minutos consumidos por los proyectos no archivados de un cliente.
 function consumedMinutes(

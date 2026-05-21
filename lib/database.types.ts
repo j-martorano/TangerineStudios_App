@@ -39,21 +39,88 @@ export type Database = {
   }
   public: {
     Tables: {
+      client_editor_payment_tiers: {
+        Row: {
+          amount: number
+          client_id: string
+          created_at: string
+          editor_id: string
+          id: string
+          max_minutes: number
+          min_minutes: number
+        }
+        Insert: {
+          amount?: number
+          client_id: string
+          created_at?: string
+          editor_id: string
+          id?: string
+          max_minutes: number
+          min_minutes: number
+        }
+        Update: {
+          amount?: number
+          client_id?: string
+          created_at?: string
+          editor_id?: string
+          id?: string
+          max_minutes?: number
+          min_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_editor_payment_tiers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_editor_payment_tiers_editor_id_fkey"
+            columns: ["editor_id"]
+            isOneToOne: false
+            referencedRelation: "editors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_editor_payment_tiers_pair_fkey"
+            columns: ["client_id", "editor_id"]
+            isOneToOne: false
+            referencedRelation: "client_editors"
+            referencedColumns: ["client_id", "editor_id"]
+          },
+        ]
+      }
       client_editors: {
         Row: {
           client_id: string
           created_at: string
           editor_id: string
+          flat_amount: number | null
+          payment_type:
+            | Database["public"]["Enums"]["editor_payment_model"]
+            | null
+          rate: number | null
         }
         Insert: {
           client_id: string
           created_at?: string
           editor_id: string
+          flat_amount?: number | null
+          payment_type?:
+            | Database["public"]["Enums"]["editor_payment_model"]
+            | null
+          rate?: number | null
         }
         Update: {
           client_id?: string
           created_at?: string
           editor_id?: string
+          flat_amount?: number | null
+          payment_type?:
+            | Database["public"]["Enums"]["editor_payment_model"]
+            | null
+          rate?: number | null
         }
         Relationships: [
           {
