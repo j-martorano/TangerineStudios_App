@@ -79,7 +79,12 @@ type ProjectSettleItem = {
   projectTitle: string;
   clientName: string;
   field: "cobrado" | "pagado";
-  amount: number | null;
+  /** Valor total esperado (precio del cliente o cost agregado de editores). */
+  total: number | null;
+  /** Suma de los cobros/pagos registrados (o el total si está marcado saldado sin registros). */
+  progress: number;
+  /** Restante = total − progress, clamped a 0. */
+  remaining: number | null;
   settled: boolean;
 };
 
@@ -162,44 +167,75 @@ function build(
     // vía pagos). Incluye proyectos sin cliente linkeado.
     if (!isMensual) {
       const price = computePrice(p);
-      const cobradoSettled = p.cobrado === "si";
-      if (price != null) {
-        if (cobradoSettled) bucket.collected += price;
-        else bucket.pendingCollect += price;
+      const cobrosSum = p.cobros.reduce(
+        (s, c) => s + Number(c.amount),
+        0
+      );
+      const cobradoFlag = p.cobrado === "si";
+      // Si está marcado «saldado» sin registrar cobros, tratamos el progreso
+      // como completo (modo legacy del badge antes de los parciales).
+      const progress =
+        cobradoFlag && cobrosSum === 0 && price != null ? price : cobrosSum;
+      const remaining =
+        price != null ? Math.max(0, price - progress) : null;
+      const settled =
+        cobradoFlag || (remaining === 0 && progress > 0);
+
+      bucket.collected += progress;
+      if (remaining != null && !settled) bucket.pendingCollect += remaining;
+
+      if (price != null || progress > 0) {
+        projectItems.push({
+          yearMonth: key,
+          monthLabel: bucket.label,
+          projectId: p.id,
+          projectCode: p.project_code,
+          projectTitle: p.title,
+          clientName: client?.name ?? p.client_name ?? "Sin cliente",
+          field: "cobrado",
+          total: price,
+          progress,
+          remaining,
+          settled,
+        });
       }
-      projectItems.push({
-        yearMonth: key,
-        monthLabel: bucket.label,
-        projectId: p.id,
-        projectCode: p.project_code,
-        projectTitle: p.title,
-        clientName: client?.name ?? p.client_name ?? "Sin cliente",
-        field: "cobrado",
-        amount: price,
-        settled: cobradoSettled,
-      });
     }
 
-    // Pagos por proyecto — todos los editores aportan al costo.
+    // Pagos por proyecto — todos los editores aportan al costo. Si hay
+    // pagos parciales registrados, sumamos los aportes; si no, fallback al
+    // flag pagado === 'pago_total'.
     const hasEditor = p.editors.some((e) => e.editor != null);
     if (hasEditor) {
       const cost = computeCost(p);
-      const pagadoSettled = p.pagado === "pago_total";
-      if (cost != null) {
-        if (pagadoSettled) bucket.paid += cost;
-        else bucket.pendingPay += cost;
+      const pagosSum = p.editor_pagos.reduce(
+        (s, e) => s + Number(e.amount),
+        0
+      );
+      const pagoFlag = p.pagado === "pago_total";
+      const progress =
+        pagoFlag && pagosSum === 0 && cost != null ? cost : pagosSum;
+      const remaining =
+        cost != null ? Math.max(0, cost - progress) : null;
+      const settled = pagoFlag || (remaining === 0 && progress > 0);
+
+      bucket.paid += progress;
+      if (remaining != null && !settled) bucket.pendingPay += remaining;
+
+      if (cost != null || progress > 0) {
+        projectItems.push({
+          yearMonth: key,
+          monthLabel: bucket.label,
+          projectId: p.id,
+          projectCode: p.project_code,
+          projectTitle: p.title,
+          clientName: client?.name ?? p.client_name ?? "—",
+          field: "pagado",
+          total: cost,
+          progress,
+          remaining,
+          settled,
+        });
       }
-      projectItems.push({
-        yearMonth: key,
-        monthLabel: bucket.label,
-        projectId: p.id,
-        projectCode: p.project_code,
-        projectTitle: p.title,
-        clientName: client?.name ?? p.client_name ?? "—",
-        field: "pagado",
-        amount: cost,
-        settled: pagadoSettled,
-      });
     }
 
     // Ganancia: para clientes no mensuales, precio − costo. Para mensuales,
@@ -228,7 +264,7 @@ function build(
     if (a.settled !== b.settled) return a.settled ? 1 : -1;
     if (a.yearMonth !== b.yearMonth)
       return b.yearMonth.localeCompare(a.yearMonth);
-    return (b.amount ?? 0) - (a.amount ?? 0);
+    return (b.remaining ?? b.total ?? 0) - (a.remaining ?? a.total ?? 0);
   });
 
   return { buckets, paymentItems, projectItems };
@@ -644,10 +680,20 @@ function ProjectList({
   items: ProjectSettleItem[];
 }) {
   const pendientes = items.filter((i) => !i.settled).length;
+  const totalRemaining = items
+    .filter((i) => !i.settled && i.remaining != null)
+    .reduce((s, i) => s + (i.remaining ?? 0), 0);
   return (
     <Card>
       <CardHeader className="border-b pb-3">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <CardTitle className="flex items-baseline justify-between gap-2 text-sm font-medium">
+          {title}
+          {totalRemaining > 0 ? (
+            <span className="text-xs font-normal text-amber-500 tabular-nums">
+              {formatPrice(totalRemaining)} pendiente
+            </span>
+          ) : null}
+        </CardTitle>
         <p className="text-xs text-muted-foreground">
           {pendientes} pendiente{pendientes === 1 ? "" : "s"} · {items.length}{" "}
           {subtitle}
@@ -659,37 +705,77 @@ function ProjectList({
             No hay proyectos finalizados con monto computable.
           </p>
         ) : (
-          items.map((it) => (
-            <div
-              key={`${it.projectId}-${it.field}`}
-              className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 ${
-                it.settled ? "opacity-60" : ""
-              }`}
-            >
-              <div className="flex flex-col min-w-0">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {it.projectCode}
-                </span>
-                <span className="truncate text-sm font-medium">
-                  {it.projectTitle}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {it.clientName} · {it.monthLabel}
-                </span>
+          items.map((it) => {
+            const pct =
+              it.total != null && it.total > 0
+                ? Math.min(100, Math.round((it.progress / it.total) * 100))
+                : it.settled
+                  ? 100
+                  : 0;
+            return (
+              <div
+                key={`${it.projectId}-${it.field}`}
+                className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 ${
+                  it.settled ? "opacity-60" : ""
+                }`}
+              >
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {it.projectCode}
+                  </span>
+                  <span className="truncate text-sm font-medium">
+                    {it.projectTitle}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {it.clientName} · {it.monthLabel}
+                  </span>
+                  {/* Barra de progreso. Se muestra siempre que tengamos un
+                     total computable; ayuda a leer rápido el avance. */}
+                  {it.total != null && it.total > 0 ? (
+                    <div className="mt-1 flex items-center gap-2">
+                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full transition-all ${
+                            it.settled ? "bg-emerald-500" : "bg-amber-500"
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground tabular-nums">
+                        {pct}%
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  {it.settled ? (
+                    <span className="text-sm font-semibold tabular-nums text-emerald-500">
+                      {it.total != null ? formatPrice(it.total) : "—"}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-sm font-semibold tabular-nums text-amber-500">
+                        {it.remaining != null
+                          ? formatPrice(it.remaining)
+                          : "—"}{" "}
+                        falta
+                      </span>
+                      <span className="text-[10px] text-muted-foreground tabular-nums">
+                        {formatPrice(it.progress)} de{" "}
+                        {it.total != null ? formatPrice(it.total) : "—"}
+                      </span>
+                    </>
+                  )}
+                  <ProjectSettleButton
+                    projectId={it.projectId}
+                    field={it.field}
+                    settled={it.settled}
+                    description={`${it.projectCode} (${it.field})`}
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold tabular-nums">
-                  {formatPrice(it.amount)}
-                </span>
-                <ProjectSettleButton
-                  projectId={it.projectId}
-                  field={it.field}
-                  settled={it.settled}
-                  description={`${it.projectCode} (${it.field})`}
-                />
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </CardContent>
     </Card>
