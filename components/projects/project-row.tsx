@@ -20,7 +20,12 @@ import {
   formatDate,
   formatPrice,
 } from "@/lib/projects/format";
-import { editorNames, isPack } from "@/lib/projects/types";
+import {
+  editorNames,
+  isPack,
+  PROJECT_TYPE_CLASS,
+  PROJECT_TYPE_LABEL,
+} from "@/lib/projects/types";
 import type {
   ClientForProject,
   EditorMini,
@@ -209,6 +214,14 @@ function renderValue(
               {p.children!.length === 1 ? "" : "s"}
             </span>
           ) : null}
+        </span>
+      );
+    case "type":
+      return (
+        <span
+          className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${PROJECT_TYPE_CLASS[p.project_type]}`}
+        >
+          {PROJECT_TYPE_LABEL[p.project_type]}
         </span>
       );
     case "client":

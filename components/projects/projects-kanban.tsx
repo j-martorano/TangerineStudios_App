@@ -30,7 +30,12 @@ import { KanbanCardActions } from "./kanban-card-actions";
 import type { ParentOption } from "./project-form";
 import { QuickDurationEditor } from "./quick-duration-editor";
 
-import { PROJECT_PHASES, editorNames } from "@/lib/projects/types";
+import {
+  PROJECT_PHASES,
+  PROJECT_TYPE_CLASS,
+  PROJECT_TYPE_LABEL,
+  editorNames,
+} from "@/lib/projects/types";
 import type {
   ClientForProject,
   EditorMini,
@@ -559,9 +564,16 @@ function CardView({
             </span>
           </span>
         ) : null}
-        <p className="mb-0.5 truncate pr-8 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/80">
-          {project.project_code}
-        </p>
+        <div className="mb-0.5 flex items-center justify-between gap-2 pr-8">
+          <p className="truncate font-mono text-[10px] uppercase tracking-wider text-muted-foreground/80">
+            {project.project_code}
+          </p>
+          <span
+            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider ${PROJECT_TYPE_CLASS[project.project_type]}`}
+          >
+            {PROJECT_TYPE_LABEL[project.project_type]}
+          </span>
+        </div>
         <h3 className="line-clamp-2 pr-8 text-sm font-medium leading-snug">
           {project.title}
         </h3>

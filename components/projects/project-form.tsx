@@ -47,6 +47,11 @@ import {
 } from "@/lib/projects/format";
 import { createProject, updateProject } from "@/lib/projects/actions";
 
+/**
+ * Mantenemos el tipo por compatibilidad con los componentes que ya lo
+ * importan, pero ya no se usa: el form rearmó el flujo y los shorts se
+ * crean directamente dentro del pack en vez de elegir padre desde una lista.
+ */
 export type ParentOption = {
   id: string;
   title: string;
@@ -57,7 +62,7 @@ type Props = {
   mode: "create" | "edit";
   editors: EditorMini[];
   clients: ClientForProject[];
-  /** Proyectos top-level que pueden ser pack padre del actual. */
+  /** @deprecated Ya no se usa — quedó para no romper props existentes. */
   availableParents?: ParentOption[];
   project?: ProjectWithRelations;
   onSuccess?: () => void;
@@ -74,7 +79,6 @@ export function ProjectForm({
   mode,
   editors,
   clients,
-  availableParents = [],
   project,
   onSuccess,
 }: Props) {
@@ -82,9 +86,18 @@ export function ProjectForm({
   const [projectType, setProjectType] = useState<ProjectType>(
     project?.project_type ?? "long_form"
   );
-  const [parentId, setParentId] = useState<string | null>(
-    project?.parent_id ?? null
+  // Si el proyecto que editamos ya tiene hijos, arrancamos con el toggle de
+  // pack prendido y los shorts pre-cargados.
+  type Short = { id?: string; title: string };
+  const initialShorts: Short[] = (project?.children ?? []).map((c) => ({
+    id: c.id,
+    title: c.title,
+  }));
+  const [isPackToggle, setIsPackToggle] = useState<boolean>(
+    initialShorts.length > 0
   );
+  const [shorts, setShorts] = useState<Short[]>(initialShorts);
+  const [newShortDraft, setNewShortDraft] = useState<string>("");
   const [clientId, setClientId] = useState<string | null>(
     project?.client?.id ?? null
   );
@@ -124,21 +137,23 @@ export function ProjectForm({
   const editorById = new Map(editors.map((ed) => [ed.id, ed.name]));
   const editorIds = editorEntries.map((e) => e.id);
 
-  // Padres elegibles: top-level, no archivados, no el propio proyecto, y
-  // del mismo cliente si ya hay uno seleccionado.
-  const eligibleParents = availableParents.filter((parent) => {
-    if (project && parent.id === project.id) return false;
-    if (clientId && parent.client_id && parent.client_id !== clientId)
-      return false;
-    return true;
-  });
+  // El proyecto en edición ES hijo de un pack (no podemos volverlo pack
+  // padre — un short hijo no puede tener a su vez hijos).
+  const isChildOfPack = project?.parent_id != null;
 
-  function handleParentChange(newParentId: string | null) {
-    setParentId(newParentId);
-    if (newParentId) {
-      const parent = availableParents.find((p) => p.id === newParentId);
-      if (parent?.client_id) setClientId(parent.client_id);
-    }
+  function addShort() {
+    const t = newShortDraft.trim();
+    if (t.length === 0) return;
+    setShorts([...shorts, { title: t }]);
+    setNewShortDraft("");
+  }
+
+  function removeShort(index: number) {
+    setShorts(shorts.filter((_, i) => i !== index));
+  }
+
+  function renameShort(index: number, value: string) {
+    setShorts(shorts.map((s, i) => (i === index ? { ...s, title: value } : s)));
   }
 
   function addEditor() {
@@ -214,7 +229,16 @@ export function ProjectForm({
       selectedClient?.payment_type === "por_proyecto" ? parsedPrice : null;
 
     // Si es hijo de un pack, el precio queda nulo (lo lleva el pack).
-    const finalPrice = parentId ? null : priceToStore;
+    const finalPrice = isChildOfPack ? null : priceToStore;
+
+    // Children del pack: solo se mandan si el toggle está prendido. Si
+    // estaba prendido y lo apagás, vaciamos la lista — el action interpreta
+    // eso como "borrar todos los hijos".
+    const childrenPayload = isPackToggle
+      ? shorts
+          .map((s) => ({ id: s.id, title: s.title.trim() }))
+          .filter((s) => s.title.length > 0)
+      : [];
 
     const payload = {
       title: trimmedTitle,
@@ -228,7 +252,8 @@ export function ProjectForm({
       duration_minutes: parsedDuration,
       editors: editorPayload,
       project_type: projectType,
-      parent_id: parentId,
+      parent_id: project?.parent_id ?? null,
+      children: childrenPayload,
     };
 
     startTransition(async () => {
@@ -273,67 +298,99 @@ export function ProjectForm({
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="project_type">Tipo</Label>
-            <Select
-              value={projectType}
-              onValueChange={(v) => v && setProjectType(v as ProjectType)}
-            >
-              <SelectTrigger id="project_type" className="w-full">
-                <SelectValue>
-                  {(v: string | null) =>
-                    v ? PROJECT_TYPE_LABEL[v as ProjectType] : ""
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {PROJECT_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {PROJECT_TYPE_LABEL[t]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="parent_pack">
-              Pack padre{" "}
-              <span className="text-xs text-muted-foreground">
-                (opcional, lo hace un short hijo)
-              </span>
-            </Label>
-            <Select
-              value={parentId ?? "__none__"}
-              onValueChange={(v) =>
-                handleParentChange(v === "__none__" ? null : v)
-              }
-              disabled={eligibleParents.length === 0}
-            >
-              <SelectTrigger id="parent_pack" className="w-full">
-                <SelectValue>
-                  {(v: string | null) => {
-                    if (!v || v === "__none__") return "Sin pack (proyecto suelto)";
-                    return (
-                      availableParents.find((p) => p.id === v)?.title ?? "—"
-                    );
-                  }}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">
-                  Sin pack (proyecto suelto)
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="project_type">Tipo</Label>
+          <Select
+            value={projectType}
+            onValueChange={(v) => v && setProjectType(v as ProjectType)}
+          >
+            <SelectTrigger id="project_type" className="w-full">
+              <SelectValue>
+                {(v: string | null) =>
+                  v ? PROJECT_TYPE_LABEL[v as ProjectType] : ""
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {PROJECT_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {PROJECT_TYPE_LABEL[t]}
                 </SelectItem>
-                {eligibleParents.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+
+        {/* Toggle de "es un pack de shorts" — sólo si NO es hijo de otro pack
+            (no soportamos anidación de varios niveles). */}
+        {!isChildOfPack ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={isPackToggle}
+                onChange={(e) => setIsPackToggle(e.target.checked)}
+                className="size-4 cursor-pointer accent-primary"
+              />
+              <span className="font-medium">Es un pack de shorts</span>
+              <span className="text-xs text-muted-foreground">
+                — agregá los shorts y editás cada uno después
+              </span>
+            </label>
+
+            {isPackToggle ? (
+              <div className="mt-2 flex flex-col gap-2">
+                {shorts.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-muted-foreground/60">↳</span>
+                    <Input
+                      value={s.title}
+                      onChange={(e) => renameShort(i, e.target.value)}
+                      placeholder={`Short #${i + 1}`}
+                      className="flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeShort(i)}
+                      aria-label="Quitar short"
+                      className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground/60">+</span>
+                  <Input
+                    value={newShortDraft}
+                    onChange={(e) => setNewShortDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addShort();
+                      }
+                    }}
+                    placeholder="Nombre del short (Enter para agregar)"
+                    className="flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={addShort}
+                    disabled={newShortDraft.trim().length === 0}
+                    className="inline-flex h-8 cursor-pointer items-center rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Agregar
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Cada short se crea como proyecto hijo con el mismo cliente.
+                  Para asignarle editor o duración, abrilo desde la tabla
+                  después de guardar.
+                </p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="flex flex-col gap-2">
           <Label>Cliente</Label>
@@ -342,9 +399,10 @@ export function ProjectForm({
             value={clientId}
             onChange={(id) => setClientId(id)}
           />
-          {parentId ? (
+          {isChildOfPack ? (
             <p className="text-xs text-muted-foreground">
-              El cliente queda fijado al del pack padre.
+              Este short pertenece a un pack — el cliente lo hereda del pack
+              padre.
             </p>
           ) : null}
         </div>

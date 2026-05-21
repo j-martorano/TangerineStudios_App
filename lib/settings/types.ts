@@ -8,6 +8,7 @@
 export const PROJECTS_COLUMNS = [
   "code",
   "title",
+  "type",
   "client",
   "phase",
   "price",
@@ -27,6 +28,7 @@ export type ProjectsColumnId = (typeof PROJECTS_COLUMNS)[number];
 export const PROJECTS_COLUMN_LABEL: Record<ProjectsColumnId, string> = {
   code: "Código",
   title: "Título",
+  type: "Tipo",
   client: "Cliente",
   phase: "Fase",
   price: "Precio",
@@ -133,6 +135,7 @@ export type UserPrefs = {
 const DEFAULT_PROJECTS_COLUMNS: ProjectsColumnId[] = [
   "code",
   "title",
+  "type",
   "client",
   "price",
   "profit",

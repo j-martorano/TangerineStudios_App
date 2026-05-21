@@ -93,6 +93,23 @@ const projectInputSchema = z
       .regex(uuidRegex, "Padre inválido")
       .nullable()
       .default(null),
+    /**
+     * Shorts del pack. Cada item con `id` ya existe (sólo se actualiza el
+     * título); los items sin `id` se crean como hijos nuevos con defaults
+     * mínimos (cliente heredado, phase=por_asignar). Si se omite o queda
+     * vacío en edición, los hijos existentes se eliminan.
+     */
+    children: z
+      .array(
+        z.object({
+          id: z.string().regex(uuidRegex, "ID hijo inválido").optional(),
+          title: z
+            .string()
+            .min(1, "El título del short es obligatorio")
+            .max(120),
+        })
+      )
+      .default([]),
   });
 
 export type ProjectInput = z.input<typeof projectInputSchema>;
@@ -138,7 +155,7 @@ export async function createProject(
   const parsed = projectInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
-  const { editors, ...projectData } = parsed.data;
+  const { editors, children, ...projectData } = parsed.data;
 
   const supabase = await createClient();
   const clientName = await getClientName(projectData.client_id);
@@ -164,6 +181,25 @@ export async function createProject(
     if (editorError) return { ok: false, error: editorError.message };
   }
 
+  // Si vino con shorts (pack), creamos cada hijo con defaults.
+  if (children.length > 0) {
+    const childRows = children.map((c) => ({
+      title: c.title,
+      client_id: projectData.client_id,
+      client_name: clientName,
+      project_type: "short_form" as const,
+      parent_id: created.id,
+      phase: "por_asignar" as const,
+      cobrado: "no" as const,
+      pagado: "sin_pagar" as const,
+      invoiced: "no" as const,
+    }));
+    const { error: childErr } = await supabase
+      .from("projects")
+      .insert(childRows as never);
+    if (childErr) return { ok: false, error: childErr.message };
+  }
+
   revalidateAll();
   return { ok: true };
 }
@@ -175,7 +211,7 @@ export async function updateProject(
   const parsed = projectInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
-  const { editors, ...projectData } = parsed.data;
+  const { editors, children, ...projectData } = parsed.data;
 
   const supabase = await createClient();
   const clientName = await getClientName(projectData.client_id);
@@ -201,6 +237,61 @@ export async function updateProject(
       .from("project_editors")
       .insert(editorRows);
     if (insertError) return { ok: false, error: insertError.message };
+  }
+
+  // Sync de hijos del pack. Diff entre lo que mandó el form y lo que ya
+  // está en DB: borramos lo que ya no aparece, actualizamos los títulos
+  // de los que siguen y creamos los nuevos. No tocamos editor, phase,
+  // pagado, etc. de los hijos existentes — eso se edita por separado.
+  const { data: existingChildren, error: fetchChildErr } = await supabase
+    .from("projects")
+    .select("id, title")
+    .eq("parent_id", id);
+  if (fetchChildErr) return { ok: false, error: fetchChildErr.message };
+
+  const existing = (existingChildren ?? []) as { id: string; title: string }[];
+  const sentIds = new Set(children.filter((c) => c.id).map((c) => c.id!));
+  const idsToDelete = existing
+    .filter((c) => !sentIds.has(c.id))
+    .map((c) => c.id);
+
+  if (idsToDelete.length > 0) {
+    const { error: delErr } = await supabase
+      .from("projects")
+      .delete()
+      .in("id", idsToDelete);
+    if (delErr) return { ok: false, error: delErr.message };
+  }
+
+  for (const c of children) {
+    if (!c.id) continue;
+    const old = existing.find((e) => e.id === c.id);
+    if (old && old.title !== c.title) {
+      const { error: updErr } = await supabase
+        .from("projects")
+        .update({ title: c.title })
+        .eq("id", c.id);
+      if (updErr) return { ok: false, error: updErr.message };
+    }
+  }
+
+  const newChildren = children.filter((c) => !c.id);
+  if (newChildren.length > 0) {
+    const childRows = newChildren.map((c) => ({
+      title: c.title,
+      client_id: projectData.client_id,
+      client_name: clientName,
+      project_type: "short_form" as const,
+      parent_id: id,
+      phase: "por_asignar" as const,
+      cobrado: "no" as const,
+      pagado: "sin_pagar" as const,
+      invoiced: "no" as const,
+    }));
+    const { error: insErr } = await supabase
+      .from("projects")
+      .insert(childRows as never);
+    if (insErr) return { ok: false, error: insErr.message };
   }
 
   revalidateAll();

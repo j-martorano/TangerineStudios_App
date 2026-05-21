@@ -76,6 +76,8 @@ function columnHeader(id: ProjectsColumnId): React.ReactNode {
       return <TableHead className="w-32">Código</TableHead>;
     case "title":
       return <TableHead>Título</TableHead>;
+    case "type":
+      return <TableHead className="w-28">Tipo</TableHead>;
     case "client":
       return <TableHead>Cliente</TableHead>;
     case "phase":
