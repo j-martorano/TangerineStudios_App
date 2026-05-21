@@ -222,8 +222,25 @@ function EditorSection({
     });
   }
 
-  function fillRemaining() {
-    if (remaining != null && remaining > 0) setAmount(String(remaining));
+  function handleRegisterRemaining() {
+    if (remaining == null || remaining <= 0) return;
+    startTransition(async () => {
+      const result = await registerEditorPago({
+        project_id: project.id,
+        editor_id: editorId,
+        amount: remaining,
+        paid_at: paidAt,
+        note: note.trim() || null,
+      });
+      if (result.ok) {
+        toast.success(
+          `Pago de ${formatPrice(remaining)} a ${editorName} registrado`
+        );
+        resetForm();
+      } else {
+        toast.error(result.error);
+      }
+    });
   }
 
   const fullyPaid = cost != null && remaining === 0 && pagado > 0;
@@ -315,26 +332,26 @@ function EditorSection({
             className="h-8"
             disabled={pending}
           />
-          <div className="flex items-center justify-between gap-2">
-            {remaining != null && remaining > 0 ? (
-              <button
-                type="button"
-                onClick={fillRemaining}
-                className="text-[10px] text-muted-foreground underline-offset-2 hover:underline"
-              >
-                Usar restante ({formatPrice(remaining)})
-              </button>
-            ) : (
-              <span />
-            )}
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               type="button"
               size="sm"
+              variant="ghost"
               onClick={handleRegister}
               disabled={pending}
             >
               Registrar pago
             </Button>
+            {remaining != null && remaining > 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleRegisterRemaining}
+                disabled={pending}
+              >
+                Registrar pago {formatPrice(remaining)} (resto)
+              </Button>
+            ) : null}
           </div>
         </div>
       ) : null}

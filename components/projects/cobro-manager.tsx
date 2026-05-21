@@ -106,10 +106,22 @@ export function CobroManagerPanel({ project, disabled = false }: Props) {
     });
   }
 
-  function fillRemaining() {
-    if (remaining != null && remaining > 0) {
-      setAmount(String(remaining));
-    }
+  function handleRegisterRemaining() {
+    if (remaining == null || remaining <= 0) return;
+    startTransition(async () => {
+      const result = await registerCobro({
+        project_id: project.id,
+        amount: remaining,
+        paid_at: paidAt,
+        note: note.trim() || null,
+      });
+      if (result.ok) {
+        toast.success(`Cobro de ${formatPrice(remaining)} registrado`);
+        resetForm();
+      } else {
+        toast.error(result.error);
+      }
+    });
   }
 
   const interactive = !disabled;
@@ -220,26 +232,26 @@ export function CobroManagerPanel({ project, disabled = false }: Props) {
                 disabled={pending}
               />
             </div>
-            <div className="flex items-center justify-between gap-2 pt-1">
-              {remaining != null && remaining > 0 ? (
-                <button
-                  type="button"
-                  onClick={fillRemaining}
-                  className="text-[10px] underline-offset-2 text-muted-foreground hover:underline"
-                >
-                  Usar restante ({formatPrice(remaining)})
-                </button>
-              ) : (
-                <span />
-              )}
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
               <Button
                 type="button"
                 size="sm"
+                variant="ghost"
                 onClick={handleRegister}
                 disabled={pending}
               >
                 Registrar
               </Button>
+              {remaining != null && remaining > 0 ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleRegisterRemaining}
+                  disabled={pending}
+                >
+                  Registrar {formatPrice(remaining)} (resto)
+                </Button>
+              ) : null}
             </div>
           </div>
 

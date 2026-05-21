@@ -16,7 +16,13 @@ import type {
   PagadoStatus,
   ProjectPhase,
   ProjectType,
+  ProjectWithRelations,
 } from "./types";
+import {
+  computePrice,
+  editorCostInProject,
+} from "./format";
+import { PROJECT_SELECT } from "./queries";
 
 async function getClientName(clientId: string | null): Promise<string | null> {
   if (!clientId) return null;
@@ -365,6 +371,94 @@ const cobroInputSchema = z.object({
 
 export type CobroInput = z.input<typeof cobroInputSchema>;
 
+/**
+ * Recalcula el estado `cobrado` del proyecto a partir de la suma actual de
+ * cobros vs el precio computado. Se llama después de registrar/borrar.
+ *   - sum = 0          → no
+ *   - sum >= total     → si
+ *   - else             → parcial
+ * Si no podemos computar el total (cliente sin precio, mensual, etc.) no
+ * tocamos el estado — quedará el valor manual previo.
+ */
+async function recomputeCobradoStatus(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectId: string
+) {
+  const { data } = await supabase
+    .from("projects")
+    .select(PROJECT_SELECT)
+    .eq("id", projectId)
+    .single();
+  if (!data) return;
+  const proj = data as unknown as ProjectWithRelations;
+  const total = computePrice(proj);
+  if (total == null) return;
+
+  const sum = (proj.cobros ?? []).reduce(
+    (s, c) => s + Number(c.amount),
+    0
+  );
+
+  let next: CobradoStatus;
+  if (sum === 0) next = "no";
+  else if (sum >= total) next = "si";
+  else next = "parcial";
+
+  if (proj.cobrado !== next) {
+    await supabase
+      .from("projects")
+      .update({ cobrado: next })
+      .eq("id", projectId);
+  }
+}
+
+/**
+ * Recalcula el estado `pagado` del proyecto. Mira cada editor del proyecto:
+ *   - Si NINGÚN editor tiene pagos     → sin_pagar
+ *   - Si TODOS los editores están al   → pago_total
+ *     día (sum >= cost de c/u)
+ *   - En otro caso                     → parcial
+ * Si no hay editores asignados o no podemos computar el cost, no tocamos.
+ */
+async function recomputePagadoStatus(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectId: string
+) {
+  const { data } = await supabase
+    .from("projects")
+    .select(PROJECT_SELECT)
+    .eq("id", projectId)
+    .single();
+  if (!data) return;
+  const proj = data as unknown as ProjectWithRelations;
+  const editors = proj.editors.filter((e) => e.editor != null);
+  if (editors.length === 0) return;
+
+  let allPaid = true;
+  let anyPaid = false;
+  for (const entry of editors) {
+    const editorId = entry.editor!.id;
+    const cost = editorCostInProject(proj, editorId);
+    const sumForEditor = proj.editor_pagos
+      .filter((p) => p.editor_id === editorId)
+      .reduce((s, p) => s + Number(p.amount), 0);
+    if (sumForEditor > 0) anyPaid = true;
+    if (cost == null || sumForEditor < cost) allPaid = false;
+  }
+
+  let next: PagadoStatus;
+  if (!anyPaid) next = "sin_pagar";
+  else if (allPaid) next = "pago_total";
+  else next = "parcial";
+
+  if (proj.pagado !== next) {
+    await supabase
+      .from("projects")
+      .update({ pagado: next })
+      .eq("id", projectId);
+  }
+}
+
 export async function registerCobro(
   input: CobroInput
 ): Promise<ActionResult> {
@@ -379,6 +473,7 @@ export async function registerCobro(
     note: parsed.data.note ?? null,
   });
   if (error) return { ok: false, error: error.message };
+  await recomputeCobradoStatus(supabase, parsed.data.project_id);
   revalidateAll();
   return { ok: true };
 }
@@ -386,8 +481,15 @@ export async function registerCobro(
 export async function deleteCobro(id: string): Promise<ActionResult> {
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
   const supabase = await createClient();
+  const { data: cobro } = await supabase
+    .from("project_cobros")
+    .select("project_id")
+    .eq("id", id)
+    .single<{ project_id: string }>();
   const { error } = await supabase.from("project_cobros").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+  if (cobro?.project_id)
+    await recomputeCobradoStatus(supabase, cobro.project_id);
   revalidateAll();
   return { ok: true };
 }
@@ -421,6 +523,7 @@ export async function registerEditorPago(
     note: parsed.data.note ?? null,
   });
   if (error) return { ok: false, error: error.message };
+  await recomputePagadoStatus(supabase, parsed.data.project_id);
   revalidateAll();
   return { ok: true };
 }
@@ -428,11 +531,18 @@ export async function registerEditorPago(
 export async function deleteEditorPago(id: string): Promise<ActionResult> {
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
   const supabase = await createClient();
+  const { data: pago } = await supabase
+    .from("project_editor_pagos")
+    .select("project_id")
+    .eq("id", id)
+    .single<{ project_id: string }>();
   const { error } = await supabase
     .from("project_editor_pagos")
     .delete()
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
+  if (pago?.project_id)
+    await recomputePagadoStatus(supabase, pago.project_id);
   revalidateAll();
   return { ok: true };
 }
