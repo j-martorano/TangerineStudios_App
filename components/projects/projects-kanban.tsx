@@ -38,7 +38,9 @@ import type {
 import {
   PHASE_CLASS,
   PHASE_LABEL,
+  computeCost,
   computePrice,
+  computeProfit,
   formatPrice,
 } from "@/lib/projects/format";
 import { reorderProjects } from "@/lib/projects/actions";
@@ -120,11 +122,14 @@ export function ProjectsKanban(props: Props) {
     return [...set].sort((a, b) => b.localeCompare(a));
   }, [props.projects]);
 
+  // Auto-carry: cuando se selecciona un mes, además de los proyectos de ese
+  // mes mostramos los pendientes (no finalizados) de meses anteriores. Como
+  // el kanban ya filtra finalizados al fetch, basta con permitir mes <= X.
   const filtered = useMemo(
     () =>
       month === "all"
         ? props.projects
-        : props.projects.filter((p) => monthKey(p.created_at) === month),
+        : props.projects.filter((p) => monthKey(p.created_at) <= month),
     [props.projects, month]
   );
 
@@ -534,20 +539,62 @@ function CardView({
         ) : (
           <span className="truncate">{project.client_name ?? "—"}</span>
         )}
-        <div className="flex items-center justify-between gap-2 pt-1 text-foreground">
-          <span className="tabular-nums">
-            {project.client?.payment_type === "mensual"
-              ? "Mensual"
-              : (() => {
-                  const price = computePrice(project);
-                  return price != null ? formatPrice(price) : "—";
-                })()}
-          </span>
-          <span className="truncate text-muted-foreground">
-            {editorNames(project)}
-          </span>
-        </div>
+        <span className="truncate">{editorNames(project)}</span>
+        {(() => {
+          const isMensual = project.client?.payment_type === "mensual";
+          const price = isMensual ? null : computePrice(project);
+          const cost = computeCost(project);
+          const profit = computeProfit(project);
+          const profitClass =
+            profit == null
+              ? ""
+              : profit < 0
+                ? "text-destructive"
+                : "text-emerald-500";
+          return (
+            <div className="grid grid-cols-3 gap-1 pt-1 text-foreground">
+              <Stat
+                label="Precio"
+                value={
+                  isMensual
+                    ? "FLAT"
+                    : price != null
+                      ? formatPrice(price)
+                      : "—"
+                }
+              />
+              <Stat
+                label="Costo"
+                value={cost != null ? formatPrice(cost) : "—"}
+              />
+              <Stat
+                label="Ganancia"
+                value={profit != null ? formatPrice(profit) : "—"}
+                valueClass={profitClass}
+              />
+            </div>
+          );
+        })()}
       </CardContent>
     </Card>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-[9px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <span className={`tabular-nums ${valueClass ?? ""}`}>{value}</span>
+    </div>
   );
 }

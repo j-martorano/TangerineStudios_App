@@ -5,6 +5,7 @@ import { ChevronsUpDownIcon, PlusIcon, Trash2Icon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { MethodIcon } from "@/components/payment-methods/method-icon";
 import {
   Command,
   CommandEmpty,
@@ -136,7 +137,8 @@ export function EditorPaymentMethods({ catalog, value, onChange }: Props) {
               className="flex flex-col gap-2 rounded-lg border bg-card/50 p-3"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">
+                <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">
+                  <MethodIcon name={v.name} className="size-3" />
                   {v.name}
                 </span>
                 <button
@@ -199,8 +201,9 @@ export function EditorPaymentMethods({ catalog, value, onChange }: Props) {
                         className="justify-between"
                       >
                         <span
-                          className={isSelected ? "text-muted-foreground" : ""}
+                          className={`inline-flex items-center gap-1.5 ${isSelected ? "text-muted-foreground" : ""}`}
                         >
+                          <MethodIcon name={method.name} className="size-3.5" />
                           {method.name}
                           {isSelected ? " · agregado" : ""}
                         </span>

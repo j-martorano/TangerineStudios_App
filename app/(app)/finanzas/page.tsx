@@ -11,7 +11,6 @@ import {
   computeCost,
   computePrice,
   computeProfit,
-  formatDuration,
   formatPrice,
 } from "@/lib/projects/format";
 import { monthToneFromKey } from "@/lib/projects/month-colors";
@@ -248,7 +247,7 @@ export default async function FinanzasPage() {
   const totalProfit = sumAcrossBuckets(buckets, "profit");
 
   const resumenSection = (
-    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
       <TotalCard
         label="Cobrado"
         value={formatPrice(totalCollected)}
@@ -268,6 +267,11 @@ export default async function FinanzasPage() {
         label="Por pagar"
         value={formatPrice(totalPendingPay)}
         tone="warning"
+      />
+      <TotalCard
+        label="Servicios / mes"
+        value={formatPrice(servicesMonthlyTotal)}
+        tone="neutral"
       />
       <TotalCard
         label="Ganancia"
@@ -349,13 +353,25 @@ function fmtMin(n: number): string {
   return `${rounded} min`;
 }
 
+function cobradoColor(status: ProjectWithRelations["cobrado"]): string {
+  if (status === "si") return "text-emerald-500";
+  if (status === "parcial") return "text-amber-500";
+  return "text-muted-foreground";
+}
+
+function pagadoColor(status: ProjectWithRelations["pagado"]): string {
+  if (status === "pago_total") return "text-emerald-500";
+  if (status === "parcial") return "text-amber-500";
+  return "text-muted-foreground";
+}
+
 function PagosSection({ items }: { items: PaymentItem[] }) {
   const total = items.reduce((sum, i) => sum + i.amount, 0);
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
         <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Pagos de clientes mensuales
+          Pagos de clientes FLAT
         </h2>
         <span className="text-xs text-muted-foreground">
           {items.length} pago{items.length === 1 ? "" : "s"} ·{" "}
@@ -546,13 +562,29 @@ function MonthCard({ bucket }: { bucket: MonthBucket }) {
               Recap — videos finalizados
             </h4>
             <div className="flex flex-col divide-y divide-border/40">
+              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                <span>Proyecto / cliente</span>
+                <span className="text-right">Cobrado</span>
+                <span className="text-right">Pagado</span>
+                <span className="text-right">Ganancia</span>
+              </div>
               {bucket.projects.map((p) => {
-                const price = computePrice(p);
+                const isMensual = p.client?.payment_type === "mensual";
+                const price = isMensual ? null : computePrice(p);
+                const cost = computeCost(p);
                 const profit = computeProfit(p);
+                const cobradoStr = isMensual
+                  ? "FLAT"
+                  : price != null
+                    ? formatPrice(price)
+                    : "—";
+                const pagadoStr = cost != null ? formatPrice(cost) : "—";
+                const profitStr =
+                  profit != null ? formatPrice(profit) : "—";
                 return (
                   <div
                     key={p.id}
-                    className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-1.5 text-xs"
+                    className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-4 py-1.5 text-xs"
                   >
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -563,27 +595,27 @@ function MonthCard({ bucket }: { bucket: MonthBucket }) {
                         {p.client?.name ?? p.client_name ?? "Sin cliente"}
                       </span>
                     </div>
-                    <div className="flex shrink-0 items-center gap-3 tabular-nums">
-                      <span className="text-muted-foreground">
-                        {formatDuration(p.duration_minutes)}
-                      </span>
-                      <span>
-                        {p.client?.payment_type === "mensual"
-                          ? "Mensual"
-                          : price != null
-                            ? formatPrice(price)
-                            : "—"}
-                      </span>
-                      <span
-                        className={
-                          profit != null && profit < 0
+                    <span
+                      className={`text-right tabular-nums ${cobradoColor(p.cobrado)}`}
+                    >
+                      {cobradoStr}
+                    </span>
+                    <span
+                      className={`text-right tabular-nums ${pagadoColor(p.pagado)}`}
+                    >
+                      {pagadoStr}
+                    </span>
+                    <span
+                      className={`text-right tabular-nums ${
+                        profit == null
+                          ? "text-muted-foreground"
+                          : profit < 0
                             ? "text-destructive"
                             : "text-emerald-500"
-                        }
-                      >
-                        {profit != null ? formatPrice(profit) : "—"}
-                      </span>
-                    </div>
+                      }`}
+                    >
+                      {profitStr}
+                    </span>
                   </div>
                 );
               })}

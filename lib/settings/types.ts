@@ -104,7 +104,7 @@ export type FinanzasTabId = (typeof FINANZAS_TABS)[number];
 export const FINANZAS_TAB_LABEL: Record<FinanzasTabId, string> = {
   resumen: "Resumen",
   por_mes: "Por mes",
-  pagos: "Pagos mensuales",
+  pagos: "Pagos FLAT",
   por_proyecto: "Por proyecto",
   servicios: "Servicios fijos",
 };
@@ -127,9 +127,22 @@ export type UserPrefs = {
   };
 };
 
+// Subset por default para la tabla de Proyectos: las columnas clave que se
+// ven de un vistazo. El resto queda en el panel expandible (click en la fila).
+// El usuario puede cambiar cuáles están visibles desde /configuracion.
+const DEFAULT_PROJECTS_COLUMNS: ProjectsColumnId[] = [
+  "code",
+  "title",
+  "client",
+  "price",
+  "profit",
+  "actions",
+  "finalized",
+];
+
 export const DEFAULT_PREFS: UserPrefs = {
   columns: {
-    projects: [...PROJECTS_COLUMNS],
+    projects: DEFAULT_PROJECTS_COLUMNS,
     editors: [...EDITORS_COLUMNS],
     clients: [...CLIENTS_COLUMNS],
   },

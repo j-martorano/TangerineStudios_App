@@ -10,28 +10,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { ArchiveProjectButton } from "./archive-project-button";
-import { EditProjectButton } from "./edit-project-button";
-import { FinalizeToggle } from "./finalize-toggle";
-import { QuickPhaseBadge } from "./quick-phase-badge";
-import { QuickPaymentBadge } from "./quick-payment-badge";
+import { ProjectRow } from "./project-row";
 
-import {
-  computeCost,
-  computePrice,
-  computeProfit,
-  formatDate,
-  formatDuration,
-  formatPrice,
-} from "@/lib/projects/format";
 import { monthToneFromKey } from "@/lib/projects/month-colors";
-import { editorNames } from "@/lib/projects/types";
 import type {
   ClientForProject,
   EditorMini,
   ProjectWithRelations,
 } from "@/lib/projects/types";
-import type { ProjectsColumnId } from "@/lib/settings/types";
+import {
+  PROJECTS_COLUMNS,
+  type ProjectsColumnId,
+} from "@/lib/settings/types";
 
 // Tinte de fondo de fila con el color del cliente (~12% de opacidad).
 function clientTint(hex: string | null | undefined): string | undefined {
@@ -39,10 +29,6 @@ function clientTint(hex: string | null | undefined): string | undefined {
   return `${hex}1f`; // hex de 8 dígitos: #RRGGBB + alpha 0x1f
 }
 
-// Estilo de la fila según el estado del proyecto:
-//   - archivado  : gris apagado (deshabilitado)
-//   - finalizado : gris
-//   - activo     : tinte con el color del cliente
 function rowAppearance(p: ProjectWithRelations): {
   className: string;
   style?: React.CSSProperties;
@@ -96,6 +82,41 @@ function groupByMonth(
   return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 }
 
+function columnHeader(id: ProjectsColumnId): React.ReactNode {
+  switch (id) {
+    case "code":
+      return <TableHead className="w-32">Código</TableHead>;
+    case "title":
+      return <TableHead>Título</TableHead>;
+    case "client":
+      return <TableHead>Cliente</TableHead>;
+    case "phase":
+      return <TableHead>Fase</TableHead>;
+    case "price":
+      return <TableHead className="text-right">Precio</TableHead>;
+    case "cost":
+      return <TableHead className="text-right">Costo</TableHead>;
+    case "profit":
+      return <TableHead className="text-right">Ganancia</TableHead>;
+    case "duration":
+      return <TableHead>Duración</TableHead>;
+    case "editor":
+      return <TableHead>Editor</TableHead>;
+    case "cobrado":
+      return <TableHead>Cobrado</TableHead>;
+    case "pagado":
+      return <TableHead>Pagado</TableHead>;
+    case "invoiced":
+      return <TableHead>Facturado</TableHead>;
+    case "updated":
+      return <TableHead>Actualizado</TableHead>;
+    case "actions":
+      return <TableHead className="w-24 text-right">Acciones</TableHead>;
+    case "finalized":
+      return <TableHead className="w-24 text-center">Finalizado</TableHead>;
+  }
+}
+
 type Props = {
   projects: ProjectWithRelations[];
   editors: EditorMini[];
@@ -117,39 +138,19 @@ export function ProjectsTable({
     );
   }
 
-  const visible = new Set<ProjectsColumnId>(visibleColumns);
-  const colSpan = Math.max(1, visibleColumns.length);
+  // Mostramos la columna del chevron sólo si hay columnas ocultas para expandir.
+  const showExpand = visibleColumns.length < PROJECTS_COLUMNS.length;
+  const colSpan = visibleColumns.length + (showExpand ? 1 : 0);
   const groups = groupByMonth(projects);
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          {visible.has("code") && <TableHead className="w-32">Código</TableHead>}
-          {visible.has("title") && <TableHead>Título</TableHead>}
-          {visible.has("client") && <TableHead>Cliente</TableHead>}
-          {visible.has("phase") && <TableHead>Fase</TableHead>}
-          {visible.has("price") && (
-            <TableHead className="text-right">Precio</TableHead>
-          )}
-          {visible.has("cost") && (
-            <TableHead className="text-right">Costo</TableHead>
-          )}
-          {visible.has("profit") && (
-            <TableHead className="text-right">Ganancia</TableHead>
-          )}
-          {visible.has("duration") && <TableHead>Duración</TableHead>}
-          {visible.has("editor") && <TableHead>Editor</TableHead>}
-          {visible.has("cobrado") && <TableHead>Cobrado</TableHead>}
-          {visible.has("pagado") && <TableHead>Pagado</TableHead>}
-          {visible.has("invoiced") && <TableHead>Facturado</TableHead>}
-          {visible.has("updated") && <TableHead>Actualizado</TableHead>}
-          {visible.has("actions") && (
-            <TableHead className="w-24 text-right">Acciones</TableHead>
-          )}
-          {visible.has("finalized") && (
-            <TableHead className="w-24 text-center">Finalizado</TableHead>
-          )}
+          {showExpand ? <TableHead className="w-8" /> : null}
+          {visibleColumns.map((id) => (
+            <Fragment key={id}>{columnHeader(id)}</Fragment>
+          ))}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -177,155 +178,18 @@ export function ProjectsTable({
                 </TableCell>
               </TableRow>
               {items.map((p) => {
-                const locked = p.finalized;
                 const appearance = rowAppearance(p);
                 return (
-                  <TableRow
+                  <ProjectRow
                     key={p.id}
-                    className={appearance.className}
-                    style={appearance.style}
-                  >
-                    {visible.has("code") && (
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {p.project_code}
-                      </TableCell>
-                    )}
-                    {visible.has("title") && (
-                      <TableCell className="font-medium">{p.title}</TableCell>
-                    )}
-                    {visible.has("client") && (
-                      <TableCell>
-                        {p.client ? (
-                          <span className="inline-flex items-center gap-2">
-                            <span
-                              className="size-2.5 shrink-0 rounded-full"
-                              style={{ backgroundColor: p.client.color }}
-                            />
-                            {p.client.name}
-                          </span>
-                        ) : (
-                          (p.client_name ?? "—")
-                        )}
-                      </TableCell>
-                    )}
-                    {visible.has("phase") && (
-                      <TableCell>
-                        <QuickPhaseBadge
-                          id={p.id}
-                          phase={p.phase}
-                          disabled={locked}
-                        />
-                      </TableCell>
-                    )}
-                    {visible.has("price") && (
-                      <TableCell className="text-right tabular-nums">
-                        {p.client?.payment_type === "mensual"
-                          ? "Mensual"
-                          : (() => {
-                              const price = computePrice(p);
-                              return price != null
-                                ? formatPrice(price)
-                                : "—";
-                            })()}
-                      </TableCell>
-                    )}
-                    {visible.has("cost") && (
-                      <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {(() => {
-                          const c = computeCost(p);
-                          return c != null ? formatPrice(c) : "—";
-                        })()}
-                      </TableCell>
-                    )}
-                    {visible.has("profit") && (
-                      <TableCell className="text-right tabular-nums">
-                        {(() => {
-                          const profit = computeProfit(p);
-                          if (profit == null) return "—";
-                          return (
-                            <span
-                              className={
-                                profit < 0 ? "text-destructive" : ""
-                              }
-                            >
-                              {formatPrice(profit)}
-                            </span>
-                          );
-                        })()}
-                      </TableCell>
-                    )}
-                    {visible.has("duration") && (
-                      <TableCell className="tabular-nums">
-                        {formatDuration(p.duration_minutes)}
-                      </TableCell>
-                    )}
-                    {visible.has("editor") && (
-                      <TableCell>{editorNames(p)}</TableCell>
-                    )}
-                    {visible.has("cobrado") && (
-                      <TableCell>
-                        <QuickPaymentBadge
-                          kind="cobrado"
-                          id={p.id}
-                          value={p.cobrado}
-                          disabled={locked}
-                        />
-                      </TableCell>
-                    )}
-                    {visible.has("pagado") && (
-                      <TableCell>
-                        <QuickPaymentBadge
-                          kind="pagado"
-                          id={p.id}
-                          value={p.pagado}
-                          disabled={locked}
-                        />
-                      </TableCell>
-                    )}
-                    {visible.has("invoiced") && (
-                      <TableCell>
-                        <QuickPaymentBadge
-                          kind="invoiced"
-                          id={p.id}
-                          value={p.invoiced}
-                          disabled={locked}
-                        />
-                      </TableCell>
-                    )}
-                    {visible.has("updated") && (
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(p.updated_at)}
-                      </TableCell>
-                    )}
-                    {visible.has("actions") && (
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <EditProjectButton
-                            project={p}
-                            editors={editors}
-                            clients={clients}
-                            disabled={locked}
-                          />
-                          <ArchiveProjectButton
-                            id={p.id}
-                            title={p.title}
-                            archived={p.archived}
-                          />
-                        </div>
-                      </TableCell>
-                    )}
-                    {visible.has("finalized") && (
-                      <TableCell>
-                        <div className="flex justify-center">
-                          <FinalizeToggle
-                            id={p.id}
-                            title={p.title}
-                            finalized={p.finalized}
-                          />
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
+                    project={p}
+                    editors={editors}
+                    clients={clients}
+                    visibleColumns={visibleColumns}
+                    showExpand={showExpand}
+                    rowClassName={appearance.className}
+                    rowStyle={appearance.style}
+                  />
                 );
               })}
             </Fragment>

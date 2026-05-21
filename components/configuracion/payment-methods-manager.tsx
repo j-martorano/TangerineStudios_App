@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { MethodIcon } from "@/components/payment-methods/method-icon";
 
 import {
   createPaymentMethod,
@@ -64,7 +65,10 @@ function MethodRow({ method }: { method: PaymentMethod }) {
 
   return (
     <div className="flex items-center justify-between px-4 py-3">
-      <span className="text-sm">{method.name}</span>
+      <span className="inline-flex items-center gap-2 text-sm">
+        <MethodIcon name={method.name} className="size-3.5" />
+        {method.name}
+      </span>
       <Button
         type="button"
         variant="ghost"

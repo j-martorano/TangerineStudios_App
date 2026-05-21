@@ -3,6 +3,7 @@
 import { CopyIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import { MethodIcon } from "@/components/payment-methods/method-icon";
 import type { EditorPaymentMethod } from "@/lib/payment-methods/queries";
 
 /**
@@ -50,6 +51,7 @@ export function PaymentMethodChips({
           }
           className="group/chip inline-flex cursor-pointer items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs ring-1 ring-border transition-colors hover:bg-primary/15 hover:text-foreground hover:ring-primary/50 active:scale-95"
         >
+          <MethodIcon name={method.name} className="size-3" />
           {method.name}
           <CopyIcon className="size-3 opacity-50 transition-opacity group-hover/chip:opacity-100" />
         </button>

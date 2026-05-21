@@ -401,7 +401,7 @@ export function ProjectForm({
                 <span className="text-muted-foreground">Precio (calc.)</span>
                 <span className="font-medium tabular-nums">
                   {isMensual
-                    ? "Mensual"
+                    ? "FLAT"
                     : computedPrice != null
                       ? formatPrice(computedPrice)
                       : "—"}
