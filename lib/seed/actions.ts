@@ -55,7 +55,8 @@ const CP = (n: number): string =>
 
 const ALL_EDITORS = [ED1, ED2, ED3];
 const ALL_CLIENTS = [CL1, CL2, CL3, CL4, CL5];
-const ALL_PROJECTS = Array.from({ length: 15 }, (_, i) => PJ(i + 1));
+// Incluye los 15 proyectos sueltos + 1 pack (16) + 3 shorts hijos (17,18,19).
+const ALL_PROJECTS = Array.from({ length: 19 }, (_, i) => PJ(i + 1));
 const ALL_METHODS = [PM(1), PM(2), PM(3), PM(4)];
 const ALL_SERVICES = [FS(1), FS(2), FS(3)];
 const ALL_PAYMENTS = [CP(1), CP(2), CP(3)];
@@ -516,6 +517,86 @@ export async function activateSeed(): Promise<SeedResult> {
   if (projectsIns.error)
     return { ok: false, error: `projects: ${projectsIns.error.message}` };
 
+  // ---- Pack + 3 shorts (abril 2026) ----
+  // Va en un upsert aparte porque project_type y parent_id deben estar
+  // explícitos en TODOS los rows del array (supabase-js unifica las keys; si
+  // falta en alguno manda NULL → falla NOT NULL en project_type).
+  const packProjects = [
+    {
+      id: PJ(16),
+      title: "[SEED] Pack shorts Acme — abril",
+      client_id: CL1,
+      client_name: "[SEED] Acme Studios",
+      phase: "editando" as const,
+      finalized: false,
+      finalized_at: null,
+      price: 400,
+      duration_minutes: null,
+      cobrado: "no" as const,
+      pagado: "sin_pagar" as const,
+      invoiced: "no" as const,
+      created_at: "2026-04-05T12:00:00Z",
+      project_type: "short_form" as const,
+      parent_id: null,
+    },
+    {
+      id: PJ(17),
+      title: "[SEED] Short Acme #1 — intro",
+      client_id: CL1,
+      client_name: "[SEED] Acme Studios",
+      phase: "terminado" as const,
+      finalized: false,
+      finalized_at: null,
+      price: null,
+      duration_minutes: 45,
+      cobrado: "no" as const,
+      pagado: "sin_pagar" as const,
+      invoiced: "no" as const,
+      created_at: "2026-04-06T12:00:00Z",
+      project_type: "short_form" as const,
+      parent_id: PJ(16),
+    },
+    {
+      id: PJ(18),
+      title: "[SEED] Short Acme #2 — desarrollo",
+      client_id: CL1,
+      client_name: "[SEED] Acme Studios",
+      phase: "editando" as const,
+      finalized: false,
+      finalized_at: null,
+      price: null,
+      duration_minutes: 50,
+      cobrado: "no" as const,
+      pagado: "sin_pagar" as const,
+      invoiced: "no" as const,
+      created_at: "2026-04-07T12:00:00Z",
+      project_type: "short_form" as const,
+      parent_id: PJ(16),
+    },
+    {
+      id: PJ(19),
+      title: "[SEED] Short Acme #3 — cierre",
+      client_id: CL1,
+      client_name: "[SEED] Acme Studios",
+      phase: "por_asignar" as const,
+      finalized: false,
+      finalized_at: null,
+      price: null,
+      duration_minutes: null,
+      cobrado: "no" as const,
+      pagado: "sin_pagar" as const,
+      invoiced: "no" as const,
+      created_at: "2026-04-08T12:00:00Z",
+      project_type: "short_form" as const,
+      parent_id: PJ(16),
+    },
+  ];
+  const packsIns = await supabase
+    .from("projects")
+    .upsert(packProjects as never, { onConflict: "id" });
+  if (packsIns.error)
+    return { ok: false, error: `pack projects: ${packsIns.error.message}` };
+
   // ---- project_editors ----
   await supabase
     .from("project_editors")
@@ -540,6 +621,10 @@ export async function activateSeed(): Promise<SeedResult> {
     { project_id: PJ(14), editor_id: ED1, cost: null }, // Kopi Naranja
     { project_id: PJ(15), editor_id: ED1, cost: null }, // Kopi Chino $17 × 8 = $136
     { project_id: PJ(15), editor_id: ED2, cost: null }, // Diego Chino → global flat $70
+    // Shorts del pack PJ(16). PJ(17) y PJ(18) ya tienen editor; PJ(19) sigue
+    // sin asignar para que muestre la columna "Por asignar" en el kanban.
+    { project_id: PJ(17), editor_id: ED2, cost: null }, // Diego Acme = $70 flat (pair)
+    { project_id: PJ(18), editor_id: ED3, cost: null }, // Mariana → global flat_variable
   ];
   const peIns = await supabase
     .from("project_editors")
