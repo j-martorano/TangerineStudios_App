@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronRightIcon } from "lucide-react";
 
 import { TableCell, TableRow } from "@/components/ui/table";
 
@@ -69,11 +69,11 @@ export function ProjectRow({
                 aria-expanded={expanded}
                 className="flex size-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
-                {expanded ? (
-                  <ChevronDownIcon className="size-4" />
-                ) : (
-                  <ChevronRightIcon className="size-4" />
-                )}
+                <ChevronRightIcon
+                  className={`size-4 transition-transform duration-200 ${
+                    expanded ? "rotate-90" : ""
+                  }`}
+                />
               </button>
             ) : null}
           </TableCell>
@@ -89,7 +89,7 @@ export function ProjectRow({
           {showExpand ? <TableCell className="w-8 p-1" /> : null}
           <TableCell
             colSpan={visibleColumns.length}
-            className="bg-muted/20 px-4 py-3"
+            className="bg-muted/20 px-4 py-3 animate-in fade-in slide-in-from-top-1 duration-200"
           >
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs sm:grid-cols-3 md:grid-cols-4">
               {hidden.map((id) => (

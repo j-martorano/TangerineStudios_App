@@ -376,17 +376,23 @@ export type Database = {
       }
       payment_methods: {
         Row: {
+          color: string
           created_at: string
+          icon: string | null
           id: string
           name: string
         }
         Insert: {
+          color?: string
           created_at?: string
+          icon?: string | null
           id?: string
           name: string
         }
         Update: {
+          color?: string
           created_at?: string
+          icon?: string | null
           id?: string
           name?: string
         }

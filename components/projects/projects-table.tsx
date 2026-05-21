@@ -1,18 +1,15 @@
 import { Fragment } from "react";
-import { FolderIcon } from "lucide-react";
 
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 
-import { ProjectRow } from "./project-row";
+import { MonthGroup } from "./month-group";
 
-import { monthToneFromKey } from "@/lib/projects/month-colors";
 import type {
   ClientForProject,
   EditorMini,
@@ -22,24 +19,6 @@ import {
   PROJECTS_COLUMNS,
   type ProjectsColumnId,
 } from "@/lib/settings/types";
-
-// Tinte de fondo de fila con el color del cliente (~12% de opacidad).
-function clientTint(hex: string | null | undefined): string | undefined {
-  if (!hex) return undefined;
-  return `${hex}1f`; // hex de 8 dígitos: #RRGGBB + alpha 0x1f
-}
-
-function rowAppearance(p: ProjectWithRelations): {
-  className: string;
-  style?: React.CSSProperties;
-} {
-  if (p.archived) return { className: "bg-muted/60 opacity-55" };
-  if (p.finalized) return { className: "bg-muted/40" };
-  return {
-    style: { backgroundColor: clientTint(p.client?.color) },
-    className: "",
-  };
-}
 
 const MONTH_NAMES = [
   "Enero",
@@ -67,6 +46,11 @@ function monthLabel(key: string): string {
   const idx = Number(month) - 1;
   const name = MONTH_NAMES[idx] ?? "Sin fecha";
   return year === "0000" ? "Sin fecha" : `${name} ${year}`;
+}
+
+function currentMonthKey(): string {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function groupByMonth(
@@ -138,10 +122,10 @@ export function ProjectsTable({
     );
   }
 
-  // Mostramos la columna del chevron sólo si hay columnas ocultas para expandir.
   const showExpand = visibleColumns.length < PROJECTS_COLUMNS.length;
   const colSpan = visibleColumns.length + (showExpand ? 1 : 0);
   const groups = groupByMonth(projects);
+  const currentKey = currentMonthKey();
 
   return (
     <Table>
@@ -154,47 +138,20 @@ export function ProjectsTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {groups.map(([key, items]) => {
-          const tone = monthToneFromKey(key);
-          return (
-            <Fragment key={key}>
-              {/* Etiqueta de mes — estilo pestaña de carpeta de informes. */}
-              <TableRow className="border-0 hover:bg-transparent">
-                <TableCell colSpan={colSpan} className="p-0 pt-5 pb-1">
-                  <span
-                    className="inline-flex items-center gap-2 rounded-t-lg rounded-br-lg border-b-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider"
-                    style={{
-                      backgroundColor: tone.tint,
-                      borderColor: tone.accent,
-                      color: tone.solid,
-                    }}
-                  >
-                    <FolderIcon className="size-3.5" />
-                    {monthLabel(key)}
-                    <span className="font-normal opacity-70">
-                      · {items.length}
-                    </span>
-                  </span>
-                </TableCell>
-              </TableRow>
-              {items.map((p) => {
-                const appearance = rowAppearance(p);
-                return (
-                  <ProjectRow
-                    key={p.id}
-                    project={p}
-                    editors={editors}
-                    clients={clients}
-                    visibleColumns={visibleColumns}
-                    showExpand={showExpand}
-                    rowClassName={appearance.className}
-                    rowStyle={appearance.style}
-                  />
-                );
-              })}
-            </Fragment>
-          );
-        })}
+        {groups.map(([key, items]) => (
+          <MonthGroup
+            key={key}
+            monthKey={key}
+            monthLabel={monthLabel(key)}
+            items={items}
+            editors={editors}
+            clients={clients}
+            visibleColumns={visibleColumns}
+            showExpand={showExpand}
+            colSpan={colSpan}
+            defaultOpen={key === currentKey}
+          />
+        ))}
       </TableBody>
     </Table>
   );

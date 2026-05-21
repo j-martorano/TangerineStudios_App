@@ -613,10 +613,30 @@ export async function activateSeed(): Promise<SeedResult> {
   // ---- Catálogo de métodos de pago ----
   const pmIns = await supabase.from("payment_methods").upsert(
     [
-      { id: PM(1), name: "[SEED] Binance" },
-      { id: PM(2), name: "[SEED] DolarApp" },
-      { id: PM(3), name: "[SEED] Banco BBVA" },
-      { id: PM(4), name: "[SEED] PayPal" },
+      {
+        id: PM(1),
+        name: "[SEED] Binance",
+        icon: "bitcoin",
+        color: "#eab308",
+      },
+      {
+        id: PM(2),
+        name: "[SEED] DolarApp",
+        icon: "smartphone",
+        color: "#22c55e",
+      },
+      {
+        id: PM(3),
+        name: "[SEED] Banco BBVA",
+        icon: "landmark",
+        color: "#3b82f6",
+      },
+      {
+        id: PM(4),
+        name: "[SEED] PayPal",
+        icon: "credit-card",
+        color: "#6366f1",
+      },
     ],
     { onConflict: "id" }
   );

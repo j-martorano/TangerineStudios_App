@@ -209,7 +209,7 @@ export type EditorWithCount = EditorRow & {
 };
 
 const EDITOR_FULL_SELECT =
-  "id, name, email, phone, discord_id, docs_url, payment_type, rate, flat_amount, created_at, project_editors(count), client_editors(payment_type, rate, flat_amount, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct)), editor_payment_methods(method_id, info, method:payment_methods(id, name)), editor_payment_tiers(min_minutes, max_minutes, amount)";
+  "id, name, email, phone, discord_id, docs_url, payment_type, rate, flat_amount, created_at, project_editors(count), client_editors(payment_type, rate, flat_amount, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct)), editor_payment_methods(method_id, info, method:payment_methods(id, name, icon, color)), editor_payment_tiers(min_minutes, max_minutes, amount)";
 
 function mapEditor(
   e: {
@@ -236,7 +236,12 @@ function mapEditor(
       | {
           method_id: string;
           info: string | null;
-          method: { id: string; name: string } | null;
+          method: {
+            id: string;
+            name: string;
+            icon: string | null;
+            color: string;
+          } | null;
         }[]
       | null;
     editor_payment_tiers?:
@@ -277,6 +282,8 @@ function mapEditor(
         method_id: pm.method_id,
         name: pm.method!.name,
         info: pm.info,
+        icon: pm.method!.icon,
+        color: pm.method!.color,
       }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     tiers: (e.editor_payment_tiers ?? [])

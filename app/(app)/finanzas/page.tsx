@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchProjects } from "@/lib/projects/queries";
+import { fetchClients, fetchProjects } from "@/lib/projects/queries";
 import {
   fetchClientPayments,
   fetchFixedServices,
@@ -7,6 +7,10 @@ import {
 import { fetchUserPrefs } from "@/lib/settings/queries";
 import { FixedServicesSection } from "@/components/finanzas/fixed-services-section";
 import { FinanzasTabs } from "@/components/finanzas/finanzas-tabs";
+import {
+  RegisterRetainerPaymentDialog,
+  type RetainerClient,
+} from "@/components/finanzas/register-retainer-payment-dialog";
 import {
   computeCost,
   computePrice,
@@ -17,6 +21,13 @@ import { monthToneFromKey } from "@/lib/projects/month-colors";
 import type { ProjectWithRelations } from "@/lib/projects/types";
 import type { FinanzasPayment } from "@/lib/finanzas/queries";
 import { ProjectSettleButton } from "@/components/finanzas/project-settle-button";
+
+// Tinte de fondo basado en el color del cliente (mismo patrón que en
+// proyectos: hex de 8 dígitos = RRGGBB + alpha 0x1f).
+function clientTint(hex: string | null | undefined): string | undefined {
+  if (!hex) return undefined;
+  return `${hex}1f`;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -222,12 +233,24 @@ function sumAcrossBuckets(
 }
 
 export default async function FinanzasPage() {
-  const [projects, payments, fixedServices, prefs] = await Promise.all([
-    fetchProjects(),
-    fetchClientPayments(),
-    fetchFixedServices(),
-    fetchUserPrefs(),
-  ]);
+  const [projects, payments, fixedServices, prefs, clients] =
+    await Promise.all([
+      fetchProjects(),
+      fetchClientPayments(),
+      fetchFixedServices(),
+      fetchUserPrefs(),
+      fetchClients(),
+    ]);
+
+  const retainerClients: RetainerClient[] = clients
+    .filter((c) => c.payment_type === "mensual")
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      color: c.color,
+      rate: c.agreed_price != null ? Number(c.agreed_price) : null,
+      discountPct: Number(c.retainer_discount_pct),
+    }));
   const { buckets, paymentItems, projectItems } = build(projects, payments);
 
   // Servicios fijos activos: su costo mensual se resta de la ganancia de
@@ -308,7 +331,12 @@ export default async function FinanzasPage() {
         sections={{
           resumen: resumenSection,
           por_mes: porMesSection,
-          pagos: <PagosSection items={paymentItems} />,
+          pagos: (
+            <PagosSection
+              items={paymentItems}
+              retainerClients={retainerClients}
+            />
+          ),
           por_proyecto: <ProjectsSection items={projectItems} />,
           servicios: <FixedServicesSection services={fixedServices} />,
         }}
@@ -365,23 +393,32 @@ function pagadoColor(status: ProjectWithRelations["pagado"]): string {
   return "text-muted-foreground";
 }
 
-function PagosSection({ items }: { items: PaymentItem[] }) {
+function PagosSection({
+  items,
+  retainerClients,
+}: {
+  items: PaymentItem[];
+  retainerClients: RetainerClient[];
+}) {
   const total = items.reduce((sum, i) => sum + i.amount, 0);
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Pagos de clientes retainer
-        </h2>
-        <span className="text-xs text-muted-foreground">
-          {items.length} pago{items.length === 1 ? "" : "s"} ·{" "}
-          {formatPrice(total)}
-        </span>
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Pagos de clientes retainer
+          </h2>
+          <span className="text-xs text-muted-foreground">
+            {items.length} pago{items.length === 1 ? "" : "s"} ·{" "}
+            {formatPrice(total)}
+          </span>
+        </div>
+        <RegisterRetainerPaymentDialog clients={retainerClients} />
       </div>
       {items.length === 0 ? (
         <p className="text-sm italic text-muted-foreground">
-          No hay pagos de clientes mensuales registrados. Cargalos desde la
-          ficha del cliente.
+          No hay pagos registrados todavía. Tocá «Registrar pago» para cargar
+          el primero.
         </p>
       ) : (
         <Card>
@@ -389,6 +426,7 @@ function PagosSection({ items }: { items: PaymentItem[] }) {
             {items.map((it, i) => (
               <div
                 key={`${it.paidAt}-${it.clientName}-${i}`}
+                style={{ backgroundColor: clientTint(it.clientColor) }}
                 className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
               >
                 <div className="flex items-center gap-3">

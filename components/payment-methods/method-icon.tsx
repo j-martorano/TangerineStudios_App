@@ -8,10 +8,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-// Heurística simple por nombre del método. Si Joaco escribe algo nuevo, le
-// caemos al ícono genérico (Wallet) y listo. Más adelante podemos hacer que
-// cada método tenga su ícono elegido a mano.
-function pickIcon(name: string): LucideIcon {
+import { iconForKey } from "./icon-map";
+
+// Heurística por nombre cuando el método no tiene un ícono elegido a mano.
+function pickByName(name: string): LucideIcon {
   const n = name.toLowerCase();
   if (
     n.includes("binance") ||
@@ -55,14 +55,19 @@ function pickIcon(name: string): LucideIcon {
   return WalletIcon;
 }
 
-/** Ícono asociado al nombre de un método de pago. */
+/**
+ * Ícono asociado a un método de pago. Prioriza el ícono elegido a mano y
+ * cae a la heurística por nombre si no hay nada.
+ */
 export function MethodIcon({
   name,
+  icon,
   className,
 }: {
   name: string;
+  icon?: string | null;
   className?: string;
 }) {
-  const Icon = pickIcon(name);
+  const Icon = iconForKey(icon) ?? pickByName(name);
   return <Icon className={className ?? "size-3"} aria-hidden />;
 }

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { MethodIcon } from "@/components/payment-methods/method-icon";
+import { methodTint } from "@/components/payment-methods/icon-map";
 import {
   Command,
   CommandEmpty,
@@ -131,14 +132,26 @@ export function EditorPaymentMethods({ catalog, value, onChange }: Props) {
     <div className="flex flex-col gap-3">
       {value.length > 0 ? (
         <div className="flex flex-col gap-2">
-          {value.map((v) => (
+          {value.map((v) => {
+            const m = fullCatalog.find((c) => c.id === v.method_id);
+            return (
             <div
               key={v.method_id}
               className="flex flex-col gap-2 rounded-lg border bg-card/50 p-3"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">
-                  <MethodIcon name={v.name} className="size-3" />
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                  style={{
+                    backgroundColor: methodTint(m?.color),
+                    borderColor: m?.color ?? undefined,
+                  }}
+                >
+                  <MethodIcon
+                    name={v.name}
+                    icon={m?.icon ?? null}
+                    className="size-3"
+                  />
                   {v.name}
                 </span>
                 <button
@@ -157,7 +170,8 @@ export function EditorPaymentMethods({ catalog, value, onChange }: Props) {
                 placeholder={`Datos de ${v.name} (alias, usuario, CBU/CVU…)`}
               />
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
 
@@ -203,7 +217,11 @@ export function EditorPaymentMethods({ catalog, value, onChange }: Props) {
                         <span
                           className={`inline-flex items-center gap-1.5 ${isSelected ? "text-muted-foreground" : ""}`}
                         >
-                          <MethodIcon name={method.name} className="size-3.5" />
+                          <MethodIcon
+                            name={method.name}
+                            icon={method.icon}
+                            className="size-3.5"
+                          />
                           {method.name}
                           {isSelected ? " · agregado" : ""}
                         </span>
