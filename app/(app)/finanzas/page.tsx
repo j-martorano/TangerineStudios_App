@@ -7,6 +7,7 @@ import {
 import { fetchUserPrefs } from "@/lib/settings/queries";
 import { FixedServicesSection } from "@/components/finanzas/fixed-services-section";
 import { FinanzasTabs } from "@/components/finanzas/finanzas-tabs";
+import { MonthCard } from "@/components/finanzas/month-card";
 import {
   RegisterRetainerPaymentDialog,
   type RetainerClient,
@@ -304,6 +305,9 @@ export default async function FinanzasPage() {
     </section>
   );
 
+  const now = new Date();
+  const currentMonthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+
   const porMesSection =
     buckets.length === 0 ? (
       <p className="text-sm italic text-muted-foreground">
@@ -312,7 +316,19 @@ export default async function FinanzasPage() {
     ) : (
       <div className="flex flex-col gap-3">
         {buckets.map((b) => (
-          <MonthCard key={b.key} bucket={b} />
+          <MonthCard
+            key={b.key}
+            monthKey={b.key}
+            label={b.label}
+            collected={b.collected}
+            pendingCollect={b.pendingCollect}
+            paid={b.paid}
+            pendingPay={b.pendingPay}
+            profit={b.profit}
+            servicesCost={b.servicesCost}
+            projects={b.projects}
+            defaultOpen={b.key === currentMonthKey}
+          />
         ))}
       </div>
     );
@@ -545,154 +561,3 @@ function ProjectList({
   );
 }
 
-function MonthCard({ bucket }: { bucket: MonthBucket }) {
-  const tone = monthToneFromKey(bucket.key);
-  return (
-    <Card
-      className="relative overflow-hidden"
-      style={{ backgroundColor: tone.tint }}
-    >
-      <span
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-1"
-        style={{ backgroundColor: tone.solid }}
-      />
-      <CardHeader className="flex flex-row items-baseline justify-between gap-2 border-b pb-3">
-        <CardTitle className="uppercase tracking-wide">
-          {bucket.label}
-        </CardTitle>
-        <span className="text-xs text-muted-foreground">
-          {bucket.projects.length} video
-          {bucket.projects.length === 1 ? "" : "s"} finalizado
-          {bucket.projects.length === 1 ? "" : "s"}
-        </span>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-          <MonthRow
-            label="Cobrado"
-            primary={formatPrice(bucket.collected)}
-            secondaryLabel="Por cobrar"
-            secondary={formatPrice(bucket.pendingCollect)}
-          />
-          <MonthRow
-            label="Pagado"
-            primary={formatPrice(bucket.paid)}
-            secondaryLabel="Por pagar"
-            secondary={formatPrice(bucket.pendingPay)}
-          />
-          {bucket.servicesCost > 0 ? (
-            <MonthRow
-              label="Servicios fijos"
-              primary={`− ${formatPrice(bucket.servicesCost)}`}
-            />
-          ) : null}
-          <MonthRow
-            label="Ganancia"
-            primary={formatPrice(bucket.profit)}
-            tone={bucket.profit < 0 ? undefined : "positive"}
-          />
-        </div>
-
-        {bucket.projects.length > 0 ? (
-          <div className="mt-4 border-t pt-3">
-            <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Recap — videos finalizados
-            </h4>
-            <div className="flex flex-col divide-y divide-border/40">
-              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                <span>Proyecto / cliente</span>
-                <span className="text-right">Cobrado</span>
-                <span className="text-right">Pagado</span>
-                <span className="text-right">Ganancia</span>
-              </div>
-              {bucket.projects.map((p) => {
-                const isMensual = p.client?.payment_type === "mensual";
-                const price = isMensual ? null : computePrice(p);
-                const cost = computeCost(p);
-                const profit = computeProfit(p);
-                const cobradoStr = isMensual
-                  ? "RETAINER"
-                  : price != null
-                    ? formatPrice(price)
-                    : "—";
-                const pagadoStr = cost != null ? formatPrice(cost) : "—";
-                const profitStr =
-                  profit != null ? formatPrice(profit) : "—";
-                return (
-                  <div
-                    key={p.id}
-                    className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-4 py-1.5 text-xs"
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                        {p.project_code}
-                      </span>
-                      <span className="truncate font-medium">{p.title}</span>
-                      <span className="truncate text-muted-foreground">
-                        {p.client?.name ?? p.client_name ?? "Sin cliente"}
-                      </span>
-                    </div>
-                    <span
-                      className={`text-right tabular-nums ${cobradoColor(p.cobrado)}`}
-                    >
-                      {cobradoStr}
-                    </span>
-                    <span
-                      className={`text-right tabular-nums ${pagadoColor(p.pagado)}`}
-                    >
-                      {pagadoStr}
-                    </span>
-                    <span
-                      className={`text-right tabular-nums ${
-                        profit == null
-                          ? "text-muted-foreground"
-                          : profit < 0
-                            ? "text-destructive"
-                            : "text-emerald-500"
-                      }`}
-                    >
-                      {profitStr}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
-
-function MonthRow({
-  label,
-  primary,
-  secondaryLabel,
-  secondary,
-  tone,
-}: {
-  label: string;
-  primary: string;
-  secondaryLabel?: string;
-  secondary?: string;
-  tone?: "positive";
-}) {
-  const primaryClass =
-    tone === "positive" ? "text-emerald-500" : "text-foreground";
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        {label}
-      </span>
-      <span className={`text-sm font-semibold tabular-nums ${primaryClass}`}>
-        {primary}
-      </span>
-      {secondaryLabel ? (
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {secondaryLabel}: {secondary}
-        </span>
-      ) : null}
-    </div>
-  );
-}

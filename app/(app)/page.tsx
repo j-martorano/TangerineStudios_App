@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { ArrowRightIcon } from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchClients, fetchProjects } from "@/lib/projects/queries";
+import { fetchClientPayments } from "@/lib/finanzas/queries";
 import { PROJECT_PHASES } from "@/lib/projects/types";
-import type { ProjectPhase } from "@/lib/projects/types";
+import type { ProjectPhase, ProjectWithRelations } from "@/lib/projects/types";
 import {
   PHASE_CLASS,
   PHASE_LABEL,
@@ -12,70 +11,224 @@ import {
   computePrice,
   formatPrice,
 } from "@/lib/projects/format";
-import type { ProjectWithRelations } from "@/lib/projects/types";
+
+import {
+  MonthNav,
+  currentMonthKey,
+  monthKeyOf,
+  monthLabelUpper,
+  shiftMonth,
+} from "@/components/dashboard/month-nav";
+import { StatCard, type StatCardItem } from "@/components/dashboard/stat-card";
+import {
+  RetainerClientsSection,
+  type RetainerClientSummary,
+} from "@/components/dashboard/retainer-clients-section";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const [projects, clients] = await Promise.all([
+type SearchParams = Promise<{ month?: string }>;
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const params = await searchParams;
+  const selectedMonth = isValidMonthKey(params.month)
+    ? (params.month as string)
+    : currentMonthKey();
+  const previousMonth = shiftMonth(selectedMonth, -1);
+
+  const [projects, clients, payments] = await Promise.all([
     fetchProjects(),
     fetchClients(),
+    fetchClientPayments(),
   ]);
 
-  const byPhase = countBy(projects, (p) => p.phase);
-  const active = (byPhase.por_asignar ?? 0) + (byPhase.editando ?? 0);
-
-  // Por cobrar: proyectos terminados que no están cobrados todavía
-  const toCollectProjects = projects.filter(
-    (p) => p.phase === "terminado" && p.cobrado !== "si"
-  );
-  // Por pagar: proyectos terminados que no le pagamos al editor todavía
-  const toPayProjects = projects.filter(
-    (p) => p.phase === "terminado" && p.pagado !== "pago_total"
+  // Snapshot global (no depende del mes seleccionado).
+  const byPhase = countByPhase(projects);
+  const activeProjects = projects.filter(
+    (p) =>
+      !p.finalized &&
+      !p.archived &&
+      (p.phase === "por_asignar" || p.phase === "editando")
   );
 
-  // Cobros usan precio calculado (lo que nos debe el cliente).
-  // Pagos usan cost (lo que le debemos al editor). Todo en USD.
-  const toCollectTotal = sumPrice(toCollectProjects);
-  const toPayTotal = sumCost(toPayProjects);
+  // Métricas del mes seleccionado y del previo.
+  const monthMetrics = computeMonthMetrics(projects, payments, selectedMonth);
+  const previousMetrics = computeMonthMetrics(
+    projects,
+    payments,
+    previousMonth
+  );
+
+  // Pendientes del mes (cobrado != si / pagado != pago_total en proyectos
+  // finalizados en el mes).
+  const pendingCobroProjects = projects.filter(
+    (p) =>
+      p.finalized &&
+      p.finalized_at &&
+      monthKeyOf(new Date(p.finalized_at)) === selectedMonth &&
+      p.cobrado !== "si" &&
+      p.client?.payment_type !== "mensual"
+  );
+  const pendingPagoProjects = projects.filter(
+    (p) =>
+      p.finalized &&
+      p.finalized_at &&
+      monthKeyOf(new Date(p.finalized_at)) === selectedMonth &&
+      p.pagado !== "pago_total" &&
+      p.editors.some((e) => e.editor != null)
+  );
+
+  const pendingCobroTotal = sumPrice(pendingCobroProjects);
+  const pendingPagoTotal = sumCost(pendingPagoProjects);
+  const previousPendingCobro = sumPrice(
+    projects.filter(
+      (p) =>
+        p.finalized &&
+        p.finalized_at &&
+        monthKeyOf(new Date(p.finalized_at)) === previousMonth &&
+        p.cobrado !== "si" &&
+        p.client?.payment_type !== "mensual"
+    )
+  );
+  const previousPendingPago = sumCost(
+    projects.filter(
+      (p) =>
+        p.finalized &&
+        p.finalized_at &&
+        monthKeyOf(new Date(p.finalized_at)) === previousMonth &&
+        p.pagado !== "pago_total" &&
+        p.editors.some((e) => e.editor != null)
+    )
+  );
+
+  // Clientes activos (con al menos 1 proyecto creado en el mes).
+  const monthClientIds = new Set(
+    projects
+      .filter((p) => monthKeyOf(new Date(p.created_at)) === selectedMonth)
+      .map((p) => p.client_id)
+      .filter((id): id is string => Boolean(id))
+  );
+  const previousClientIds = new Set(
+    projects
+      .filter((p) => monthKeyOf(new Date(p.created_at)) === previousMonth)
+      .map((p) => p.client_id)
+      .filter((id): id is string => Boolean(id))
+  );
+
+  // Resumen retainer: último pago + saldo por cliente mensual. `payments` de
+  // fetchClientPayments no expone client_id, así que matcheamos por nombre.
+  const retainerClients: RetainerClientSummary[] = clients
+    .filter((c) => c.payment_type === "mensual")
+    .map((c) => {
+      const last = payments
+        .filter((pay) => pay.clientName === c.name)
+        .map((pay) => pay.paid_at)
+        .sort()
+        .at(-1) ?? null;
+      return {
+        id: c.id,
+        name: c.name,
+        color: c.color,
+        minute_balance: c.minute_balance,
+        lastPaymentAt: last,
+      };
+    });
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-6 md:p-8">
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          {projects.length} proyecto{projects.length === 1 ? "" : "s"} ·{" "}
-          {clients.length} cliente{clients.length === 1 ? "" : "s"}
-        </p>
+      <header className="flex flex-wrap items-baseline justify-between gap-3">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            {clients.length} cliente{clients.length === 1 ? "" : "s"} ·{" "}
+            {projects.length} proyecto{projects.length === 1 ? "" : "s"}
+          </p>
+        </div>
+        <MonthNav current={selectedMonth} />
       </header>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard
-          label="Activos"
-          value={active}
-          hint="Por asignar + Editando"
-          href="/kanban"
+      {/* Resumen del mes — números netos del mes con delta vs mes anterior. */}
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <SummaryRow
+          label="Cobrado del mes"
+          value={formatPrice(monthMetrics.cobrado)}
+          delta={moneyDelta(monthMetrics.cobrado, previousMetrics.cobrado)}
+          tone="positive"
         />
-        <StatCard
-          label="Por cobrar"
-          value={toCollectProjects.length}
-          hint={toCollectTotal > 0 ? formatPrice(toCollectTotal) : "Sin monto"}
-          href="/finanzas"
-          highlight
+        <SummaryRow
+          label="Pagado del mes"
+          value={formatPrice(monthMetrics.pagado)}
+          delta={moneyDelta(monthMetrics.pagado, previousMetrics.pagado)}
+          tone="neutral"
         />
-        <StatCard
-          label="Por pagar"
-          value={toPayProjects.length}
-          hint={toPayTotal > 0 ? formatPrice(toPayTotal) : "Sin monto"}
-          href="/finanzas"
-        />
-        <StatCard
-          label="Clientes"
-          value={clients.length}
-          hint="Cargados en la base"
-          href="/clients"
+        <SummaryRow
+          label="Ganancia del mes"
+          value={formatPrice(monthMetrics.profit)}
+          delta={moneyDelta(monthMetrics.profit, previousMetrics.profit)}
+          tone={monthMetrics.profit < 0 ? "negative" : "positive"}
         />
       </section>
+
+      {/* Cards operativas con info breve. */}
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Activos ahora"
+          value={String(activeProjects.length)}
+          hint="Por asignar + Editando"
+          items={projectItems(activeProjects.slice(0, 3), "phase-label")}
+          href="/kanban"
+          hrefLabel="Ir al kanban"
+        />
+        <StatCard
+          label={`Por cobrar — ${monthLabelUpper(selectedMonth)}`}
+          value={
+            pendingCobroTotal > 0
+              ? formatPrice(pendingCobroTotal)
+              : `${pendingCobroProjects.length}`
+          }
+          hint={
+            pendingCobroProjects.length === 0
+              ? "Todo cobrado"
+              : `${pendingCobroProjects.length} proyecto${pendingCobroProjects.length === 1 ? "" : "s"}`
+          }
+          delta={moneyDelta(pendingCobroTotal, previousPendingCobro)}
+          items={projectItems(pendingCobroProjects.slice(0, 3), "price")}
+          href="/finanzas"
+          hrefLabel="Ver en Finanzas"
+          highlight={pendingCobroTotal > 0}
+        />
+        <StatCard
+          label={`Por pagar — ${monthLabelUpper(selectedMonth)}`}
+          value={
+            pendingPagoTotal > 0
+              ? formatPrice(pendingPagoTotal)
+              : `${pendingPagoProjects.length}`
+          }
+          hint={
+            pendingPagoProjects.length === 0
+              ? "Todo pagado"
+              : `${pendingPagoProjects.length} proyecto${pendingPagoProjects.length === 1 ? "" : "s"}`
+          }
+          delta={moneyDelta(pendingPagoTotal, previousPendingPago)}
+          items={projectItems(pendingPagoProjects.slice(0, 3), "cost")}
+          href="/finanzas"
+          hrefLabel="Ver en Finanzas"
+        />
+        <StatCard
+          label={`Clientes del mes`}
+          value={String(monthClientIds.size)}
+          hint={`Distintos con proyectos en ${monthLabelUpper(selectedMonth)}`}
+          delta={countDelta(monthClientIds.size, previousClientIds.size)}
+          href="/clients"
+          hrefLabel="Ver clientes"
+        />
+      </section>
+
+      <RetainerClientsSection clients={retainerClients} />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -115,58 +268,72 @@ export default async function DashboardPage() {
   );
 }
 
-function StatCard({
-  label,
-  value,
-  hint,
-  href,
-  highlight,
-}: {
-  label: string;
-  value: number;
-  hint: string;
-  href: string;
-  highlight?: boolean;
-}) {
-  return (
-    <Link href={href} className="group">
-      <Card
-        size="sm"
-        className={`h-full transition-colors group-hover:bg-accent/30 ${highlight ? "ring-1 ring-primary/50" : ""}`}
-      >
-        <CardHeader className="flex flex-row items-start justify-between gap-2">
-          <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            {label}
-          </CardTitle>
-          <ArrowRightIcon className="size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-        </CardHeader>
-        <CardContent className="flex flex-col gap-1">
-          <span
-            className={`text-3xl font-semibold tabular-nums ${highlight ? "text-primary" : ""}`}
-          >
-            {value}
-          </span>
-          {hint ? (
-            <span className="text-xs text-muted-foreground truncate">
-              {hint}
-            </span>
-          ) : null}
-        </CardContent>
-      </Card>
-    </Link>
-  );
+// ---- Helpers ----
+
+function isValidMonthKey(s: string | undefined): boolean {
+  return !!s && /^\d{4}-\d{2}$/.test(s);
 }
 
-function countBy<T>(
-  arr: T[],
-  key: (item: T) => ProjectPhase
+function countByPhase(
+  projects: ProjectWithRelations[]
 ): Partial<Record<ProjectPhase, number>> {
   const acc: Partial<Record<ProjectPhase, number>> = {};
-  for (const item of arr) {
-    const k = key(item);
-    acc[k] = (acc[k] ?? 0) + 1;
+  for (const p of projects) {
+    if (p.archived) continue;
+    acc[p.phase] = (acc[p.phase] ?? 0) + 1;
   }
   return acc;
+}
+
+type MonthMetrics = {
+  cobrado: number;
+  pagado: number;
+  profit: number;
+};
+
+function computeMonthMetrics(
+  projects: ProjectWithRelations[],
+  payments: { amount: number; paid_at: string }[],
+  monthKey: string
+): MonthMetrics {
+  let cobrado = 0;
+  let pagado = 0;
+  let profit = 0;
+
+  // Proyectos finalizados en el mes.
+  for (const p of projects) {
+    if (!p.finalized || !p.finalized_at) continue;
+    if (monthKeyOf(new Date(p.finalized_at)) !== monthKey) continue;
+
+    const isMensual = p.client?.payment_type === "mensual";
+
+    if (!isMensual && p.cobrado === "si") {
+      const price = computePrice(p);
+      if (price != null) cobrado += price;
+    }
+    if (p.pagado === "pago_total") {
+      const cost = computeCost(p);
+      if (cost != null) pagado += cost;
+    }
+    if (isMensual) {
+      const cost = computeCost(p);
+      if (cost != null) profit -= cost;
+    } else {
+      const price = computePrice(p);
+      const cost = computeCost(p);
+      if (price != null && cost != null) profit += price - cost;
+      else if (price != null) profit += price;
+    }
+  }
+
+  // Pagos retainer recibidos en el mes.
+  for (const pay of payments) {
+    if (!pay.paid_at.startsWith(monthKey)) continue;
+    cobrado += pay.amount;
+    profit += pay.amount;
+  }
+
+  return { cobrado, pagado, profit };
 }
 
 function sumPrice(projects: ProjectWithRelations[]): number {
@@ -185,4 +352,93 @@ function sumCost(projects: ProjectWithRelations[]): number {
     if (cost != null) total += cost;
   }
   return total;
+}
+
+function projectItems(
+  projects: ProjectWithRelations[],
+  mode: "phase-label" | "price" | "cost"
+): StatCardItem[] {
+  return projects.map((p) => {
+    let secondary: string | undefined;
+    if (mode === "phase-label") {
+      secondary = PHASE_LABEL[p.phase];
+    } else if (mode === "price") {
+      const price = computePrice(p);
+      secondary = price != null ? formatPrice(price) : undefined;
+    } else if (mode === "cost") {
+      const cost = computeCost(p);
+      secondary = cost != null ? formatPrice(cost) : undefined;
+    }
+    return {
+      primary: p.title,
+      secondary,
+      color: p.client?.color ?? null,
+    };
+  });
+}
+
+function moneyDelta(
+  current: number,
+  previous: number
+): { raw: number; text: string } | undefined {
+  const raw = current - previous;
+  if (raw === 0 && previous === 0) return undefined;
+  const sign = raw > 0 ? "+" : raw < 0 ? "−" : "";
+  const abs = Math.abs(raw);
+  return { raw, text: `${sign}${formatPrice(abs)}` };
+}
+
+function countDelta(
+  current: number,
+  previous: number
+): { raw: number; text: string } | undefined {
+  const raw = current - previous;
+  if (raw === 0) return undefined;
+  const sign = raw > 0 ? "+" : "−";
+  return { raw, text: `${sign}${Math.abs(raw)}` };
+}
+
+function SummaryRow({
+  label,
+  value,
+  delta,
+  tone,
+}: {
+  label: string;
+  value: string;
+  delta?: { raw: number; text: string };
+  tone: "positive" | "negative" | "neutral";
+}) {
+  const toneClass =
+    tone === "positive"
+      ? "text-emerald-500"
+      : tone === "negative"
+        ? "text-destructive"
+        : "text-foreground";
+  return (
+    <div className="flex flex-col gap-1 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <div className="flex items-baseline gap-3">
+        <span className={`text-2xl font-semibold tabular-nums ${toneClass}`}>
+          {value}
+        </span>
+        {delta ? (
+          <span
+            className={`text-[11px] font-medium tabular-nums ${
+              delta.raw > 0
+                ? "text-emerald-500"
+                : delta.raw < 0
+                  ? "text-destructive"
+                  : "text-muted-foreground"
+            }`}
+            title="vs mes anterior"
+          >
+            {delta.text}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
 }
