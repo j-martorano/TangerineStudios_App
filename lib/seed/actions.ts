@@ -3,6 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
+// Sólo este usuario ve y puede tocar el seed. Si el día de mañana hay que
+// agregar otro, hacelo acá. Server-side: las acciones también validan.
+const SEED_OWNER_EMAIL = "erikpastuszek@gmail.com";
+
+export async function isSeedOwner(): Promise<boolean> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.email === SEED_OWNER_EMAIL;
+}
+
 // =========================================================================
 // Datos de prueba — seed activable / desactivable.
 //
@@ -55,6 +67,7 @@ function revalidateAll() {
 }
 
 export async function isSeedActive(): Promise<boolean> {
+  if (!(await isSeedOwner())) return false;
   const supabase = await createClient();
   const { data } = await supabase
     .from("editors")
@@ -65,6 +78,9 @@ export async function isSeedActive(): Promise<boolean> {
 }
 
 export async function activateSeed(): Promise<SeedResult> {
+  if (!(await isSeedOwner())) {
+    return { ok: false, error: "No autorizado" };
+  }
   const supabase = await createClient();
 
   // ---- Editores ----
@@ -110,6 +126,10 @@ export async function activateSeed(): Promise<SeedResult> {
     };
 
   // ---- Clientes ----
+  // Importante: supabase-js unifica las keys de los rows que pasamos al
+  // upsert; los rows que no incluyen una key terminan mandando NULL en el
+  // SQL. Por eso tenemos que pasar agreed_price y retainer_discount_pct
+  // SIEMPRE (retainer_discount_pct es NOT NULL).
   const clientsIns = await supabase.from("clients").upsert(
     [
       {
@@ -117,6 +137,8 @@ export async function activateSeed(): Promise<SeedResult> {
         name: "[SEED] Acme Studios",
         color: "#ff6b35",
         payment_type: "por_proyecto" as const,
+        agreed_price: null,
+        retainer_discount_pct: 10,
       },
       {
         id: CL2,
@@ -124,6 +146,7 @@ export async function activateSeed(): Promise<SeedResult> {
         color: "#f7b801",
         payment_type: "por_rate" as const,
         agreed_price: 20,
+        retainer_discount_pct: 10,
       },
       {
         id: CL3,
@@ -139,6 +162,7 @@ export async function activateSeed(): Promise<SeedResult> {
         color: "#1d3557",
         payment_type: "por_rate" as const,
         agreed_price: 25,
+        retainer_discount_pct: 10,
       },
       {
         id: CL5,
@@ -235,187 +259,251 @@ export async function activateSeed(): Promise<SeedResult> {
     };
 
   // ---- Proyectos ----
-  const projects = [
-    // Marzo 2026 — casi todos finalizados
+  // Importante: supabase-js unifica las keys, así que pasamos siempre todos
+  // los campos con null donde corresponda (sobre todo invoiced que es NOT
+  // NULL y client_name por las dudas).
+  type SeedProject = {
+    id: string;
+    title: string;
+    client_id: string;
+    client_name: string;
+    phase: "por_asignar" | "editando" | "terminado";
+    finalized: boolean;
+    finalized_at: string | null;
+    price: number | null;
+    duration_minutes: number | null;
+    cobrado: "no" | "parcial" | "si";
+    pagado: "sin_pagar" | "parcial" | "pago_total";
+    invoiced: "no" | "parcial" | "si";
+    created_at: string;
+  };
+  const projects: SeedProject[] = [
+    // Marzo 2026
     {
       id: PJ(1),
       title: "[SEED] Reel demo Acme",
       client_id: CL1,
-      phase: "terminado" as const,
+      client_name: "[SEED] Acme Studios",
+      phase: "terminado",
       finalized: true,
       finalized_at: "2026-03-25T12:00:00Z",
       price: 450,
       duration_minutes: 90,
-      cobrado: "si" as const,
-      pagado: "pago_total" as const,
-      invoiced: "si" as const,
+      cobrado: "si",
+      pagado: "pago_total",
+      invoiced: "si",
       created_at: "2026-03-05T12:00:00Z",
     },
     {
       id: PJ(2),
       title: "[SEED] Spot Naranja otoño",
       client_id: CL2,
-      phase: "terminado" as const,
+      client_name: "[SEED] Naranja Films",
+      phase: "terminado",
       finalized: true,
       finalized_at: "2026-03-28T12:00:00Z",
+      price: null,
       duration_minutes: 30,
-      cobrado: "si" as const,
-      pagado: "pago_total" as const,
+      cobrado: "si",
+      pagado: "pago_total",
+      invoiced: "si",
       created_at: "2026-03-10T12:00:00Z",
     },
     {
       id: PJ(3),
       title: "[SEED] Podcast Chino ep.1",
       client_id: CL3,
-      phase: "terminado" as const,
+      client_name: "[SEED] El Chino",
+      phase: "terminado",
       finalized: true,
       finalized_at: "2026-03-25T12:00:00Z",
+      price: null,
       duration_minutes: 45,
-      cobrado: "si" as const,
-      pagado: "pago_total" as const,
+      cobrado: "si",
+      pagado: "pago_total",
+      invoiced: "si",
       created_at: "2026-03-12T12:00:00Z",
     },
     {
       id: PJ(4),
       title: "[SEED] Reel Policing #1",
       client_id: CL4,
-      phase: "terminado" as const,
+      client_name: "[SEED] Policing Uncut",
+      phase: "terminado",
       finalized: true,
       finalized_at: "2026-03-30T12:00:00Z",
+      price: null,
       duration_minutes: 18,
-      cobrado: "parcial" as const,
-      pagado: "parcial" as const,
+      cobrado: "parcial",
+      pagado: "parcial",
+      invoiced: "parcial",
       created_at: "2026-03-15T12:00:00Z",
     },
     {
       id: PJ(5),
       title: "[SEED] Acme video pendiente (auto-carry)",
       client_id: CL1,
-      phase: "editando" as const,
+      client_name: "[SEED] Acme Studios",
+      phase: "editando",
       finalized: false,
+      finalized_at: null,
       price: 300,
       duration_minutes: 60,
-      cobrado: "no" as const,
-      pagado: "sin_pagar" as const,
+      cobrado: "no",
+      pagado: "sin_pagar",
+      invoiced: "no",
       created_at: "2026-03-22T12:00:00Z",
     },
-
-    // Abril 2026 — mix
+    // Abril 2026
     {
       id: PJ(6),
       title: "[SEED] DJ's Thoughts ep.5",
       client_id: CL5,
-      phase: "terminado" as const,
+      client_name: "[SEED] DJ's Thoughts",
+      phase: "terminado",
       finalized: true,
       finalized_at: "2026-04-15T12:00:00Z",
+      price: null,
       duration_minutes: 22,
-      cobrado: "si" as const,
-      pagado: "pago_total" as const,
+      cobrado: "si",
+      pagado: "pago_total",
+      invoiced: "si",
       created_at: "2026-04-03T12:00:00Z",
     },
     {
       id: PJ(7),
       title: "[SEED] Naranja spring spot",
       client_id: CL2,
-      phase: "terminado" as const,
+      client_name: "[SEED] Naranja Films",
+      phase: "terminado",
       finalized: true,
       finalized_at: "2026-04-22T12:00:00Z",
+      price: null,
       duration_minutes: 25,
-      cobrado: "parcial" as const,
-      pagado: "sin_pagar" as const,
+      cobrado: "parcial",
+      pagado: "sin_pagar",
+      invoiced: "parcial",
       created_at: "2026-04-08T12:00:00Z",
     },
     {
       id: PJ(8),
       title: "[SEED] Acme corporativo Q2",
       client_id: CL1,
-      phase: "editando" as const,
+      client_name: "[SEED] Acme Studios",
+      phase: "editando",
       finalized: false,
+      finalized_at: null,
       price: 600,
       duration_minutes: 50,
-      cobrado: "no" as const,
-      pagado: "sin_pagar" as const,
+      cobrado: "no",
+      pagado: "sin_pagar",
+      invoiced: "no",
       created_at: "2026-04-12T12:00:00Z",
     },
     {
       id: PJ(9),
       title: "[SEED] Policing Uncut #3",
       client_id: CL4,
-      phase: "editando" as const,
+      client_name: "[SEED] Policing Uncut",
+      phase: "editando",
       finalized: false,
+      finalized_at: null,
+      price: null,
       duration_minutes: 20,
-      cobrado: "no" as const,
-      pagado: "sin_pagar" as const,
+      cobrado: "no",
+      pagado: "sin_pagar",
+      invoiced: "no",
       created_at: "2026-04-18T12:00:00Z",
     },
     {
       id: PJ(10),
       title: "[SEED] Reel highlights Chino",
       client_id: CL3,
-      phase: "terminado" as const,
+      client_name: "[SEED] El Chino",
+      phase: "terminado",
       finalized: true,
       finalized_at: "2026-04-30T12:00:00Z",
+      price: null,
       duration_minutes: 12,
-      cobrado: "si" as const,
-      pagado: "pago_total" as const,
+      cobrado: "si",
+      pagado: "pago_total",
+      invoiced: "si",
       created_at: "2026-04-25T12:00:00Z",
     },
-
-    // Mayo 2026 — mostly active
+    // Mayo 2026
     {
       id: PJ(11),
       title: "[SEED] Acme casamiento P/G",
       client_id: CL1,
-      phase: "editando" as const,
+      client_name: "[SEED] Acme Studios",
+      phase: "editando",
       finalized: false,
+      finalized_at: null,
       price: 800,
       duration_minutes: 40,
-      cobrado: "no" as const,
-      pagado: "sin_pagar" as const,
+      cobrado: "no",
+      pagado: "sin_pagar",
+      invoiced: "no",
       created_at: "2026-05-02T12:00:00Z",
     },
     {
       id: PJ(12),
       title: "[SEED] DJ's Thoughts ep.6",
       client_id: CL5,
-      phase: "editando" as const,
+      client_name: "[SEED] DJ's Thoughts",
+      phase: "editando",
       finalized: false,
+      finalized_at: null,
+      price: null,
       duration_minutes: 0,
-      cobrado: "no" as const,
-      pagado: "sin_pagar" as const,
+      cobrado: "no",
+      pagado: "sin_pagar",
+      invoiced: "no",
       created_at: "2026-05-05T12:00:00Z",
     },
     {
       id: PJ(13),
       title: "[SEED] Policing Uncut #4",
       client_id: CL4,
-      phase: "terminado" as const,
+      client_name: "[SEED] Policing Uncut",
+      phase: "terminado",
       finalized: true,
       finalized_at: "2026-05-18T12:00:00Z",
+      price: null,
       duration_minutes: 28,
-      cobrado: "si" as const,
-      pagado: "pago_total" as const,
+      cobrado: "si",
+      pagado: "pago_total",
+      invoiced: "si",
       created_at: "2026-05-10T12:00:00Z",
     },
     {
       id: PJ(14),
       title: "[SEED] Naranja teaser verano",
       client_id: CL2,
-      phase: "por_asignar" as const,
+      client_name: "[SEED] Naranja Films",
+      phase: "por_asignar",
       finalized: false,
-      cobrado: "no" as const,
-      pagado: "sin_pagar" as const,
+      finalized_at: null,
+      price: null,
+      duration_minutes: null,
+      cobrado: "no",
+      pagado: "sin_pagar",
+      invoiced: "no",
       created_at: "2026-05-12T12:00:00Z",
     },
     {
       id: PJ(15),
       title: "[SEED] Chino recap semanal",
       client_id: CL3,
-      phase: "editando" as const,
+      client_name: "[SEED] El Chino",
+      phase: "editando",
       finalized: false,
+      finalized_at: null,
+      price: null,
       duration_minutes: 8,
-      cobrado: "no" as const,
-      pagado: "sin_pagar" as const,
+      cobrado: "no",
+      pagado: "sin_pagar",
+      invoiced: "no",
       created_at: "2026-05-18T12:00:00Z",
     },
   ];
@@ -573,6 +661,9 @@ export async function activateSeed(): Promise<SeedResult> {
 }
 
 export async function deactivateSeed(): Promise<SeedResult> {
+  if (!(await isSeedOwner())) {
+    return { ok: false, error: "No autorizado" };
+  }
   const supabase = await createClient();
 
   // Borramos en orden seguro. Las pivots con FK on-delete-cascade desaparecen
