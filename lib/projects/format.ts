@@ -128,6 +128,24 @@ export function computeCost(p: ProjectForCalc): number | null {
   return anyContribution ? total : null;
 }
 
+/**
+ * Cost atribuido a UN editor específico dentro de un proyecto. Mira primero
+ * el cost manual de la asignación; si es null, computa desde el modelo de
+ * pago del editor con la duración del proyecto.
+ */
+export function editorCostInProject(
+  p: ProjectForCalc,
+  editorId: string
+): number | null {
+  const entry = p.editors.find((e) => e.editor?.id === editorId);
+  if (!entry) return null;
+  if (entry.cost != null) return Number(entry.cost);
+  if (!entry.editor) return null;
+  const duration =
+    p.duration_minutes == null ? null : Number(p.duration_minutes);
+  return editorCost(entry.editor, duration);
+}
+
 // Ganancia calculada del proyecto:
 //   - por_proyecto / por_rate: precio - costo
 //   - mensual: null (la ganancia real se calcula a nivel mes en Finanzas)

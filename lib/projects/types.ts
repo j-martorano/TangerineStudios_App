@@ -74,6 +74,23 @@ export type ProjectEditorAssignment = {
   editor: EditorMini | null;
 };
 
+/** Cobro parcial registrado contra un proyecto. */
+export type ProjectCobro = {
+  id: string;
+  amount: number;
+  paid_at: string;
+  note: string | null;
+};
+
+/** Pago parcial registrado a un editor por su trabajo en un proyecto. */
+export type ProjectEditorPago = {
+  id: string;
+  editor_id: string;
+  amount: number;
+  paid_at: string;
+  note: string | null;
+};
+
 export type ProjectParentRef = {
   id: string;
   title: string;
@@ -90,6 +107,10 @@ export type ProjectWithRelations = ProjectRow & {
   children?: ProjectWithRelations[];
   /** Referencia al padre (sólo populado para shorts hijos). */
   parent?: ProjectParentRef | null;
+  /** Cobros parciales registrados contra este proyecto. */
+  cobros: ProjectCobro[];
+  /** Pagos parciales registrados a cada editor del proyecto. */
+  editor_pagos: ProjectEditorPago[];
 };
 
 /** Un proyecto es "pack" cuando tiene al menos un hijo. */

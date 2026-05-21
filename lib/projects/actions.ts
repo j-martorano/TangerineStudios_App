@@ -352,6 +352,91 @@ export async function changePagado(
   return { ok: true };
 }
 
+// ====== Cobros parciales por proyecto ======
+
+const cobroInputSchema = z.object({
+  project_id: z.string().regex(uuidRegex, "ID de proyecto inválido"),
+  amount: z.number().positive("El monto debe ser mayor a 0"),
+  paid_at: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida (YYYY-MM-DD)"),
+  note: z.string().max(200).nullable().optional(),
+});
+
+export type CobroInput = z.input<typeof cobroInputSchema>;
+
+export async function registerCobro(
+  input: CobroInput
+): Promise<ActionResult> {
+  const parsed = cobroInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("project_cobros").insert({
+    project_id: parsed.data.project_id,
+    amount: parsed.data.amount,
+    paid_at: parsed.data.paid_at,
+    note: parsed.data.note ?? null,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function deleteCobro(id: string): Promise<ActionResult> {
+  if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
+  const supabase = await createClient();
+  const { error } = await supabase.from("project_cobros").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true };
+}
+
+// ====== Pagos parciales a editores por proyecto ======
+
+const editorPagoInputSchema = z.object({
+  project_id: z.string().regex(uuidRegex, "ID de proyecto inválido"),
+  editor_id: z.string().regex(uuidRegex, "ID de editor inválido"),
+  amount: z.number().positive("El monto debe ser mayor a 0"),
+  paid_at: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida (YYYY-MM-DD)"),
+  note: z.string().max(200).nullable().optional(),
+});
+
+export type EditorPagoInput = z.input<typeof editorPagoInputSchema>;
+
+export async function registerEditorPago(
+  input: EditorPagoInput
+): Promise<ActionResult> {
+  const parsed = editorPagoInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("project_editor_pagos").insert({
+    project_id: parsed.data.project_id,
+    editor_id: parsed.data.editor_id,
+    amount: parsed.data.amount,
+    paid_at: parsed.data.paid_at,
+    note: parsed.data.note ?? null,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function deleteEditorPago(id: string): Promise<ActionResult> {
+  if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("project_editor_pagos")
+    .delete()
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true };
+}
+
 export async function changeProjectDuration(
   id: string,
   minutes: number | null

@@ -6,8 +6,10 @@ import { ChevronRightIcon } from "lucide-react";
 import { TableCell, TableRow } from "@/components/ui/table";
 
 import { ArchiveProjectButton } from "./archive-project-button";
+import { CobroManager } from "./cobro-manager";
 import { EditProjectButton } from "./edit-project-button";
 import { FinalizeToggle } from "./finalize-toggle";
+import { PagoManager } from "./pago-manager";
 import type { ParentOption } from "./project-form";
 import { QuickDurationEditor } from "./quick-duration-editor";
 import { QuickPhaseBadge } from "./quick-phase-badge";
@@ -266,23 +268,9 @@ function renderValue(
     case "editor":
       return editorNames(p);
     case "cobrado":
-      return (
-        <QuickPaymentBadge
-          kind="cobrado"
-          id={p.id}
-          value={p.cobrado}
-          disabled={locked}
-        />
-      );
+      return <CobroManager project={p} disabled={locked} />;
     case "pagado":
-      return (
-        <QuickPaymentBadge
-          kind="pagado"
-          id={p.id}
-          value={p.pagado}
-          disabled={locked}
-        />
-      );
+      return <PagoManager project={p} disabled={locked} />;
     case "invoiced":
       return (
         <QuickPaymentBadge

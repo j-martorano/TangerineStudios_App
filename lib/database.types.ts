@@ -398,6 +398,86 @@ export type Database = {
         }
         Relationships: []
       }
+      project_cobros: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          note: string | null
+          paid_at: string
+          project_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          paid_at?: string
+          project_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          paid_at?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_cobros_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_editor_pagos: {
+        Row: {
+          amount: number
+          created_at: string
+          editor_id: string
+          id: string
+          note: string | null
+          paid_at: string
+          project_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          editor_id: string
+          id?: string
+          note?: string | null
+          paid_at?: string
+          project_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          editor_id?: string
+          id?: string
+          note?: string | null
+          paid_at?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_editor_pagos_editor_id_fkey"
+            columns: ["editor_id"]
+            isOneToOne: false
+            referencedRelation: "editors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_editor_pagos_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_editors: {
         Row: {
           cost: number | null

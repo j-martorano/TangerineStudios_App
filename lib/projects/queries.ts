@@ -14,7 +14,7 @@ import type {
 import type { EditorPaymentMethod } from "@/lib/payment-methods/queries";
 
 const PROJECT_SELECT =
-  "id, project_code, title, client_name, phase, cobrado, pagado, invoiced, status, price, cost, duration_minutes, position, finalized, finalized_at, archived, archived_at, project_type, parent_id, created_at, updated_at, client_id, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct), editors:project_editors(cost, editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))";
+  "id, project_code, title, client_name, phase, cobrado, pagado, invoiced, status, price, cost, duration_minutes, position, finalized, finalized_at, archived, archived_at, project_type, parent_id, created_at, updated_at, client_id, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct), editors:project_editors(cost, editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount))), cobros:project_cobros(id, amount, paid_at, note), editor_pagos:project_editor_pagos(id, editor_id, amount, paid_at, note)";
 
 export const DEFAULT_PER_PAGE = 20;
 
