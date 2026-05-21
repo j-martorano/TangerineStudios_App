@@ -8,6 +8,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { ArchiveProjectButton } from "./archive-project-button";
 import { EditProjectButton } from "./edit-project-button";
 import { FinalizeToggle } from "./finalize-toggle";
+import type { ParentOption } from "./project-form";
 import { QuickDurationEditor } from "./quick-duration-editor";
 import { QuickPhaseBadge } from "./quick-phase-badge";
 import { QuickPaymentBadge } from "./quick-payment-badge";
@@ -19,7 +20,7 @@ import {
   formatDate,
   formatPrice,
 } from "@/lib/projects/format";
-import { editorNames } from "@/lib/projects/types";
+import { editorNames, isPack } from "@/lib/projects/types";
 import type {
   ClientForProject,
   EditorMini,
@@ -35,33 +36,40 @@ type Props = {
   project: ProjectWithRelations;
   editors: EditorMini[];
   clients: ClientForProject[];
+  availableParents?: ParentOption[];
   visibleColumns: ProjectsColumnId[];
   /** Si false, no se renderiza la celda del chevron (no hay nada para expandir). */
   showExpand: boolean;
   rowClassName: string;
   rowStyle?: React.CSSProperties;
+  /** True si esta fila es un short hijo de un pack (se indenta). */
+  nested?: boolean;
 };
 
 export function ProjectRow({
   project,
   editors,
   clients,
+  availableParents = [],
   visibleColumns,
   showExpand,
   rowClassName,
   rowStyle,
+  nested = false,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const visible = new Set<ProjectsColumnId>(visibleColumns);
   const hidden = PROJECTS_COLUMNS.filter((c) => !visible.has(c));
   const locked = project.finalized;
+  const pack = isPack(project);
+  const canExpand = pack || hidden.length > 0;
 
   return (
     <Fragment>
       <TableRow className={rowClassName} style={rowStyle}>
         {showExpand ? (
           <TableCell className="w-8 p-1 align-middle">
-            {hidden.length > 0 ? (
+            {canExpand ? (
               <button
                 type="button"
                 onClick={() => setExpanded((v) => !v)}
@@ -80,11 +88,37 @@ export function ProjectRow({
         ) : null}
         {visibleColumns.map((id) => (
           <TableCell key={id} className={cellClass(id)}>
-            {renderValue(id, project, editors, clients, locked)}
+            {renderValue(
+              id,
+              project,
+              editors,
+              clients,
+              availableParents,
+              locked,
+              nested,
+              pack
+            )}
           </TableCell>
         ))}
       </TableRow>
-      {expanded && hidden.length > 0 ? (
+      {expanded && pack ? (
+        <Fragment>
+          {project.children!.map((child) => (
+            <ProjectRow
+              key={child.id}
+              project={child}
+              editors={editors}
+              clients={clients}
+              availableParents={availableParents}
+              visibleColumns={visibleColumns}
+              showExpand={showExpand}
+              rowClassName={`bg-muted/30 animate-in fade-in slide-in-from-top-1 duration-200`}
+              nested
+            />
+          ))}
+        </Fragment>
+      ) : null}
+      {expanded && !pack && hidden.length > 0 ? (
         <TableRow className={rowClassName} style={rowStyle}>
           {showExpand ? <TableCell className="w-8 p-1" /> : null}
           <TableCell
@@ -98,7 +132,16 @@ export function ProjectRow({
                     {PROJECTS_COLUMN_LABEL[id]}
                   </span>
                   <div>
-                    {renderValue(id, project, editors, clients, locked)}
+                    {renderValue(
+                      id,
+                      project,
+                      editors,
+                      clients,
+                      availableParents,
+                      locked,
+                      nested,
+                      pack
+                    )}
                   </div>
                 </div>
               ))}
@@ -139,13 +182,35 @@ function renderValue(
   p: ProjectWithRelations,
   editors: EditorMini[],
   clients: ClientForProject[],
-  locked: boolean
+  availableParents: ParentOption[],
+  locked: boolean,
+  nested: boolean,
+  pack: boolean
 ): React.ReactNode {
   switch (id) {
     case "code":
       return p.project_code;
     case "title":
-      return p.title;
+      return (
+        <span
+          className={`inline-flex flex-wrap items-center gap-2 ${
+            nested ? "pl-4" : ""
+          }`}
+        >
+          {nested ? (
+            <span aria-hidden className="text-muted-foreground/60">
+              ↳
+            </span>
+          ) : null}
+          <span>{p.title}</span>
+          {pack ? (
+            <span className="inline-flex items-center rounded-full bg-purple-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-purple-600 dark:text-purple-300">
+              Pack · {p.children!.length} short
+              {p.children!.length === 1 ? "" : "s"}
+            </span>
+          ) : null}
+        </span>
+      );
     case "client":
       return p.client ? (
         <span className="inline-flex items-center gap-2">
@@ -223,6 +288,7 @@ function renderValue(
             project={p}
             editors={editors}
             clients={clients}
+            availableParents={availableParents}
             disabled={locked}
           />
           <ArchiveProjectButton

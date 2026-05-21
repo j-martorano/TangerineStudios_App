@@ -6,6 +6,7 @@ import { ChevronDownIcon, FolderIcon } from "lucide-react";
 import { TableCell, TableRow } from "@/components/ui/table";
 
 import { ProjectRow } from "./project-row";
+import type { ParentOption } from "./project-form";
 import { monthToneFromKey } from "@/lib/projects/month-colors";
 import type {
   ClientForProject,
@@ -38,6 +39,7 @@ type Props = {
   items: ProjectWithRelations[];
   editors: EditorMini[];
   clients: ClientForProject[];
+  availableParents?: ParentOption[];
   visibleColumns: ProjectsColumnId[];
   showExpand: boolean;
   colSpan: number;
@@ -55,6 +57,7 @@ export function MonthGroup({
   items,
   editors,
   clients,
+  availableParents = [],
   visibleColumns,
   showExpand,
   colSpan,
@@ -98,6 +101,7 @@ export function MonthGroup({
                 project={p}
                 editors={editors}
                 clients={clients}
+                availableParents={availableParents}
                 visibleColumns={visibleColumns}
                 showExpand={showExpand}
                 rowClassName={`${appearance.className} animate-in fade-in slide-in-from-top-1 duration-200`}

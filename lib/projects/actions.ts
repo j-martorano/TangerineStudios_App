@@ -8,12 +8,14 @@ import {
   INVOICED_STATUSES,
   PAGADO_STATUSES,
   PROJECT_PHASES,
+  PROJECT_TYPES,
 } from "./types";
 import type {
   CobradoStatus,
   InvoicedStatus,
   PagadoStatus,
   ProjectPhase,
+  ProjectType,
 } from "./types";
 
 async function getClientName(clientId: string | null): Promise<string | null> {
@@ -36,6 +38,9 @@ const pagadoEnum = z.enum(
 );
 const invoicedEnum = z.enum(
   INVOICED_STATUSES as [InvoicedStatus, ...InvoicedStatus[]]
+);
+const projectTypeEnum = z.enum(
+  PROJECT_TYPES as [ProjectType, ...ProjectType[]]
 );
 
 const uuidRegex =
@@ -81,6 +86,13 @@ const projectInputSchema = z
         })
       )
       .default([]),
+    project_type: projectTypeEnum.default("long_form"),
+    /** Si está seteado, este proyecto es un short hijo del pack indicado. */
+    parent_id: z
+      .string()
+      .regex(uuidRegex, "Padre inválido")
+      .nullable()
+      .default(null),
   });
 
 export type ProjectInput = z.input<typeof projectInputSchema>;
@@ -303,15 +315,22 @@ export async function setProjectArchived(
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("projects")
-    .update({
-      archived,
-      archived_at: archived ? new Date().toISOString() : null,
-    })
-    .eq("id", id);
+  const archivedAt = archived ? new Date().toISOString() : null;
 
-  if (error) return { ok: false, error: error.message };
+  // El proyecto en sí + sus hijos en cascada. Si es un pack, archivar el
+  // padre archiva también todos los shorts; desarchivar hace lo opuesto.
+  const { error: ownErr } = await supabase
+    .from("projects")
+    .update({ archived, archived_at: archivedAt })
+    .eq("id", id);
+  if (ownErr) return { ok: false, error: ownErr.message };
+
+  const { error: childErr } = await supabase
+    .from("projects")
+    .update({ archived, archived_at: archivedAt })
+    .eq("parent_id", id);
+  if (childErr) return { ok: false, error: childErr.message };
+
   revalidateAll();
   return { ok: true };
 }

@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { KanbanCardActions } from "./kanban-card-actions";
+import type { ParentOption } from "./project-form";
 import { QuickDurationEditor } from "./quick-duration-editor";
 
 import { PROJECT_PHASES, editorNames } from "@/lib/projects/types";
@@ -50,6 +51,7 @@ type Props = {
   projects: ProjectWithRelations[];
   editors: EditorMini[];
   clients: ClientForProject[];
+  availableParents?: ParentOption[];
 };
 
 // Tinte de fondo de la card con el color del cliente (~12% de opacidad).
@@ -138,6 +140,7 @@ export function ProjectsKanban(props: Props) {
     projects: filtered,
     editors: props.editors,
     clients: props.clients,
+    availableParents: props.availableParents ?? [],
   };
 
   return (
@@ -191,7 +194,12 @@ function MonthTab({
   );
 }
 
-function StaticKanban({ projects, editors, clients }: Props) {
+function StaticKanban({
+  projects,
+  editors,
+  clients,
+  availableParents = [],
+}: Props) {
   const columns = buildColumns(projects);
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -221,6 +229,7 @@ function StaticKanban({ projects, editors, clients }: Props) {
                     project={p}
                     editors={editors}
                     clients={clients}
+                    availableParents={availableParents}
                   />
                 ))
               )}
@@ -232,7 +241,12 @@ function StaticKanban({ projects, editors, clients }: Props) {
   );
 }
 
-function InteractiveKanban({ projects, editors, clients }: Props) {
+function InteractiveKanban({
+  projects,
+  editors,
+  clients,
+  availableParents = [],
+}: Props) {
   const [columns, setColumns] = useState<ColumnsMap>(() =>
     buildColumns(projects)
   );
@@ -380,6 +394,7 @@ function InteractiveKanban({ projects, editors, clients }: Props) {
             items={columns[phase]}
             editors={editors}
             clients={clients}
+            availableParents={availableParents}
           />
         ))}
       </div>
@@ -395,11 +410,13 @@ function KanbanColumn({
   items,
   editors,
   clients,
+  availableParents = [],
 }: {
   phase: ProjectPhase;
   items: ProjectWithRelations[];
   editors: EditorMini[];
   clients: ClientForProject[];
+  availableParents?: ParentOption[];
 }) {
   const { isOver, setNodeRef } = useDroppableColumn(phase);
   const itemIds = useMemo(() => items.map((p) => p.id), [items]);
@@ -438,6 +455,7 @@ function KanbanColumn({
                 project={p}
                 editors={editors}
                 clients={clients}
+                availableParents={availableParents}
               />
             ))
           )}
@@ -456,10 +474,12 @@ function SortableCard({
   project,
   editors,
   clients,
+  availableParents = [],
 }: {
   project: ProjectWithRelations;
   editors: EditorMini[];
   clients: ClientForProject[];
+  availableParents?: ParentOption[];
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: project.id });
@@ -479,6 +499,7 @@ function SortableCard({
         project={project}
         editors={editors}
         clients={clients}
+        availableParents={availableParents}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
     </div>
@@ -489,12 +510,14 @@ function CardView({
   project,
   editors,
   clients,
+  availableParents = [],
   dragging,
   dragHandleProps,
 }: {
   project: ProjectWithRelations;
   editors?: EditorMini[];
   clients?: ClientForProject[];
+  availableParents?: ParentOption[];
   dragging?: boolean;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
@@ -510,6 +533,7 @@ function CardView({
             project={project}
             editors={editors}
             clients={clients}
+            availableParents={availableParents}
           />
         </div>
       ) : null}
@@ -521,6 +545,20 @@ function CardView({
           aria-hidden
           className="pointer-events-none absolute left-1/2 top-1 size-3.5 -translate-x-1/2 text-muted-foreground/60"
         />
+        {project.parent ? (
+          <span
+            className="mb-1 inline-flex items-center gap-1 rounded-full bg-purple-500/20 px-2 py-0.5 text-[10px] font-medium text-purple-600 dark:text-purple-300"
+            title={`Pertenece al pack «${project.parent.title}»`}
+          >
+            <span className="truncate max-w-[120px]">
+              Pack · {project.parent.title}
+            </span>
+            <span className="opacity-70">
+              · {project.parent.finalizedChildren}/
+              {project.parent.totalChildren}
+            </span>
+          </span>
+        ) : null}
         <p className="mb-0.5 truncate pr-8 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/80">
           {project.project_code}
         </p>

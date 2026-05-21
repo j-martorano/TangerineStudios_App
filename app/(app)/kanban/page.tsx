@@ -6,6 +6,7 @@ import {
   fetchEditors,
   fetchProjects,
 } from "@/lib/projects/queries";
+import { isPack } from "@/lib/projects/types";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +20,21 @@ export default async function KanbanPage({
   const params = await searchParams;
   const query = params.q?.trim() || undefined;
 
-  const [projects, editors, clients] = await Promise.all([
+  const [allProjects, editors, clients] = await Promise.all([
     fetchProjects({ query, includeFinalized: false }),
     fetchEditors(),
     fetchClients(),
   ]);
+
+  // En el kanban no mostramos los packs como card propia — sus shorts hijos
+  // sí aparecen, cada uno en su columna, con un chip que indica el pack.
+  const projects = allProjects.filter((p) => !isPack(p));
+
+  // Padres disponibles para asignar como pack en el form: proyectos top-level
+  // (no hijos) no archivados.
+  const availableParents = allProjects
+    .filter((p) => !p.parent_id && !p.archived)
+    .map((p) => ({ id: p.id, title: p.title, client_id: p.client_id }));
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 md:p-8">
@@ -35,14 +46,23 @@ export default async function KanbanPage({
             {query ? <> · filtro: «{query}»</> : null}
           </p>
         </div>
-        <NewProjectButton editors={editors} clients={clients} />
+        <NewProjectButton
+          editors={editors}
+          clients={clients}
+          availableParents={availableParents}
+        />
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <DataSearch placeholder="Buscar por título o cliente…" />
       </div>
 
-      <ProjectsKanban projects={projects} editors={editors} clients={clients} />
+      <ProjectsKanban
+        projects={projects}
+        editors={editors}
+        clients={clients}
+        availableParents={availableParents}
+      />
     </main>
   );
 }

@@ -22,6 +22,8 @@ import {
   INVOICED_STATUSES,
   PAGADO_STATUSES,
   PROJECT_PHASES,
+  PROJECT_TYPES,
+  PROJECT_TYPE_LABEL,
 } from "@/lib/projects/types";
 import type {
   ClientForProject,
@@ -30,6 +32,7 @@ import type {
   InvoicedStatus,
   PagadoStatus,
   ProjectPhase,
+  ProjectType,
   ProjectWithRelations,
 } from "@/lib/projects/types";
 import {
@@ -44,10 +47,18 @@ import {
 } from "@/lib/projects/format";
 import { createProject, updateProject } from "@/lib/projects/actions";
 
+export type ParentOption = {
+  id: string;
+  title: string;
+  client_id: string | null;
+};
+
 type Props = {
   mode: "create" | "edit";
   editors: EditorMini[];
   clients: ClientForProject[];
+  /** Proyectos top-level que pueden ser pack padre del actual. */
+  availableParents?: ParentOption[];
   project?: ProjectWithRelations;
   onSuccess?: () => void;
 };
@@ -63,10 +74,17 @@ export function ProjectForm({
   mode,
   editors,
   clients,
+  availableParents = [],
   project,
   onSuccess,
 }: Props) {
   const [title, setTitle] = useState(project?.title ?? "");
+  const [projectType, setProjectType] = useState<ProjectType>(
+    project?.project_type ?? "long_form"
+  );
+  const [parentId, setParentId] = useState<string | null>(
+    project?.parent_id ?? null
+  );
   const [clientId, setClientId] = useState<string | null>(
     project?.client?.id ?? null
   );
@@ -105,6 +123,23 @@ export function ProjectForm({
 
   const editorById = new Map(editors.map((ed) => [ed.id, ed.name]));
   const editorIds = editorEntries.map((e) => e.id);
+
+  // Padres elegibles: top-level, no archivados, no el propio proyecto, y
+  // del mismo cliente si ya hay uno seleccionado.
+  const eligibleParents = availableParents.filter((parent) => {
+    if (project && parent.id === project.id) return false;
+    if (clientId && parent.client_id && parent.client_id !== clientId)
+      return false;
+    return true;
+  });
+
+  function handleParentChange(newParentId: string | null) {
+    setParentId(newParentId);
+    if (newParentId) {
+      const parent = availableParents.find((p) => p.id === newParentId);
+      if (parent?.client_id) setClientId(parent.client_id);
+    }
+  }
 
   function addEditor() {
     const next = editors.find((ed) => !editorIds.includes(ed.id));
@@ -178,6 +213,9 @@ export function ProjectForm({
     const priceToStore =
       selectedClient?.payment_type === "por_proyecto" ? parsedPrice : null;
 
+    // Si es hijo de un pack, el precio queda nulo (lo lleva el pack).
+    const finalPrice = parentId ? null : priceToStore;
+
     const payload = {
       title: trimmedTitle,
       client_id: clientId,
@@ -185,10 +223,12 @@ export function ProjectForm({
       cobrado,
       pagado,
       invoiced,
-      price: priceToStore,
+      price: finalPrice,
       cost: parsedCost,
       duration_minutes: parsedDuration,
       editors: editorPayload,
+      project_type: projectType,
+      parent_id: parentId,
     };
 
     startTransition(async () => {
@@ -233,6 +273,68 @@ export function ProjectForm({
           />
         </div>
 
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="project_type">Tipo</Label>
+            <Select
+              value={projectType}
+              onValueChange={(v) => v && setProjectType(v as ProjectType)}
+            >
+              <SelectTrigger id="project_type" className="w-full">
+                <SelectValue>
+                  {(v: string | null) =>
+                    v ? PROJECT_TYPE_LABEL[v as ProjectType] : ""
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {PROJECT_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {PROJECT_TYPE_LABEL[t]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="parent_pack">
+              Pack padre{" "}
+              <span className="text-xs text-muted-foreground">
+                (opcional, lo hace un short hijo)
+              </span>
+            </Label>
+            <Select
+              value={parentId ?? "__none__"}
+              onValueChange={(v) =>
+                handleParentChange(v === "__none__" ? null : v)
+              }
+              disabled={eligibleParents.length === 0}
+            >
+              <SelectTrigger id="parent_pack" className="w-full">
+                <SelectValue>
+                  {(v: string | null) => {
+                    if (!v || v === "__none__") return "Sin pack (proyecto suelto)";
+                    return (
+                      availableParents.find((p) => p.id === v)?.title ?? "—"
+                    );
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">
+                  Sin pack (proyecto suelto)
+                </SelectItem>
+                {eligibleParents.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <div className="flex flex-col gap-2">
           <Label>Cliente</Label>
           <ClientCombobox
@@ -240,6 +342,11 @@ export function ProjectForm({
             value={clientId}
             onChange={(id) => setClientId(id)}
           />
+          {parentId ? (
+            <p className="text-xs text-muted-foreground">
+              El cliente queda fijado al del pack padre.
+            </p>
+          ) : null}
         </div>
 
         {/* Saldo de minutos del cliente mensual. */}

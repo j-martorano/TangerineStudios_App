@@ -449,10 +449,12 @@ export type Database = {
           id: string
           invoiced: Database["public"]["Enums"]["invoiced_status"]
           pagado: Database["public"]["Enums"]["pagado_status"]
+          parent_id: string | null
           phase: Database["public"]["Enums"]["project_phase"]
           position: number
           price: number | null
           project_code: string
+          project_type: Database["public"]["Enums"]["project_type"]
           status: Database["public"]["Enums"]["project_status"] | null
           title: string
           updated_at: string
@@ -471,10 +473,12 @@ export type Database = {
           id?: string
           invoiced?: Database["public"]["Enums"]["invoiced_status"]
           pagado?: Database["public"]["Enums"]["pagado_status"]
+          parent_id?: string | null
           phase?: Database["public"]["Enums"]["project_phase"]
           position?: number
           price?: number | null
           project_code: string
+          project_type?: Database["public"]["Enums"]["project_type"]
           status?: Database["public"]["Enums"]["project_status"] | null
           title: string
           updated_at?: string
@@ -493,10 +497,12 @@ export type Database = {
           id?: string
           invoiced?: Database["public"]["Enums"]["invoiced_status"]
           pagado?: Database["public"]["Enums"]["pagado_status"]
+          parent_id?: string | null
           phase?: Database["public"]["Enums"]["project_phase"]
           position?: number
           price?: number | null
           project_code?: string
+          project_type?: Database["public"]["Enums"]["project_type"]
           status?: Database["public"]["Enums"]["project_status"] | null
           title?: string
           updated_at?: string
@@ -507,6 +513,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -550,6 +563,7 @@ export type Database = {
         | "revising"
         | "done"
         | "invoiced"
+      project_type: "long_form" | "short_form" | "other"
       settlement_party_type: "client_cobro" | "editor_pago"
     }
     CompositeTypes: {
@@ -694,6 +708,7 @@ export const Constants = {
         "done",
         "invoiced",
       ],
+      project_type: ["long_form", "short_form", "other"],
       settlement_party_type: ["client_cobro", "editor_pago"],
     },
   },

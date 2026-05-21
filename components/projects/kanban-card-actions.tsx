@@ -33,7 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { ProjectForm } from "./project-form";
+import { ProjectForm, type ParentOption } from "./project-form";
 import {
   setProjectArchived,
   setProjectFinalized,
@@ -48,9 +48,15 @@ type Props = {
   project: ProjectWithRelations;
   editors: EditorMini[];
   clients: ClientForProject[];
+  availableParents?: ParentOption[];
 };
 
-export function KanbanCardActions({ project, editors, clients }: Props) {
+export function KanbanCardActions({
+  project,
+  editors,
+  clients,
+  availableParents = [],
+}: Props) {
   const [editOpen, setEditOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -131,6 +137,7 @@ export function KanbanCardActions({ project, editors, clients }: Props) {
             project={project}
             editors={editors}
             clients={clients}
+            availableParents={availableParents}
             onSuccess={() => setEditOpen(false)}
           />
         </DialogContent>

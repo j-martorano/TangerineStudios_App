@@ -37,9 +37,17 @@ export default async function ProjectsPage({
 
   const projectsPerYear = prefs.limits.projects_per_year;
 
-  // Años con proyectos, del más reciente al más viejo.
+  // Padres elegibles para asignar como pack: top-level no archivados.
+  const availableParents = projects
+    .filter((p) => !p.parent_id && !p.archived)
+    .map((p) => ({ id: p.id, title: p.title, client_id: p.client_id }));
+
+  // Años con proyectos, del más reciente al más viejo. Sólo top-level (los
+  // shorts hijos se cuentan dentro de su pack).
   const years = Array.from(
-    new Set(projects.map((p) => projectYear(p.created_at)))
+    new Set(
+      projects.filter((p) => !p.parent_id).map((p) => projectYear(p.created_at))
+    )
   ).sort((a, b) => b - a);
 
   const currentYear = new Date().getUTCFullYear();
@@ -50,11 +58,16 @@ export default async function ProjectsPage({
       ? currentYear
       : (years[0] ?? currentYear);
 
+  // Sólo top-level para el listado del año (los hijos se ven dentro del pack).
   const yearProjectsAll = projects.filter(
-    (p) => projectYear(p.created_at) === selectedYear
+    (p) => !p.parent_id && projectYear(p.created_at) === selectedYear
   );
   const yearProjects = yearProjectsAll.slice(0, projectsPerYear);
   const yearTrimmed = yearProjectsAll.length - yearProjects.length;
+
+  // Adjuntar los hijos (children ya vienen vinculados desde fetchProjects)
+  // pero como filtramos por año/limit, los hijos siguen en su pack porque
+  // las referencias son por objeto.
 
   function yearHref(year: number): string {
     const sp = new URLSearchParams();
@@ -83,7 +96,11 @@ export default async function ProjectsPage({
             {projects.length} proyecto{projects.length === 1 ? "" : "s"}
           </p>
         </div>
-        <NewProjectButton editors={editors} clients={clients} />
+        <NewProjectButton
+          editors={editors}
+          clients={clients}
+          availableParents={availableParents}
+        />
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -128,6 +145,7 @@ export default async function ProjectsPage({
           projects={yearProjects}
           editors={editors}
           clients={clients}
+          availableParents={availableParents}
           visibleColumns={prefs.columns.projects}
         />
       </div>

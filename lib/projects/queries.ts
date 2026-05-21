@@ -8,12 +8,13 @@ import type {
   EditorPaymentType,
   EditorRow,
   PaymentTier,
+  ProjectParentRef,
   ProjectWithRelations,
 } from "./types";
 import type { EditorPaymentMethod } from "@/lib/payment-methods/queries";
 
 const PROJECT_SELECT =
-  "id, project_code, title, client_name, phase, cobrado, pagado, invoiced, status, price, cost, duration_minutes, position, finalized, finalized_at, archived, archived_at, created_at, updated_at, client_id, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct), editors:project_editors(cost, editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))";
+  "id, project_code, title, client_name, phase, cobrado, pagado, invoiced, status, price, cost, duration_minutes, position, finalized, finalized_at, archived, archived_at, project_type, parent_id, created_at, updated_at, client_id, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct), editors:project_editors(cost, editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))";
 
 export const DEFAULT_PER_PAGE = 20;
 
@@ -66,6 +67,48 @@ async function fetchPairTiersMap(): Promise<Map<string, PaymentTier[]>> {
     arr.sort((a, b) => a.min_minutes - b.min_minutes);
   }
   return map;
+}
+
+/**
+ * Conecta cada proyecto con su pack padre (si lo tiene) y cada pack con sus
+ * hijos. Trabaja sobre el array entero — los refs apuntan a objetos vivos,
+ * así que cualquier filtro posterior sigue viendo las relaciones.
+ */
+function attachParentChildLinks(
+  projects: ProjectWithRelations[]
+): ProjectWithRelations[] {
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  const childrenByParent = new Map<string, ProjectWithRelations[]>();
+
+  for (const p of projects) {
+    if (p.parent_id) {
+      const arr = childrenByParent.get(p.parent_id) ?? [];
+      arr.push(p);
+      childrenByParent.set(p.parent_id, arr);
+    }
+  }
+
+  for (const p of projects) {
+    const children = childrenByParent.get(p.id);
+    if (children && children.length > 0) {
+      p.children = children;
+    }
+    if (p.parent_id) {
+      const parent = byId.get(p.parent_id);
+      if (parent) {
+        const siblings = childrenByParent.get(parent.id) ?? [];
+        const parentRef: ProjectParentRef = {
+          id: parent.id,
+          title: parent.title,
+          totalChildren: siblings.length,
+          finalizedChildren: siblings.filter((s) => s.finalized).length,
+        };
+        p.parent = parentRef;
+      }
+    }
+  }
+
+  return projects;
 }
 
 /**
@@ -130,7 +173,8 @@ export async function fetchProjects(
 
   // Tiebreaker estable por created_at para que el orden no cambie entre
   // refetches cuando varios proyectos comparten phase + position (típico del
-  // seed con position=0 en todos).
+  // seed con position=0 en todos). Filtramos finalized en JS post-fetch para
+  // poder armar las relaciones padre/hijo aunque el padre esté finalized.
   const [{ data, error }, pairs, tiers] = await Promise.all([
     q
       .order("phase")
@@ -141,8 +185,10 @@ export async function fetchProjects(
     fetchPairTiersMap(),
   ]);
   if (error) throw new Error(error.message);
-  const projects = (data ?? []) as unknown as ProjectWithRelations[];
-  return applyPairOverrides(projects, pairs, tiers);
+  const all = (data ?? []) as unknown as ProjectWithRelations[];
+  applyPairOverrides(all, pairs, tiers);
+  attachParentChildLinks(all);
+  return includeFinalized ? all : all.filter((p) => !p.finalized);
 }
 
 export type ProjectsListOptions = {

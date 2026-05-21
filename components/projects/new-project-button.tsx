@@ -13,15 +13,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-import { ProjectForm } from "./project-form";
+import { ProjectForm, type ParentOption } from "./project-form";
 import type { ClientForProject, EditorMini } from "@/lib/projects/types";
 
 export function NewProjectButton({
   editors,
   clients,
+  availableParents = [],
 }: {
   editors: EditorMini[];
   clients: ClientForProject[];
+  availableParents?: ParentOption[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -43,6 +45,7 @@ export function NewProjectButton({
           mode="create"
           editors={editors}
           clients={clients}
+          availableParents={availableParents}
           onSuccess={() => setOpen(false)}
         />
       </DialogContent>

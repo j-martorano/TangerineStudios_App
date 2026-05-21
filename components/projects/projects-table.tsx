@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/table";
 
 import { MonthGroup } from "./month-group";
+import type { ParentOption } from "./project-form";
 
 import type {
   ClientForProject,
@@ -56,8 +57,11 @@ function currentMonthKey(): string {
 function groupByMonth(
   projects: ProjectWithRelations[]
 ): [string, ProjectWithRelations[]][] {
+  // Solo proyectos top-level (sin parent). Los shorts hijos se renderizan
+  // dentro de su pack cuando se despliega.
+  const topLevel = projects.filter((p) => !p.parent_id);
   const map = new Map<string, ProjectWithRelations[]>();
-  for (const p of projects) {
+  for (const p of topLevel) {
     const key = monthKey(p.created_at);
     const arr = map.get(key);
     if (arr) arr.push(p);
@@ -106,6 +110,7 @@ type Props = {
   editors: EditorMini[];
   clients: ClientForProject[];
   visibleColumns: ProjectsColumnId[];
+  availableParents?: ParentOption[];
 };
 
 export function ProjectsTable({
@@ -113,6 +118,7 @@ export function ProjectsTable({
   editors,
   clients,
   visibleColumns,
+  availableParents = [],
 }: Props) {
   if (projects.length === 0) {
     return (
@@ -146,6 +152,7 @@ export function ProjectsTable({
             items={items}
             editors={editors}
             clients={clients}
+            availableParents={availableParents}
             visibleColumns={visibleColumns}
             showExpand={showExpand}
             colSpan={colSpan}

@@ -4,6 +4,7 @@ export type ProjectPhase = Database["public"]["Enums"]["project_phase"];
 export type CobradoStatus = Database["public"]["Enums"]["cobrado_status"];
 export type PagadoStatus = Database["public"]["Enums"]["pagado_status"];
 export type InvoicedStatus = Database["public"]["Enums"]["invoiced_status"];
+export type ProjectType = Database["public"]["Enums"]["project_type"];
 
 export type PaymentType = Database["public"]["Enums"]["payment_type"];
 export type EditorPaymentType =
@@ -73,16 +74,58 @@ export type ProjectEditorAssignment = {
   editor: EditorMini | null;
 };
 
+export type ProjectParentRef = {
+  id: string;
+  title: string;
+  /** Total de hijos del pack. Útil para el chip "X/N". */
+  totalChildren: number;
+  /** Cantidad de hijos finalizados. */
+  finalizedChildren: number;
+};
+
 export type ProjectWithRelations = ProjectRow & {
   client: ClientMini | null;
   editors: ProjectEditorAssignment[];
+  /** Hijos del pack (sólo populado para proyectos que son pack). */
+  children?: ProjectWithRelations[];
+  /** Referencia al padre (sólo populado para shorts hijos). */
+  parent?: ProjectParentRef | null;
 };
+
+/** Un proyecto es "pack" cuando tiene al menos un hijo. */
+export function isPack(p: ProjectWithRelations): boolean {
+  return (p.children?.length ?? 0) > 0;
+}
+
+/** Un proyecto es "hijo de un pack" si tiene parent_id seteado. */
+export function isChildOfPack(p: ProjectWithRelations): boolean {
+  return p.parent_id != null;
+}
 
 export const PROJECT_PHASES: ProjectPhase[] = [
   "por_asignar",
   "editando",
   "terminado",
 ];
+
+export const PROJECT_TYPES: ProjectType[] = [
+  "long_form",
+  "short_form",
+  "other",
+];
+
+export const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
+  long_form: "Long-form",
+  short_form: "Short-form",
+  other: "Otro",
+};
+
+export const PROJECT_TYPE_CLASS: Record<ProjectType, string> = {
+  long_form: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
+  short_form:
+    "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300",
+  other: "bg-stone-200 text-stone-800 dark:bg-stone-800 dark:text-stone-300",
+};
 
 export const COBRADO_STATUSES: CobradoStatus[] = ["no", "parcial", "si"];
 export const PAGADO_STATUSES: PagadoStatus[] = [

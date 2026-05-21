@@ -16,6 +16,8 @@ type ProjectForCalc = {
   price: number | null; // override manual; usado sólo para client.payment_type='por_proyecto'
   client: ClientMini | null;
   editors: ProjectEditorAssignment[];
+  /** Si el proyecto es un pack, sus shorts hijos suman al cost agregado. */
+  children?: ProjectForCalc[];
 };
 
 // Precio calculado del proyecto según el payment_type del cliente:
@@ -83,10 +85,12 @@ function editorCost(
 /**
  * Costo calculado del proyecto. Cascada:
  *   1. Si el proyecto tiene `cost` cargado → ese es el total (override manual).
- *   2. Si no, sumamos el aporte de cada editor:
+ *   2. Si es un pack (children populated), suma el costo de cada hijo +
+ *      los editores propios del pack.
+ *   3. Si no, sumamos el aporte de cada editor:
  *      a. Si la asignación tiene `cost` manual → ese valor.
  *      b. Si no, se calcula desde el modelo de pago del editor.
- * Si ningún editor aporta nada calculable, devolvemos null.
+ * Si nada aporta cost computable, devolvemos null.
  */
 export function computeCost(p: ProjectForCalc): number | null {
   if (p.cost != null) return Number(p.cost);
@@ -95,6 +99,8 @@ export function computeCost(p: ProjectForCalc): number | null {
     p.duration_minutes == null ? null : Number(p.duration_minutes);
   let total = 0;
   let anyContribution = false;
+
+  // Editores propios del proyecto (pack o no).
   for (const entry of p.editors) {
     let cost: number | null;
     if (entry.cost != null) {
@@ -108,6 +114,17 @@ export function computeCost(p: ProjectForCalc): number | null {
     total += cost;
     anyContribution = true;
   }
+
+  // Si es un pack, sumamos el costo agregado de los hijos.
+  if (p.children && p.children.length > 0) {
+    for (const child of p.children) {
+      const cc = computeCost(child);
+      if (cc == null) continue;
+      total += cc;
+      anyContribution = true;
+    }
+  }
+
   return anyContribution ? total : null;
 }
 

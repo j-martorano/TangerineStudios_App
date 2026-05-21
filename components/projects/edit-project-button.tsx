@@ -12,7 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-import { ProjectForm } from "./project-form";
+import { ProjectForm, type ParentOption } from "./project-form";
 import type {
   ClientForProject,
   EditorMini,
@@ -23,6 +23,7 @@ type Props = {
   project: ProjectWithRelations;
   editors: EditorMini[];
   clients: ClientForProject[];
+  availableParents?: ParentOption[];
   variant?: "icon" | "ghost-icon";
   /** Si el proyecto está finalizado, la edición queda bloqueada. */
   disabled?: boolean;
@@ -32,6 +33,7 @@ export function EditProjectButton({
   project,
   editors,
   clients,
+  availableParents = [],
   variant = "icon",
   disabled = false,
 }: Props) {
@@ -70,6 +72,7 @@ export function EditProjectButton({
           project={project}
           editors={editors}
           clients={clients}
+          availableParents={availableParents}
           onSuccess={() => setOpen(false)}
         />
       </DialogContent>

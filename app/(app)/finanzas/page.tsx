@@ -144,8 +144,12 @@ function build(
   }
 
   // ====== Proyectos finalizados — entran en el mes en que se finalizaron ======
+  // Los shorts hijos de un pack no entran como entradas propias; el pack
+  // padre los engloba (su cost ya suma los costos de los hijos vía
+  // computeCost).
   for (const p of projects) {
     if (!p.finalized) continue;
+    if (p.parent_id) continue;
     const monthIso = p.finalized_at ?? p.created_at;
     const key = monthKey(monthIso);
     const bucket = ensureBucket(key, monthIso);
@@ -341,6 +345,7 @@ export default async function FinanzasPage({
   }
   for (const p of projects) {
     if (!p.finalized) continue;
+    if (p.parent_id) continue;
     if (p.cobrado !== "si") continue;
     if (p.client?.payment_type === "mensual") continue;
     const price = computePrice(p);

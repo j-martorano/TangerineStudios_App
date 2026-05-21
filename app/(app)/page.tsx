@@ -40,11 +40,16 @@ export default async function DashboardPage({
     : currentMonthKey();
   const previousMonth = shiftMonth(selectedMonth, -1);
 
-  const [projects, clients, payments] = await Promise.all([
+  const [allProjects, clients, payments] = await Promise.all([
     fetchProjects(),
     fetchClients(),
     fetchClientPayments(),
   ]);
+
+  // En el dashboard los stats se calculan sobre top-level (packs +
+  // proyectos sueltos). Los shorts hijos no se cuentan sueltos — su info
+  // aporta al pack vía computeCost.
+  const projects = allProjects.filter((p) => !p.parent_id);
 
   // Snapshot global (no depende del mes seleccionado).
   const byPhase = countByPhase(projects);
