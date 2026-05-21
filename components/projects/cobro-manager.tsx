@@ -47,12 +47,11 @@ function fmtDate(iso: string): string {
 }
 
 /**
- * Badge clickeable que abre un diálogo para administrar los cobros parciales
- * de un proyecto (lista + agregar + eliminar) y cambiar el estado cobrado.
- * Reemplaza al QuickPaymentBadge para la columna «cobrado».
+ * Contenido del editor de cobros — totales, historial, form para sumar uno
+ * nuevo y botones de estado. Se usa tal cual dentro del diálogo
+ * `CobroManager` o embedded en una fila (ej. Finanzas → Por proyecto).
  */
-export function CobroManager({ project, disabled = false }: Props) {
-  const [open, setOpen] = useState(false);
+export function CobroManagerPanel({ project, disabled = false }: Props) {
   const [amount, setAmount] = useState("");
   const [paidAt, setPaidAt] = useState(todayISO());
   const [note, setNote] = useState("");
@@ -113,91 +112,73 @@ export function CobroManager({ project, disabled = false }: Props) {
     }
   }
 
+  const interactive = !disabled;
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <button
-            type="button"
-            disabled={disabled}
-            className={`inline-flex w-fit cursor-pointer items-center rounded-full px-2 py-0.5 text-xs font-medium transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${COBRADO_CLASS[project.cobrado]}`}
-          />
-        }
-      >
-        {COBRADO_LABEL[project.cobrado]}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Cobros — {project.title}
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${COBRADO_CLASS[project.cobrado]}`}
-            >
-              {COBRADO_LABEL[project.cobrado]}
-            </span>
-          </DialogTitle>
-        </DialogHeader>
+    <div className="flex flex-col gap-4">
+      {/* Totales */}
+      <div className="grid grid-cols-3 gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-center">
+        <Total label="Total" value={total != null ? formatPrice(total) : "—"} />
+        <Total
+          label="Cobrado"
+          value={formatPrice(cobrado)}
+          tone="positive"
+        />
+        <Total
+          label="Falta"
+          value={remaining != null ? formatPrice(remaining) : "—"}
+          tone={remaining && remaining > 0 ? "warning" : "muted"}
+        />
+      </div>
 
-        <div className="flex flex-col gap-4">
-          {/* Totales */}
-          <div className="grid grid-cols-3 gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-center">
-            <Total label="Total" value={total != null ? formatPrice(total) : "—"} />
-            <Total
-              label="Cobrado"
-              value={formatPrice(cobrado)}
-              tone="positive"
-            />
-            <Total
-              label="Falta"
-              value={remaining != null ? formatPrice(remaining) : "—"}
-              tone={remaining && remaining > 0 ? "warning" : "muted"}
-            />
-          </div>
-
-          {/* Lista de cobros */}
-          {cobros.length > 0 ? (
-            <div className="flex flex-col gap-1">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Historial
-              </p>
-              <ul className="flex flex-col divide-y divide-border/40 rounded-md border border-border/40">
-                {cobros.map((c) => (
-                  <li
-                    key={c.id}
-                    className="flex items-center gap-2 px-3 py-2 text-xs"
+      {/* Lista de cobros */}
+      {cobros.length > 0 ? (
+        <div className="flex flex-col gap-1">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Historial
+          </p>
+          <ul className="flex flex-col divide-y divide-border/40 rounded-md border border-border/40">
+            {cobros.map((c) => (
+              <li
+                key={c.id}
+                className="flex items-center gap-2 px-3 py-2 text-xs"
+              >
+                <span className="w-16 text-muted-foreground">
+                  {fmtDate(c.paid_at)}
+                </span>
+                <span className="flex-1 truncate">
+                  {c.note ? (
+                    <span className="text-muted-foreground">{c.note}</span>
+                  ) : (
+                    <span className="text-muted-foreground/50">—</span>
+                  )}
+                </span>
+                <span className="font-medium tabular-nums">
+                  {formatPrice(Number(c.amount))}
+                </span>
+                {interactive ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(c.id)}
+                    disabled={pending}
+                    aria-label="Eliminar cobro"
+                    className="inline-flex size-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
                   >
-                    <span className="w-16 text-muted-foreground">
-                      {fmtDate(c.paid_at)}
-                    </span>
-                    <span className="flex-1 truncate">
-                      {c.note ? (
-                        <span className="text-muted-foreground">{c.note}</span>
-                      ) : (
-                        <span className="text-muted-foreground/50">—</span>
-                      )}
-                    </span>
-                    <span className="font-medium tabular-nums">
-                      {formatPrice(Number(c.amount))}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(c.id)}
-                      disabled={pending}
-                      aria-label="Eliminar cobro"
-                      className="inline-flex size-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
-                    >
-                      <Trash2Icon className="size-3" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <p className="text-xs italic text-muted-foreground">
-              Todavía no hay cobros registrados.
-            </p>
-          )}
+                    <Trash2Icon className="size-3" />
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="text-xs italic text-muted-foreground">
+          Todavía no hay cobros registrados.
+        </p>
+      )}
 
+      {interactive ? (
+        <>
           {/* Agregar cobro */}
           <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-muted/10 p-3">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -205,11 +186,8 @@ export function CobroManager({ project, disabled = false }: Props) {
             </p>
             <div className="grid grid-cols-[1fr_auto] gap-2">
               <div className="flex flex-col gap-1">
-                <Label htmlFor="cobro-amount" className="text-[10px]">
-                  Monto
-                </Label>
+                <Label className="text-[10px]">Monto</Label>
                 <Input
-                  id="cobro-amount"
                   type="number"
                   inputMode="decimal"
                   min={0}
@@ -222,11 +200,8 @@ export function CobroManager({ project, disabled = false }: Props) {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="cobro-date" className="text-[10px]">
-                  Fecha
-                </Label>
+                <Label className="text-[10px]">Fecha</Label>
                 <Input
-                  id="cobro-date"
                   type="date"
                   value={paidAt}
                   onChange={(e) => setPaidAt(e.target.value)}
@@ -236,11 +211,8 @@ export function CobroManager({ project, disabled = false }: Props) {
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <Label htmlFor="cobro-note" className="text-[10px]">
-                Nota (opcional)
-              </Label>
+              <Label className="text-[10px]">Nota (opcional)</Label>
               <Input
-                id="cobro-note"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Anticipo, transferencia, etc."
@@ -294,7 +266,44 @@ export function CobroManager({ project, disabled = false }: Props) {
               ))}
             </div>
           </div>
-        </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Badge clickeable que abre un diálogo con el `CobroManagerPanel` dentro.
+ * Se usa en la columna «cobrado» de la tabla de Proyectos.
+ */
+export function CobroManager({ project, disabled = false }: Props) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <button
+            type="button"
+            disabled={disabled}
+            className={`inline-flex w-fit cursor-pointer items-center rounded-full px-2 py-0.5 text-xs font-medium transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${COBRADO_CLASS[project.cobrado]}`}
+          />
+        }
+      >
+        {COBRADO_LABEL[project.cobrado]}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            Cobros — {project.title}
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${COBRADO_CLASS[project.cobrado]}`}
+            >
+              {COBRADO_LABEL[project.cobrado]}
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+        <CobroManagerPanel project={project} disabled={disabled} />
       </DialogContent>
     </Dialog>
   );

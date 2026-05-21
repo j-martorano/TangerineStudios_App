@@ -51,15 +51,12 @@ function fmtDate(iso: string): string {
 }
 
 /**
- * Badge clickeable que abre un diálogo con una sección por cada editor del
- * proyecto. En cada sección se ve total / pagado / falta + lista de pagos
- * registrados + form para agregar uno nuevo. También permite cambiar el
- * estado global `pagado` del proyecto.
+ * Contenido del editor de pagos por editor (sin envoltorio de diálogo).
+ * Cada editor del proyecto tiene su propia sub-sección con sus totales,
+ * historial y form. Al pie, botones de estado global del proyecto.
  */
-export function PagoManager({ project, disabled = false }: Props) {
-  const [open, setOpen] = useState(false);
+export function PagoManagerPanel({ project, disabled = false }: Props) {
   const [pending, startTransition] = useTransition();
-
   const editorsInProject = project.editors.filter((e) => e.editor != null);
 
   function handleStatus(next: PagadoStatus) {
@@ -68,6 +65,68 @@ export function PagoManager({ project, disabled = false }: Props) {
       if (!result.ok) toast.error(result.error);
     });
   }
+
+  const interactive = !disabled;
+
+  return (
+    <div className="flex flex-col gap-4">
+      {editorsInProject.length === 0 ? (
+        <p className="text-sm italic text-muted-foreground">
+          Este proyecto no tiene editores asignados — no hay nada para
+          pagar.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {editorsInProject.map((entry) => (
+            <EditorSection
+              key={entry.editor!.id}
+              project={project}
+              editorId={entry.editor!.id}
+              editorName={entry.editor!.name}
+              pending={pending}
+              startTransition={startTransition}
+              disabled={disabled}
+            />
+          ))}
+        </div>
+      )}
+
+      {interactive ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Estado global del pago
+          </p>
+          <div className="flex gap-2">
+            {(["sin_pagar", "parcial", "pago_total"] as PagadoStatus[]).map(
+              (s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => handleStatus(s)}
+                  disabled={pending || project.pagado === s}
+                  className={`flex-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed ${
+                    project.pagado === s
+                      ? `border-transparent ${PAGADO_CLASS[s]}`
+                      : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                  }`}
+                >
+                  {PAGADO_LABEL[s]}
+                </button>
+              )
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Badge clickeable que abre un diálogo con el `PagoManagerPanel` dentro.
+ * Se usa en la columna «pagado» de la tabla de Proyectos.
+ */
+export function PagoManager({ project, disabled = false }: Props) {
+  const [open, setOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -93,53 +152,8 @@ export function PagoManager({ project, disabled = false }: Props) {
             </span>
           </DialogTitle>
         </DialogHeader>
-
-        <div className="flex flex-col gap-4">
-          {editorsInProject.length === 0 ? (
-            <p className="text-sm italic text-muted-foreground">
-              Este proyecto no tiene editores asignados — no hay nada para
-              pagar.
-            </p>
-          ) : (
-            <div className="flex max-h-[55vh] flex-col gap-3 overflow-y-auto pr-1">
-              {editorsInProject.map((entry) => (
-                <EditorSection
-                  key={entry.editor!.id}
-                  project={project}
-                  editorId={entry.editor!.id}
-                  editorName={entry.editor!.name}
-                  pending={pending}
-                  startTransition={startTransition}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Estado global del pago */}
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Estado global del pago
-            </p>
-            <div className="flex gap-2">
-              {(["sin_pagar", "parcial", "pago_total"] as PagadoStatus[]).map(
-                (s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => handleStatus(s)}
-                    disabled={pending || project.pagado === s}
-                    className={`flex-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed ${
-                      project.pagado === s
-                        ? `border-transparent ${PAGADO_CLASS[s]}`
-                        : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
-                    }`}
-                  >
-                    {PAGADO_LABEL[s]}
-                  </button>
-                )
-              )}
-            </div>
-          </div>
+        <div className="max-h-[55vh] overflow-y-auto pr-1">
+          <PagoManagerPanel project={project} disabled={disabled} />
         </div>
       </DialogContent>
     </Dialog>
@@ -152,12 +166,14 @@ function EditorSection({
   editorName,
   pending,
   startTransition,
+  disabled,
 }: {
   project: ProjectWithRelations;
   editorId: string;
   editorName: string;
   pending: boolean;
   startTransition: (cb: () => void) => void;
+  disabled: boolean;
 }) {
   const [amount, setAmount] = useState("");
   const [paidAt, setPaidAt] = useState(todayISO());
@@ -211,6 +227,7 @@ function EditorSection({
   }
 
   const fullyPaid = cost != null && remaining === 0 && pagado > 0;
+  const interactive = !disabled;
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/10 p-3">
@@ -253,70 +270,74 @@ function EditorSection({
               <span className="font-medium tabular-nums">
                 {formatPrice(Number(p.amount))}
               </span>
-              <button
-                type="button"
-                onClick={() => handleDelete(p.id)}
-                disabled={pending}
-                aria-label="Eliminar pago"
-                className="inline-flex size-5 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
-              >
-                <Trash2Icon className="size-3" />
-              </button>
+              {interactive ? (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(p.id)}
+                  disabled={pending}
+                  aria-label="Eliminar pago"
+                  className="inline-flex size-5 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+                >
+                  <Trash2Icon className="size-3" />
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
       ) : null}
 
-      <div className="flex flex-col gap-2 rounded-md bg-muted/30 p-2">
-        <div className="grid grid-cols-[1fr_auto] gap-2">
+      {interactive ? (
+        <div className="flex flex-col gap-2 rounded-md bg-muted/30 p-2">
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <Input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Monto"
+              className="h-8"
+              disabled={pending}
+            />
+            <Input
+              type="date"
+              value={paidAt}
+              onChange={(e) => setPaidAt(e.target.value)}
+              className="h-8 w-[140px]"
+              disabled={pending}
+            />
+          </div>
           <Input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="Monto"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Nota (opcional)"
             className="h-8"
             disabled={pending}
           />
-          <Input
-            type="date"
-            value={paidAt}
-            onChange={(e) => setPaidAt(e.target.value)}
-            className="h-8 w-[140px]"
-            disabled={pending}
-          />
-        </div>
-        <Input
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Nota (opcional)"
-          className="h-8"
-          disabled={pending}
-        />
-        <div className="flex items-center justify-between gap-2">
-          {remaining != null && remaining > 0 ? (
-            <button
+          <div className="flex items-center justify-between gap-2">
+            {remaining != null && remaining > 0 ? (
+              <button
+                type="button"
+                onClick={fillRemaining}
+                className="text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+              >
+                Usar restante ({formatPrice(remaining)})
+              </button>
+            ) : (
+              <span />
+            )}
+            <Button
               type="button"
-              onClick={fillRemaining}
-              className="text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+              size="sm"
+              onClick={handleRegister}
+              disabled={pending}
             >
-              Usar restante ({formatPrice(remaining)})
-            </button>
-          ) : (
-            <span />
-          )}
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleRegister}
-            disabled={pending}
-          >
-            Registrar pago
-          </Button>
+              Registrar pago
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

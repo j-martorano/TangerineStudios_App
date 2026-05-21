@@ -8,6 +8,7 @@ import { fetchUserPrefs } from "@/lib/settings/queries";
 import { FixedServicesSection } from "@/components/finanzas/fixed-services-section";
 import { FinanzasTabs } from "@/components/finanzas/finanzas-tabs";
 import { MonthCard } from "@/components/finanzas/month-card";
+import { SettleRow } from "@/components/finanzas/settle-row";
 import {
   MonthlyBarsChart,
   type MonthlyDatum,
@@ -86,6 +87,8 @@ type ProjectSettleItem = {
   /** Restante = total − progress, clamped a 0. */
   remaining: number | null;
   settled: boolean;
+  /** Proyecto entero — necesario para abrir los managers inline. */
+  project: ProjectWithRelations;
 };
 
 function monthKey(iso: string): string {
@@ -197,6 +200,7 @@ function build(
           progress,
           remaining,
           settled,
+          project: p,
         });
       }
     }
@@ -234,6 +238,7 @@ function build(
           progress,
           remaining,
           settled,
+          project: p,
         });
       }
     }
@@ -705,77 +710,9 @@ function ProjectList({
             No hay proyectos finalizados con monto computable.
           </p>
         ) : (
-          items.map((it) => {
-            const pct =
-              it.total != null && it.total > 0
-                ? Math.min(100, Math.round((it.progress / it.total) * 100))
-                : it.settled
-                  ? 100
-                  : 0;
-            return (
-              <div
-                key={`${it.projectId}-${it.field}`}
-                className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 ${
-                  it.settled ? "opacity-60" : ""
-                }`}
-              >
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                    {it.projectCode}
-                  </span>
-                  <span className="truncate text-sm font-medium">
-                    {it.projectTitle}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {it.clientName} · {it.monthLabel}
-                  </span>
-                  {/* Barra de progreso. Se muestra siempre que tengamos un
-                     total computable; ayuda a leer rápido el avance. */}
-                  {it.total != null && it.total > 0 ? (
-                    <div className="mt-1 flex items-center gap-2">
-                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className={`h-full transition-all ${
-                            it.settled ? "bg-emerald-500" : "bg-amber-500"
-                          }`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-muted-foreground tabular-nums">
-                        {pct}%
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  {it.settled ? (
-                    <span className="text-sm font-semibold tabular-nums text-emerald-500">
-                      {it.total != null ? formatPrice(it.total) : "—"}
-                    </span>
-                  ) : (
-                    <>
-                      <span className="text-sm font-semibold tabular-nums text-amber-500">
-                        {it.remaining != null
-                          ? formatPrice(it.remaining)
-                          : "—"}{" "}
-                        falta
-                      </span>
-                      <span className="text-[10px] text-muted-foreground tabular-nums">
-                        {formatPrice(it.progress)} de{" "}
-                        {it.total != null ? formatPrice(it.total) : "—"}
-                      </span>
-                    </>
-                  )}
-                  <ProjectSettleButton
-                    projectId={it.projectId}
-                    field={it.field}
-                    settled={it.settled}
-                    description={`${it.projectCode} (${it.field})`}
-                  />
-                </div>
-              </div>
-            );
-          })
+          items.map((it) => (
+            <SettleRow key={`${it.projectId}-${it.field}`} item={it} />
+          ))
         )}
       </CardContent>
     </Card>
