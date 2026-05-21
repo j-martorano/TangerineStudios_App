@@ -43,6 +43,7 @@ export const dynamic = "force-dynamic";
 const MONTH_FORMATTER = new Intl.DateTimeFormat("es-AR", {
   month: "long",
   year: "numeric",
+  timeZone: "UTC",
 });
 
 // Todos los montos en USD (moneda única).
@@ -279,7 +280,10 @@ export default async function FinanzasPage() {
   const totalProfit = sumAcrossBuckets(buckets, "profit");
 
   // Datos para los gráficos del Resumen.
-  const SHORT_MONTH = new Intl.DateTimeFormat("es-AR", { month: "short" });
+  const SHORT_MONTH = new Intl.DateTimeFormat("es-AR", {
+    month: "short",
+    timeZone: "UTC",
+  });
   function shortMonthLabel(key: string): string {
     const [y, m] = key.split("-").map(Number);
     const d = new Date(Date.UTC(y, m - 1, 1));
