@@ -119,7 +119,8 @@ export function ProjectRow({
               availableParents={availableParents}
               visibleColumns={visibleColumns}
               showExpand={showExpand}
-              rowClassName={`bg-muted/30 animate-in fade-in slide-in-from-top-1 duration-200`}
+              rowClassName={`bg-muted/50 border-l-2 border-l-border/60 animate-in fade-in slide-in-from-top-1 duration-200`}
+              rowStyle={rowStyle}
               nested
             />
           ))}
@@ -130,7 +131,7 @@ export function ProjectRow({
           {showExpand ? <TableCell className="w-8 p-1" /> : null}
           <TableCell
             colSpan={visibleColumns.length}
-            className="bg-muted/20 px-4 py-3 animate-in fade-in slide-in-from-top-1 duration-200"
+            className="border-l-2 border-l-border/60 bg-muted/50 px-4 py-3 animate-in fade-in slide-in-from-top-1 duration-200"
           >
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs sm:grid-cols-3 md:grid-cols-4">
               {hidden.map((id) => (

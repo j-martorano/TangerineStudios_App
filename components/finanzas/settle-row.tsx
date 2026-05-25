@@ -116,7 +116,7 @@ export function SettleRow({ item }: { item: SettleRowItem }) {
       </div>
 
       {open ? (
-        <div className="border-t border-border/40 bg-muted/10 px-4 py-3 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="border-t border-border bg-muted/50 px-4 py-3 border-l-2 border-l-border/60 animate-in fade-in slide-in-from-top-1 duration-200">
           {item.field === "cobrado" ? (
             <CobroManagerPanel project={item.project} />
           ) : (
