@@ -180,48 +180,44 @@ function StaticKanban({
 }: Props) {
   const columns = buildColumns(projects);
   return (
-    <div className="flex flex-col gap-8">
-      {/* Columnas activas */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {ACTIVE_PHASES.map((phase) => (
-          <div key={phase} className="flex min-w-0 flex-col gap-3">
-            <div className="flex items-center justify-between px-1">
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${PHASE_CLASS[phase]}`}
-              >
-                {PHASE_LABEL[phase]}
-              </span>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {columns[phase].length}
-              </span>
-            </div>
-            <div className="flex min-h-24 flex-col gap-2 rounded-lg p-1">
-              {columns[phase].length === 0 ? (
-                <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
-                  Sin proyectos
-                </p>
-              ) : (
-                columns[phase].map((p) => (
-                  <CardView
-                    key={p.id}
-                    project={p}
-                    editors={editors}
-                    clients={clients}
-                    availableParents={availableParents}
-                  />
-                ))
-              )}
-            </div>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {ACTIVE_PHASES.map((phase) => (
+        <div key={phase} className="flex min-w-0 flex-col gap-3">
+          <div className="flex items-center justify-between px-1">
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${PHASE_CLASS[phase]}`}
+            >
+              {PHASE_LABEL[phase]}
+            </span>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {columns[phase].length}
+            </span>
           </div>
-        ))}
-      </div>
-      {/* Sección Terminado */}
-      <TerminadoSection
+          <div className="flex min-h-24 flex-col gap-2 rounded-lg p-1">
+            {columns[phase].length === 0 ? (
+              <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
+                Sin proyectos
+              </p>
+            ) : (
+              columns[phase].map((p) => (
+                <CardView
+                  key={p.id}
+                  project={p}
+                  editors={editors}
+                  clients={clients}
+                  availableParents={availableParents}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      ))}
+      {/* 4ª columna: Terminado (log por mes) */}
+      <StaticTerminadoColumn
         projects={columns["terminado"]}
         editors={editors}
         clients={clients}
         availableParents={availableParents}
-        interactive={false}
       />
     </div>
   );
@@ -473,27 +469,24 @@ function InteractiveKanban({
           setActiveSourcePhase(null);
         }}
       >
-        <div className="flex flex-col gap-8">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {/* Tres columnas activas */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {ACTIVE_PHASES.map((phase) => (
-              <KanbanColumn
-                key={phase}
-                phase={phase}
-                items={columns[phase]}
-                editors={editors}
-                clients={clients}
-                availableParents={availableParents}
-              />
-            ))}
-          </div>
-          {/* Sección Terminado — droppable + log por mes */}
-          <TerminadoSection
+          {ACTIVE_PHASES.map((phase) => (
+            <KanbanColumn
+              key={phase}
+              phase={phase}
+              items={columns[phase]}
+              editors={editors}
+              clients={clients}
+              availableParents={availableParents}
+            />
+          ))}
+          {/* 4ª columna: Terminado — droppable + log por mes */}
+          <InteractiveTerminadoColumn
             projects={columns["terminado"]}
             editors={editors}
             clients={clients}
             availableParents={availableParents}
-            interactive
           />
         </div>
         <DragOverlay>
@@ -608,22 +601,26 @@ function KanbanColumn({
   );
 }
 
-// ─── Sección Terminado ────────────────────────────────────────────────────────
+// ─── Columna Terminado ────────────────────────────────────────────────────────
 
-function TerminadoSection({
+/** Contenido compartido de la columna Terminado (estático e interactivo) */
+function TerminadoColumnContent({
   projects,
   editors,
   clients,
   availableParents = [],
   interactive,
+  isOver = false,
+  setNodeRef,
 }: {
   projects: ProjectWithRelations[];
   editors: EditorMini[];
   clients: ClientForProject[];
   availableParents?: ParentOption[];
   interactive: boolean;
+  isOver?: boolean;
+  setNodeRef?: (el: HTMLElement | null) => void;
 }) {
-  // Agrupamos por mes de finalized_at
   const byMonth: Record<string, ProjectWithRelations[]> = {};
   for (const p of projects) {
     const mk = monthKey(p.finalized_at);
@@ -633,10 +630,10 @@ function TerminadoSection({
   const sortedMonths = Object.keys(byMonth).sort().reverse();
   const currentMk = monthKey(new Date().toISOString());
 
-  const inner = (
-    <div className="flex flex-col gap-3">
-      {/* Encabezado */}
-      <div className="flex items-center gap-3 px-1">
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      {/* Encabezado — igual a las columnas activas */}
+      <div className="flex items-center justify-between px-1">
         <span
           className={`rounded-full px-2 py-0.5 text-xs font-medium ${PHASE_CLASS.terminado}`}
         >
@@ -645,21 +642,21 @@ function TerminadoSection({
         <span className="text-xs text-muted-foreground tabular-nums">
           {projects.length}
         </span>
-        {interactive && projects.length === 0 ? (
-          <span className="text-xs italic text-muted-foreground">
-            — arrastrá una card acá para finalizar un proyecto
-          </span>
-        ) : null}
       </div>
 
-      {/* Contenido */}
-      {projects.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-border/60 px-4 py-10 text-center text-xs italic text-muted-foreground">
-          Sin proyectos finalizados todavía
-        </p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {sortedMonths.map((mk) => (
+      {/* Zona droppable / contenido */}
+      <div
+        ref={setNodeRef}
+        className={`flex min-h-24 flex-col gap-2 rounded-lg p-1 transition-colors ${
+          isOver ? "bg-emerald-500/10 ring-2 ring-emerald-500/30" : ""
+        }`}
+      >
+        {projects.length === 0 ? (
+          <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
+            {interactive ? "Arrastrá una card acá" : "Sin proyectos"}
+          </p>
+        ) : (
+          sortedMonths.map((mk) => (
             <MonthGroup
               key={mk}
               mk={mk}
@@ -670,35 +667,59 @@ function TerminadoSection({
               clients={clients}
               availableParents={availableParents}
             />
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
     </div>
   );
-
-  if (!interactive) return inner;
-
-  return <DroppableTerminadoWrapper>{inner}</DroppableTerminadoWrapper>;
 }
 
-/** Envuelve la sección Terminado como zona droppable */
-function DroppableTerminadoWrapper({
-  children,
+/** Versión estática (SSR) de la columna Terminado */
+function StaticTerminadoColumn({
+  projects,
+  editors,
+  clients,
+  availableParents = [],
 }: {
-  children: React.ReactNode;
+  projects: ProjectWithRelations[];
+  editors: EditorMini[];
+  clients: ClientForProject[];
+  availableParents?: ParentOption[];
+}) {
+  return (
+    <TerminadoColumnContent
+      projects={projects}
+      editors={editors}
+      clients={clients}
+      availableParents={availableParents}
+      interactive={false}
+    />
+  );
+}
+
+/** Versión interactiva (cliente) de la columna Terminado — incluye useDroppable */
+function InteractiveTerminadoColumn({
+  projects,
+  editors,
+  clients,
+  availableParents = [],
+}: {
+  projects: ProjectWithRelations[];
+  editors: EditorMini[];
+  clients: ClientForProject[];
+  availableParents?: ParentOption[];
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: "terminado" });
   return (
-    <div
-      ref={setNodeRef}
-      className={`rounded-xl border p-4 transition-colors ${
-        isOver
-          ? "border-emerald-500/40 bg-emerald-500/5 ring-2 ring-emerald-500/20"
-          : "border-border/40 bg-muted/5"
-      }`}
-    >
-      {children}
-    </div>
+    <TerminadoColumnContent
+      projects={projects}
+      editors={editors}
+      clients={clients}
+      availableParents={availableParents}
+      interactive
+      isOver={isOver}
+      setNodeRef={setNodeRef}
+    />
   );
 }
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 import { NewProjectButton } from "@/components/projects/new-project-button";
 import { ProjectsTable } from "@/components/projects/projects-table";
@@ -42,7 +42,7 @@ export default async function ProjectsPage({
     .filter((p) => !p.parent_id && !p.archived)
     .map((p) => ({ id: p.id, title: p.title, client_id: p.client_id }));
 
-  // Años con proyectos, del más reciente al más viejo. Sólo top-level (los
+  // AÃ±os con proyectos, del mÃ¡s reciente al mÃ¡s viejo. SÃ³lo top-level (los
   // shorts hijos se cuentan dentro de su pack).
   const years = Array.from(
     new Set(
@@ -58,7 +58,7 @@ export default async function ProjectsPage({
       ? currentYear
       : (years[0] ?? currentYear);
 
-  // Sólo top-level para el listado del año (los hijos se ven dentro del pack).
+  // SÃ³lo top-level para el listado del aÃ±o (los hijos se ven dentro del pack).
   const yearProjectsAll = projects.filter(
     (p) => !p.parent_id && projectYear(p.created_at) === selectedYear
   );
@@ -66,7 +66,7 @@ export default async function ProjectsPage({
   const yearTrimmed = yearProjectsAll.length - yearProjects.length;
 
   // Adjuntar los hijos (children ya vienen vinculados desde fetchProjects)
-  // pero como filtramos por año/limit, los hijos siguen en su pack porque
+  // pero como filtramos por aÃ±o/limit, los hijos siguen en su pack porque
   // las referencias son por objeto.
 
   function yearHref(year: number): string {
@@ -88,7 +88,7 @@ export default async function ProjectsPage({
   const archivedCount = projects.filter((p) => p.archived).length;
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 md:p-8">
+    <main className="flex w-full flex-col gap-6 p-4 md:p-5">
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <div className="flex items-baseline gap-4">
           <h1 className="text-2xl font-semibold tracking-tight">Proyectos</h1>
@@ -104,7 +104,7 @@ export default async function ProjectsPage({
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <DataSearch placeholder="Buscar por título o cliente…" />
+        <DataSearch placeholder="Buscar por tÃ­tulo o clienteâ€¦" />
         <Link
           href={archivedToggleHref()}
           className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -152,9 +152,9 @@ export default async function ProjectsPage({
 
       {yearTrimmed > 0 ? (
         <p className="text-xs text-muted-foreground">
-          Mostrando los primeros {projectsPerYear} proyectos del año. Hay{" "}
-          {yearTrimmed} más sin mostrar — ajustá «Proyectos por año» en
-          /configuración para verlos.
+          Mostrando los primeros {projectsPerYear} proyectos del aÃ±o. Hay{" "}
+          {yearTrimmed} mÃ¡s sin mostrar â€” ajustÃ¡ Â«Proyectos por aÃ±oÂ» en
+          /configuraciÃ³n para verlos.
         </p>
       ) : null}
     </main>

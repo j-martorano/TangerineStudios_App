@@ -1,4 +1,4 @@
-import { ClientsTable } from "@/components/clients/clients-table";
+﻿import { ClientsTable } from "@/components/clients/clients-table";
 import { NewClientButton } from "@/components/clients/new-client-button";
 import { DataPagination } from "@/components/data-pagination";
 import { DataSearch } from "@/components/data-search";
@@ -27,7 +27,7 @@ export default async function ClientsPage({
   ]);
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 md:p-8">
+    <main className="flex w-full flex-col gap-6 p-4 md:p-5">
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <div className="flex items-baseline gap-4">
           <h1 className="text-2xl font-semibold tracking-tight">Clientes</h1>
@@ -39,7 +39,7 @@ export default async function ClientsPage({
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <DataSearch placeholder="Buscar cliente por nombre…" />
+        <DataSearch placeholder="Buscar cliente por nombreâ€¦" />
       </div>
 
       <div className="rounded-xl border bg-card p-2">

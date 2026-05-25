@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+﻿import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchClients, fetchProjects } from "@/lib/projects/queries";
 import {
   fetchClientPayments,
@@ -32,8 +32,8 @@ import type { ProjectWithRelations } from "@/lib/projects/types";
 import type { FinanzasPayment } from "@/lib/finanzas/queries";
 import { ProjectSettleButton } from "@/components/finanzas/project-settle-button";
 
-// Tinte de fondo basado en el color del cliente (mismo patrón que en
-// proyectos: hex de 8 dígitos = RRGGBB + alpha 0x1f).
+// Tinte de fondo basado en el color del cliente (mismo patrÃ³n que en
+// proyectos: hex de 8 dÃ­gitos = RRGGBB + alpha 0x1f).
 function clientTint(hex: string | null | undefined): string | undefined {
   if (!hex) return undefined;
   return `${hex}1f`;
@@ -47,7 +47,7 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat("es-AR", {
   timeZone: "UTC",
 });
 
-// Todos los montos en USD (moneda única).
+// Todos los montos en USD (moneda Ãºnica).
 
 type MonthBucket = {
   key: string;
@@ -82,12 +82,12 @@ type ProjectSettleItem = {
   field: "cobrado" | "pagado";
   /** Valor total esperado (precio del cliente o cost agregado de editores). */
   total: number | null;
-  /** Suma de los cobros/pagos registrados (o el total si está marcado saldado sin registros). */
+  /** Suma de los cobros/pagos registrados (o el total si estÃ¡ marcado saldado sin registros). */
   progress: number;
-  /** Restante = total − progress, clamped a 0. */
+  /** Restante = total âˆ’ progress, clamped a 0. */
   remaining: number | null;
   settled: boolean;
-  /** Proyecto entero — necesario para abrir los managers inline. */
+  /** Proyecto entero â€” necesario para abrir los managers inline. */
   project: ProjectWithRelations;
 };
 
@@ -133,7 +133,7 @@ function build(
     return byKey.get(key)!;
   }
 
-  // ====== Pagos de clientes mensuales — ingreso del mes en que se pagaron ======
+  // ====== Pagos de clientes mensuales â€” ingreso del mes en que se pagaron ======
   for (const pay of payments) {
     const key = monthKey(pay.paid_at);
     const bucket = ensureBucket(key, pay.paid_at);
@@ -151,9 +151,9 @@ function build(
     });
   }
 
-  // ====== Proyectos finalizados — entran en el mes en que se finalizaron ======
+  // ====== Proyectos finalizados â€” entran en el mes en que se finalizaron ======
   // Los shorts hijos de un pack no entran como entradas propias; el pack
-  // padre los engloba (su cost ya suma los costos de los hijos vía
+  // padre los engloba (su cost ya suma los costos de los hijos vÃ­a
   // computeCost).
   for (const p of projects) {
     if (!p.finalized) continue;
@@ -166,8 +166,8 @@ function build(
     const client = p.client;
     const isMensual = client?.payment_type === "mensual";
 
-    // Cobros por proyecto — sólo clientes NO mensuales (los mensuales cobran
-    // vía pagos). Incluye proyectos sin cliente linkeado.
+    // Cobros por proyecto â€” sÃ³lo clientes NO mensuales (los mensuales cobran
+    // vÃ­a pagos). Incluye proyectos sin cliente linkeado.
     if (!isMensual) {
       const price = computePrice(p);
       const cobrosSum = p.cobros.reduce(
@@ -175,7 +175,7 @@ function build(
         0
       );
       const cobradoFlag = p.cobrado === "si";
-      // Si está marcado «saldado» sin registrar cobros, tratamos el progreso
+      // Si estÃ¡ marcado Â«saldadoÂ» sin registrar cobros, tratamos el progreso
       // como completo (modo legacy del badge antes de los parciales).
       const progress =
         cobradoFlag && cobrosSum === 0 && price != null ? price : cobrosSum;
@@ -205,7 +205,7 @@ function build(
       }
     }
 
-    // Pagos por proyecto — todos los editores aportan al costo. Si hay
+    // Pagos por proyecto â€” todos los editores aportan al costo. Si hay
     // pagos parciales registrados, sumamos los aportes; si no, fallback al
     // flag pagado === 'pago_total'.
     const hasEditor = p.editors.some((e) => e.editor != null);
@@ -232,7 +232,7 @@ function build(
           projectId: p.id,
           projectCode: p.project_code,
           projectTitle: p.title,
-          clientName: client?.name ?? p.client_name ?? "—",
+          clientName: client?.name ?? p.client_name ?? "â€”",
           field: "pagado",
           total: cost,
           progress,
@@ -243,8 +243,8 @@ function build(
       }
     }
 
-    // Ganancia: para clientes no mensuales, precio − costo. Para mensuales,
-    // sólo resta el costo de edición (el ingreso son los pagos del retainer).
+    // Ganancia: para clientes no mensuales, precio âˆ’ costo. Para mensuales,
+    // sÃ³lo resta el costo de ediciÃ³n (el ingreso son los pagos del retainer).
     if (isMensual) {
       const cost = computeCost(p);
       if (cost != null) bucket.profit -= cost;
@@ -264,7 +264,7 @@ function build(
     return b.paidAt.localeCompare(a.paidAt);
   });
 
-  // Pendientes primero, después saldados; dentro de cada grupo por mes y monto.
+  // Pendientes primero, despuÃ©s saldados; dentro de cada grupo por mes y monto.
   projectItems.sort((a, b) => {
     if (a.settled !== b.settled) return a.settled ? 1 : -1;
     if (a.yearMonth !== b.yearMonth)
@@ -349,7 +349,7 @@ export default async function FinanzasPage({
   const totalPendingPay = sumAcrossBuckets(buckets, "pendingPay");
   const totalProfit = sumAcrossBuckets(buckets, "profit");
 
-  // Datos para los gráficos del Resumen.
+  // Datos para los grÃ¡ficos del Resumen.
   const SHORT_MONTH = new Intl.DateTimeFormat("es-AR", {
     month: "short",
     timeZone: "UTC",
@@ -370,7 +370,7 @@ export default async function FinanzasPage({
     ganancia: Math.round(b.profit),
   }));
 
-  // ── Ingresos por cliente: pagos retainer + proyectos finalizados cobrados ──
+  // â”€â”€ Ingresos por cliente: pagos retainer + proyectos finalizados cobrados â”€â”€
   const incomeByClient = new Map<string, { color: string; total: number }>();
   for (const pay of payments) {
     const existing = incomeByClient.get(pay.clientName);
@@ -409,7 +409,7 @@ export default async function FinanzasPage({
     });
   }
 
-  // ── Costos por cliente: costo de editores en proyectos finalizados ──
+  // â”€â”€ Costos por cliente: costo de editores en proyectos finalizados â”€â”€
   const costByClientMap = new Map<string, { color: string; total: number }>();
   for (const p of projects) {
     if (!p.finalized) continue;
@@ -436,7 +436,7 @@ export default async function FinanzasPage({
     });
   }
 
-  // ── Ganancias por cliente: ingreso − costo (puede ser negativo) ──
+  // â”€â”€ Ganancias por cliente: ingreso âˆ’ costo (puede ser negativo) â”€â”€
   const allClientNames = new Set([
     ...incomeByClient.keys(),
     ...costByClientMap.keys(),
@@ -489,14 +489,14 @@ export default async function FinanzasPage({
         />
       </section>
 
-      {/* Fila 2: Gráfico de barras por mes */}
+      {/* Fila 2: GrÃ¡fico de barras por mes */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">
             Cobrado / Pagado / Ganancia por mes
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Últimos {monthlyData.length} mes
+            Ãšltimos {monthlyData.length} mes
             {monthlyData.length === 1 ? "" : "es"} con actividad.
           </p>
         </CardHeader>
@@ -517,7 +517,7 @@ export default async function FinanzasPage({
           <CardContent>
             <ClientIncomeDonut
               data={clientIncomeData}
-              emptyMessage="Sin ingresos cargados todavía."
+              emptyMessage="Sin ingresos cargados todavÃ­a."
             />
           </CardContent>
         </Card>
@@ -531,7 +531,7 @@ export default async function FinanzasPage({
           <CardContent>
             <ClientIncomeDonut
               data={clientCostData}
-              emptyMessage="Sin costos registrados todavía."
+              emptyMessage="Sin costos registrados todavÃ­a."
             />
           </CardContent>
         </Card>
@@ -539,14 +539,14 @@ export default async function FinanzasPage({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Ganancias por cliente</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Ingreso − costo por cliente.
+              Ingreso âˆ’ costo por cliente.
             </p>
           </CardHeader>
           <CardContent>
             <ClientIncomeDonut
               data={clientProfitData}
               allowNegative
-              emptyMessage="Sin datos suficientes todavía."
+              emptyMessage="Sin datos suficientes todavÃ­a."
             />
           </CardContent>
         </Card>
@@ -560,7 +560,7 @@ export default async function FinanzasPage({
   const porMesSection =
     buckets.length === 0 ? (
       <p className="text-sm italic text-muted-foreground">
-        No hay actividad cargada todavía.
+        No hay actividad cargada todavÃ­a.
       </p>
     ) : (
       <div className="flex flex-col gap-3">
@@ -583,7 +583,7 @@ export default async function FinanzasPage({
     );
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 md:p-8">
+    <main className="flex w-full flex-col gap-6 p-4 md:p-5">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">Finanzas</h1>
         <p className="text-sm text-muted-foreground">
@@ -677,7 +677,7 @@ function PagosSection({
             Pagos de clientes retainer
           </h2>
           <span className="text-xs text-muted-foreground">
-            {items.length} pago{items.length === 1 ? "" : "s"} ·{" "}
+            {items.length} pago{items.length === 1 ? "" : "s"} Â·{" "}
             {formatPrice(total)}
           </span>
         </div>
@@ -685,7 +685,7 @@ function PagosSection({
       </div>
       {items.length === 0 ? (
         <p className="text-sm italic text-muted-foreground">
-          No hay pagos registrados todavía. Tocá «Registrar pago» para cargar
+          No hay pagos registrados todavÃ­a. TocÃ¡ Â«Registrar pagoÂ» para cargar
           el primero.
         </p>
       ) : (
@@ -709,8 +709,8 @@ function PagosSection({
                       {it.clientName}
                     </span>
                     <span className="text-xs text-muted-foreground capitalize">
-                      {it.monthLabel} · {fmtMin(it.minutesCredited)}
-                      {it.note ? ` · ${it.note}` : ""}
+                      {it.monthLabel} Â· {fmtMin(it.minutesCredited)}
+                      {it.note ? ` Â· ${it.note}` : ""}
                     </span>
                   </div>
                 </div>
@@ -776,7 +776,7 @@ function ProjectList({
           ) : null}
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          {pendientes} pendiente{pendientes === 1 ? "" : "s"} · {items.length}{" "}
+          {pendientes} pendiente{pendientes === 1 ? "" : "s"} Â· {items.length}{" "}
           {subtitle}
         </p>
       </CardHeader>

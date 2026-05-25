@@ -1,4 +1,4 @@
-import { EditorsTable } from "@/components/editors/editors-table";
+﻿import { EditorsTable } from "@/components/editors/editors-table";
 import { NewEditorButton } from "@/components/editors/new-editor-button";
 import { DataPagination } from "@/components/data-pagination";
 import { DataSearch } from "@/components/data-search";
@@ -30,7 +30,7 @@ export default async function EditorsPage({
     ]);
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 md:p-8">
+    <main className="flex w-full flex-col gap-6 p-4 md:p-5">
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <div className="flex items-baseline gap-4">
           <h1 className="text-2xl font-semibold tracking-tight">Editores</h1>
@@ -45,7 +45,7 @@ export default async function EditorsPage({
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <DataSearch placeholder="Buscar editor por nombre…" />
+        <DataSearch placeholder="Buscar editor por nombreâ€¦" />
       </div>
 
       <div className="rounded-xl border bg-card p-2">
