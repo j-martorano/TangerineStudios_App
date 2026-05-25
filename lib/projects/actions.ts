@@ -77,6 +77,12 @@ const projectInputSchema = z
       .nonnegative("La duración no puede ser negativa")
       .nullable(),
     /**
+     * Fecha de terminado (ISO o YYYY-MM-DD). Solo se aplica si phase es
+     * "terminado"; si se omite y el proyecto se marca terminado, se usa
+     * la fecha actual.
+     */
+    finalized_at: z.string().nullable().optional(),
+    /**
      * Editores asignados al proyecto. Cada uno puede tener un `cost` manual
      * (override del cálculo) o null para usar el modelo de pago del editor.
      */
@@ -217,14 +223,36 @@ export async function updateProject(
   const parsed = projectInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
-  const { editors, children, ...projectData } = parsed.data;
+  const { editors, children, finalized_at, ...projectData } = parsed.data;
 
   const supabase = await createClient();
   const clientName = await getClientName(projectData.client_id);
 
+  // La fase "terminado" implica finalized=true. Las demás → false.
+  // finalized_at: si se va a terminado y el form manda una fecha, se usa esa;
+  // si no, solo se setea hoy cuando no había fecha previa (el drag-to-terminado
+  // la maneja por su cuenta vía reorderProjects).
+  const isTerminado = projectData.phase === "terminado";
+  const resolvedFinalizedAt = isTerminado
+    ? finalized_at
+      ? finalized_at.includes("T")
+        ? finalized_at
+        : `${finalized_at}T12:00:00Z`
+      : new Date().toISOString()
+    : undefined; // no tocar finalized_at si no es terminado
+
+  const updatePayload: Record<string, unknown> = {
+    ...projectData,
+    client_name: clientName,
+    finalized: isTerminado,
+    ...(resolvedFinalizedAt !== undefined
+      ? { finalized_at: resolvedFinalizedAt }
+      : {}),
+  };
+
   const { error } = await supabase
     .from("projects")
-    .update({ ...projectData, client_name: clientName })
+    .update(updatePayload)
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
@@ -649,6 +677,10 @@ export type ReorderUpdate = {
   id: string;
   phase: ProjectPhase;
   position: number;
+  /** Si se mueve a/desde "terminado", indica el nuevo estado de finalización. */
+  finalized?: boolean;
+  /** ISO string de la fecha de terminado. Solo relevante si finalized=true. */
+  finalized_at?: string | null;
 };
 
 const reorderSchema = z.array(
@@ -656,6 +688,8 @@ const reorderSchema = z.array(
     id: z.string().regex(uuidRegex, "ID inválido"),
     phase: phaseEnum,
     position: z.number().int().nonnegative(),
+    finalized: z.boolean().optional(),
+    finalized_at: z.string().nullable().optional(),
   })
 );
 
@@ -668,12 +702,15 @@ export async function reorderProjects(
 
   const supabase = await createClient();
   const results = await Promise.all(
-    parsed.data.map((u) =>
-      supabase
-        .from("projects")
-        .update({ phase: u.phase, position: u.position })
-        .eq("id", u.id)
-    )
+    parsed.data.map((u) => {
+      const payload: Record<string, unknown> = {
+        phase: u.phase,
+        position: u.position,
+      };
+      if (u.finalized !== undefined) payload.finalized = u.finalized;
+      if ("finalized_at" in u) payload.finalized_at = u.finalized_at ?? null;
+      return supabase.from("projects").update(payload).eq("id", u.id);
+    })
   );
 
   const failure = results.find((r) => r.error);

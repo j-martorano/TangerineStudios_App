@@ -21,13 +21,13 @@ export default async function KanbanPage({
   const query = params.q?.trim() || undefined;
 
   const [allProjects, editors, clients] = await Promise.all([
-    fetchProjects({ query, includeFinalized: false }),
+    fetchProjects({ query }), // incluye finalizados — aparecen en la sección Terminado
     fetchEditors(),
     fetchClients(),
   ]);
 
   // En el kanban no mostramos los packs como card propia — sus shorts hijos
-  // sí aparecen, cada uno en su columna, con un chip que indica el pack.
+  // sí aparecen, cada uno en su columna/sección, con un chip que indica el pack.
   const projects = allProjects.filter((p) => !isPack(p));
 
   // Padres disponibles para asignar como pack en el form: proyectos top-level

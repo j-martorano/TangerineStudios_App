@@ -268,7 +268,7 @@ export async function activateSeed(): Promise<SeedResult> {
     title: string;
     client_id: string;
     client_name: string;
-    phase: "por_asignar" | "editando" | "terminado";
+    phase: "por_asignar" | "editando" | "en_revision" | "terminado";
     finalized: boolean;
     finalized_at: string | null;
     price: number | null;
@@ -391,7 +391,7 @@ export async function activateSeed(): Promise<SeedResult> {
       title: "[SEED] Acme corporativo Q2",
       client_id: CL1,
       client_name: "[SEED] Acme Studios",
-      phase: "editando",
+      phase: "en_revision",
       finalized: false,
       finalized_at: null,
       price: 600,
@@ -406,7 +406,7 @@ export async function activateSeed(): Promise<SeedResult> {
       title: "[SEED] Policing Uncut #3",
       client_id: CL4,
       client_name: "[SEED] Policing Uncut",
-      phase: "editando",
+      phase: "en_revision",
       finalized: false,
       finalized_at: null,
       price: null,
@@ -452,7 +452,7 @@ export async function activateSeed(): Promise<SeedResult> {
       title: "[SEED] DJ's Thoughts ep.6",
       client_id: CL5,
       client_name: "[SEED] DJ's Thoughts",
-      phase: "editando",
+      phase: "en_revision",
       finalized: false,
       finalized_at: null,
       price: null,
@@ -561,7 +561,7 @@ export async function activateSeed(): Promise<SeedResult> {
       title: "[SEED] Short Acme #2 — desarrollo",
       client_id: CL1,
       client_name: "[SEED] Acme Studios",
-      phase: "editando" as const,
+      phase: "en_revision" as const,
       finalized: false,
       finalized_at: null,
       price: null,

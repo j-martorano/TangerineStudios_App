@@ -14,6 +14,7 @@ import {
 export type MonthlyDatum = {
   month: string;
   cobrado: number;
+  porCobrar: number;
   pagado: number;
   ganancia: number;
 };
@@ -104,6 +105,12 @@ export function MonthlyBarsChart({ data }: { data: MonthlyDatum[] }) {
           dataKey="cobrado"
           name="Cobrado"
           fill="#22c55e"
+          radius={[3, 3, 0, 0]}
+        />
+        <Bar
+          dataKey="porCobrar"
+          name="Por cobrar"
+          fill="#86efac"
           radius={[3, 3, 0, 0]}
         />
         <Bar

@@ -104,6 +104,10 @@ export function ProjectForm({
   const [phase, setPhase] = useState<ProjectPhase>(
     project?.phase ?? "por_asignar"
   );
+  // Fecha de terminado: mostrada cuando phase === "terminado"
+  const [finalizedAt, setFinalizedAt] = useState<string>(
+    project?.finalized_at ? project.finalized_at.slice(0, 10) : ""
+  );
   const [cobrado, setCobrado] = useState<CobradoStatus>(
     project?.cobrado ?? "no"
   );
@@ -254,6 +258,7 @@ export function ProjectForm({
       project_type: projectType,
       parent_id: project?.parent_id ?? null,
       children: childrenPayload,
+      finalized_at: phase === "terminado" ? (finalizedAt || null) : null,
     };
 
     startTransition(async () => {
@@ -458,7 +463,15 @@ export function ProjectForm({
               <Label htmlFor="phase">Fase</Label>
               <Select
                 value={phase}
-                onValueChange={(v) => v && setPhase(v as ProjectPhase)}
+                onValueChange={(v) => {
+                  if (!v) return;
+                  const next = v as ProjectPhase;
+                  setPhase(next);
+                  // Auto-completar fecha si se pone en terminado y no hay fecha
+                  if (next === "terminado" && !finalizedAt) {
+                    setFinalizedAt(new Date().toISOString().slice(0, 10));
+                  }
+                }}
               >
                 <SelectTrigger id="phase" className="w-full">
                   <SelectValue>
@@ -494,6 +507,26 @@ export function ProjectForm({
               />
             </div>
           </div>
+
+          {/* Fecha de terminado — sólo cuando la fase es "terminado" */}
+          {phase === "terminado" ? (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="finalized_at">
+                Fecha de terminado
+              </Label>
+              <Input
+                id="finalized_at"
+                type="date"
+                value={finalizedAt}
+                onChange={(e) => setFinalizedAt(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Determina en qué mes aparece en el log del kanban. Se
+                autocompleta con la fecha de hoy si la dejás vacía.
+              </p>
+            </div>
+          ) : null}
 
           {selectedClient?.payment_type === "por_proyecto" ? (
             <div className="flex flex-col gap-2">

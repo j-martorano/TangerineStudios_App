@@ -365,16 +365,13 @@ export default async function FinanzasPage({
   const monthlyData: MonthlyDatum[] = last12.map((b) => ({
     month: shortMonthLabel(b.key),
     cobrado: Math.round(b.collected),
+    porCobrar: Math.round(b.pendingCollect),
     pagado: Math.round(b.paid),
     ganancia: Math.round(b.profit),
   }));
 
-  // Ingresos por cliente: pagos retainer + proyectos finalizados cobrados
-  // (no mensuales). Top 5 + "Otros".
-  const incomeByClient = new Map<
-    string,
-    { color: string; total: number }
-  >();
+  // ── Ingresos por cliente: pagos retainer + proyectos finalizados cobrados ──
+  const incomeByClient = new Map<string, { color: string; total: number }>();
   for (const pay of payments) {
     const existing = incomeByClient.get(pay.clientName);
     if (existing) existing.total += pay.amount;
@@ -397,15 +394,12 @@ export default async function FinanzasPage({
     if (existing) existing.total += price;
     else incomeByClient.set(name, { color, total: price });
   }
+  const TOP_CLIENTS = 5;
   const rankedClients = [...incomeByClient.entries()]
     .map(([name, { color, total }]) => ({ name, color, value: total }))
     .filter((d) => d.value > 0)
     .sort((a, b) => b.value - a.value);
-  const TOP_CLIENTS = 5;
-  const clientIncomeData: ClientIncomeDatum[] = rankedClients.slice(
-    0,
-    TOP_CLIENTS
-  );
+  const clientIncomeData: ClientIncomeDatum[] = rankedClients.slice(0, TOP_CLIENTS);
   if (rankedClients.length > TOP_CLIENTS) {
     const rest = rankedClients.slice(TOP_CLIENTS);
     clientIncomeData.push({
@@ -415,8 +409,53 @@ export default async function FinanzasPage({
     });
   }
 
+  // ── Costos por cliente: costo de editores en proyectos finalizados ──
+  const costByClientMap = new Map<string, { color: string; total: number }>();
+  for (const p of projects) {
+    if (!p.finalized) continue;
+    if (p.parent_id) continue;
+    const cost = computeCost(p);
+    if (cost == null || cost === 0) continue;
+    const name = p.client?.name ?? p.client_name ?? "Sin cliente";
+    const color = p.client?.color ?? "#888888";
+    const existing = costByClientMap.get(name);
+    if (existing) existing.total += cost;
+    else costByClientMap.set(name, { color, total: cost });
+  }
+  const rankedCostClients = [...costByClientMap.entries()]
+    .map(([name, { color, total }]) => ({ name, color, value: total }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value);
+  const clientCostData: ClientIncomeDatum[] = rankedCostClients.slice(0, TOP_CLIENTS);
+  if (rankedCostClients.length > TOP_CLIENTS) {
+    const rest = rankedCostClients.slice(TOP_CLIENTS);
+    clientCostData.push({
+      name: "Otros",
+      color: "#94a3b8",
+      value: rest.reduce((s, r) => s + r.value, 0),
+    });
+  }
+
+  // ── Ganancias por cliente: ingreso − costo (puede ser negativo) ──
+  const allClientNames = new Set([
+    ...incomeByClient.keys(),
+    ...costByClientMap.keys(),
+  ]);
+  const clientProfitData: ClientIncomeDatum[] = [];
+  for (const name of allClientNames) {
+    const income = incomeByClient.get(name)?.total ?? 0;
+    const cost = costByClientMap.get(name)?.total ?? 0;
+    const color =
+      incomeByClient.get(name)?.color ??
+      costByClientMap.get(name)?.color ??
+      "#888888";
+    clientProfitData.push({ name, color, value: income - cost });
+  }
+  clientProfitData.sort((a, b) => b.value - a.value);
+
   const resumenSection = (
     <div className="flex flex-col gap-6">
+      {/* Fila 1: KPIs */}
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <TotalCard
           label="Cobrado"
@@ -446,34 +485,69 @@ export default async function FinanzasPage({
         <TotalCard
           label="Ganancia"
           value={formatPrice(totalProfit)}
-          tone="positive"
+          tone={totalProfit < 0 ? "negative" : "positive"}
         />
       </section>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">
-              Cobrado / Pagado / Ganancia por mes
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Últimos {monthlyData.length} mes
-              {monthlyData.length === 1 ? "" : "es"} con actividad.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <MonthlyBarsChart data={monthlyData} />
-          </CardContent>
-        </Card>
+      {/* Fila 2: Gráfico de barras por mes */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">
+            Cobrado / Pagado / Ganancia por mes
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Últimos {monthlyData.length} mes
+            {monthlyData.length === 1 ? "" : "es"} con actividad.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <MonthlyBarsChart data={monthlyData} />
+        </CardContent>
+      </Card>
+
+      {/* Fila 3: Tres donuts por cliente */}
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Ingresos por cliente</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Acumulado de pagos retainer + cobros por proyecto.
+              Retainer + cobros por proyecto.
             </p>
           </CardHeader>
           <CardContent>
-            <ClientIncomeDonut data={clientIncomeData} />
+            <ClientIncomeDonut
+              data={clientIncomeData}
+              emptyMessage="Sin ingresos cargados todavía."
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Costos por cliente</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Pagos a editores en proyectos finalizados.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ClientIncomeDonut
+              data={clientCostData}
+              emptyMessage="Sin costos registrados todavía."
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Ganancias por cliente</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Ingreso − costo por cliente.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ClientIncomeDonut
+              data={clientProfitData}
+              allowNegative
+              emptyMessage="Sin datos suficientes todavía."
+            />
           </CardContent>
         </Card>
       </section>
@@ -544,14 +618,16 @@ function TotalCard({
 }: {
   label: string;
   value: string;
-  tone: "positive" | "warning" | "neutral";
+  tone: "positive" | "warning" | "neutral" | "negative";
 }) {
   const toneClass =
     tone === "positive"
       ? "text-emerald-500"
       : tone === "warning"
         ? "text-amber-500"
-        : "text-foreground";
+        : tone === "negative"
+          ? "text-destructive"
+          : "text-foreground";
   return (
     <Card size="sm">
       <CardHeader>

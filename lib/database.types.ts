@@ -636,7 +636,7 @@ export type Database = {
       invoiced_status: "si" | "no" | "parcial"
       pagado_status: "pago_total" | "parcial" | "sin_pagar"
       payment_type: "por_rate" | "mensual" | "por_proyecto"
-      project_phase: "editando" | "por_asignar" | "terminado"
+      project_phase: "editando" | "en_revision" | "por_asignar" | "terminado"
       project_status:
         | "pending"
         | "in_progress"
@@ -780,7 +780,7 @@ export const Constants = {
       invoiced_status: ["si", "no", "parcial"],
       pagado_status: ["pago_total", "parcial", "sin_pagar"],
       payment_type: ["por_rate", "mensual", "por_proyecto"],
-      project_phase: ["editando", "por_asignar", "terminado"],
+      project_phase: ["editando", "en_revision", "por_asignar", "terminado"],
       project_status: [
         "pending",
         "in_progress",

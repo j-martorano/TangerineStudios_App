@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import {
   ArchiveIcon,
-  CheckCircle2Icon,
   MoreVerticalIcon,
   PencilIcon,
 } from "lucide-react";
@@ -34,10 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { ProjectForm, type ParentOption } from "./project-form";
-import {
-  setProjectArchived,
-  setProjectFinalized,
-} from "@/lib/projects/actions";
+import { setProjectArchived } from "@/lib/projects/actions";
 import type {
   ClientForProject,
   EditorMini,
@@ -73,17 +69,6 @@ export function KanbanCardActions({
     });
   }
 
-  function handleFinalize() {
-    startTransition(async () => {
-      const result = await setProjectFinalized(project.id, true);
-      if (result.ok) {
-        toast.success(`«${project.title}» finalizado`);
-      } else {
-        toast.error(result.error);
-      }
-    });
-  }
-
   return (
     <>
       <DropdownMenu>
@@ -108,14 +93,6 @@ export function KanbanCardActions({
           >
             <PencilIcon className="size-4" />
             <span>Editar</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={handleFinalize}
-            disabled={pending}
-            className="cursor-pointer text-emerald-500 focus:bg-emerald-500/15 focus:text-emerald-500"
-          >
-            <CheckCircle2Icon className="size-4" />
-            <span>Finalizar</span>
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => setArchiveOpen(true)}

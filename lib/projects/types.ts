@@ -126,6 +126,7 @@ export function isChildOfPack(p: ProjectWithRelations): boolean {
 export const PROJECT_PHASES: ProjectPhase[] = [
   "por_asignar",
   "editando",
+  "en_revision",
   "terminado",
 ];
 
