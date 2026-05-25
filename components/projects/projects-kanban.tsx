@@ -7,7 +7,6 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCorners,
-  useDraggable,
   useDroppable,
   useSensor,
   useSensors,
@@ -22,11 +21,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  GripHorizontalIcon,
-} from "lucide-react";
+import { GripHorizontalIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -67,9 +62,6 @@ import {
 } from "@/lib/projects/format";
 import { reorderProjects, type ReorderUpdate } from "@/lib/projects/actions";
 
-// Las tres fases del tablero activo (columnas del área principal)
-const ACTIVE_PHASES: ProjectPhase[] = ["por_asignar", "editando", "en_revision"];
-
 type Props = {
   projects: ProjectWithRelations[];
   editors: EditorMini[];
@@ -80,35 +72,20 @@ type Props = {
 type ColumnsMap = Record<ProjectPhase, ProjectWithRelations[]>;
 
 type PendingFinalize = {
-  /** ID del proyecto que se está moviendo a terminado */
   projectId: string;
-  /** Fecha ISO original (antes del drag) */
   existingFinalizedAt: string;
-  /** Estado de columnas previo — para rollback si el user cancela */
   rollbackCols: ColumnsMap;
-  /** Updates base (con finalized=true pero sin finalized_at resuelto aún) */
   baseUpdates: ReorderUpdate[];
 };
 
-// Tinte del cliente sobre la card (~8% de opacidad)
 function clientTint(hex: string | null | undefined): string | undefined {
   if (!hex) return undefined;
   return `${hex}1f`;
 }
 
 const MONTH_NAMES = [
-  "Enero",
-  "Febrero",
-  "Marzo",
-  "Abril",
-  "Mayo",
-  "Junio",
-  "Julio",
-  "Agosto",
-  "Septiembre",
-  "Octubre",
-  "Noviembre",
-  "Diciembre",
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
 function monthKey(iso: string | null | undefined): string {
@@ -156,17 +133,87 @@ export function ProjectsKanban(props: Props) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  // Selector de mes: "all" | "YYYY-MM"
+  const [month, setMonth] = useState<string>("all");
+
+  // Meses disponibles desde created_at Y finalized_at de todos los proyectos
+  const months = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of props.projects) {
+      const ck = monthKey(p.created_at);
+      if (ck !== "0000-00") set.add(ck);
+      if (p.finalized_at) {
+        const fk = monthKey(p.finalized_at);
+        if (fk !== "0000-00") set.add(fk);
+      }
+    }
+    return [...set].sort((a, b) => b.localeCompare(a));
+  }, [props.projects]);
+
+  // Filtro:
+  //   - terminado  → solo los finalizados en el mes seleccionado
+  //   - resto      → auto-carry: proyectos con created_at ≤ mes seleccionado
+  const filtered = useMemo(() => {
+    if (month === "all") return props.projects;
+    return props.projects.filter((p) => {
+      if (p.phase === "terminado") {
+        return monthKey(p.finalized_at) === month;
+      }
+      return monthKey(p.created_at) <= month;
+    });
+  }, [props.projects, month]);
+
   const boardProps = {
-    projects: props.projects,
+    projects: filtered,
     editors: props.editors,
     clients: props.clients,
     availableParents: props.availableParents ?? [],
   };
 
-  return mounted ? (
-    <InteractiveKanban {...boardProps} />
-  ) : (
-    <StaticKanban {...boardProps} />
+  return (
+    <div className="flex flex-col gap-4">
+      {months.length > 1 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <MonthTab active={month === "all"} onClick={() => setMonth("all")}>
+            Todos
+          </MonthTab>
+          {months.map((m) => (
+            <MonthTab key={m} active={month === m} onClick={() => setMonth(m)}>
+              {monthLabel(m)}
+            </MonthTab>
+          ))}
+        </div>
+      ) : null}
+      {mounted ? (
+        <InteractiveKanban {...boardProps} />
+      ) : (
+        <StaticKanban {...boardProps} />
+      )}
+    </div>
+  );
+}
+
+function MonthTab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+        active
+          ? "border-border bg-accent text-foreground"
+          : "border-border/60 text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -181,7 +228,7 @@ function StaticKanban({
   const columns = buildColumns(projects);
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {ACTIVE_PHASES.map((phase) => (
+      {PROJECT_PHASES.map((phase) => (
         <div key={phase} className="flex min-w-0 flex-col gap-3">
           <div className="flex items-center justify-between px-1">
             <span
@@ -212,18 +259,11 @@ function StaticKanban({
           </div>
         </div>
       ))}
-      {/* 4ª columna: Terminado (log por mes) */}
-      <StaticTerminadoColumn
-        projects={columns["terminado"]}
-        editors={editors}
-        clients={clients}
-        availableParents={availableParents}
-      />
     </div>
   );
 }
 
-// ─── Interactive (client DnD) ─────────────────────────────────────────────────
+// ─── Interactive (cliente DnD) ────────────────────────────────────────────────
 
 function InteractiveKanban({
   projects,
@@ -244,7 +284,6 @@ function InteractiveKanban({
     useState<PendingFinalize | null>(null);
   const [, startTransition] = useTransition();
 
-  // Sincronizamos con datos del servidor sólo cuando cambia el contenido real.
   const projectsKey = useMemo(
     () =>
       projects
@@ -269,8 +308,6 @@ function InteractiveKanban({
         .flat()
         .find((p) => p.id === activeId) ?? null
     : null;
-
-  // ── DnD handlers ─────────────────────────────────────────────────────────
 
   function handleDragStart(e: DragStartEvent) {
     const id = String(e.active.id);
@@ -313,7 +350,6 @@ function InteractiveKanban({
   }
 
   function handleDragEnd(e: DragEndEvent) {
-    // Capturamos sourcePhase antes de resetear
     const sourcePhase = activeSourcePhase;
     setActiveId(null);
     setActiveSourcePhase(null);
@@ -329,24 +365,14 @@ function InteractiveKanban({
     const overContainer = findContainer(prevCols, overIdStr);
     if (!activeContainer || !overContainer) return;
 
-    // Sin-op: movimiento dentro de terminado (no ordenamos el log)
-    if (sourcePhase === "terminado" && overContainer === "terminado") return;
-
     let next = prevCols;
 
-    // Reorden dentro de una columna activa
-    if (
-      activeContainer === overContainer &&
-      activeContainer !== "terminado"
-    ) {
+    // Reorden dentro de la misma columna
+    if (activeContainer === overContainer) {
       const items = prevCols[activeContainer];
       const activeIndex = items.findIndex((p) => p.id === activeIdStr);
       const overIndex = items.findIndex((p) => p.id === overIdStr);
-      if (
-        activeIndex !== -1 &&
-        overIndex !== -1 &&
-        activeIndex !== overIndex
-      ) {
+      if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
         next = {
           ...prevCols,
           [activeContainer]: arrayMove(items, activeIndex, overIndex),
@@ -361,7 +387,7 @@ function InteractiveKanban({
     for (const phase of affected) {
       next[phase].forEach((p, idx) => {
         const u: ReorderUpdate = { id: p.id, phase, position: idx };
-        // Movido DESDE terminado → activo: des-finalizar
+        // Movido DESDE terminado → activo
         if (
           p.id === activeIdStr &&
           phase !== "terminado" &&
@@ -373,7 +399,7 @@ function InteractiveKanban({
       });
     }
 
-    // Movido HACIA terminado desde activo
+    // Movido HACIA terminado
     if (overContainer === "terminado" && sourcePhase !== "terminado") {
       const original = projects.find((p) => p.id === activeIdStr);
       const existingDate = original?.finalized_at
@@ -382,7 +408,6 @@ function InteractiveKanban({
       const today = todayUTC();
 
       if (existingDate && existingDate !== today) {
-        // Mostrar AlertDialog para elegir fecha
         const baseUpdates = updates.map((u) =>
           u.id === activeIdStr ? { ...u, finalized: true } : u
         );
@@ -395,7 +420,6 @@ function InteractiveKanban({
         return;
       }
 
-      // Finalizar con la fecha de hoy
       const finalUpdates = updates.map((u) =>
         u.id === activeIdStr
           ? { ...u, finalized: true, finalized_at: `${today}T12:00:00Z` }
@@ -408,7 +432,6 @@ function InteractiveKanban({
       return;
     }
 
-    // Commit normal (activo ↔ activo, o terminado → activo)
     if (updates.length > 0) {
       startTransition(async () => {
         const result = await reorderProjects(updates);
@@ -417,16 +440,12 @@ function InteractiveKanban({
     }
   }
 
-  // ── Handlers del AlertDialog ──────────────────────────────────────────────
-
   function handleUsarHoy() {
     if (!pendingFinalize) return;
     const { projectId, baseUpdates } = pendingFinalize;
     const today = todayUTC();
     const finalUpdates = baseUpdates.map((u) =>
-      u.id === projectId
-        ? { ...u, finalized_at: `${today}T12:00:00Z` }
-        : u
+      u.id === projectId ? { ...u, finalized_at: `${today}T12:00:00Z` } : u
     );
     startTransition(async () => {
       const result = await reorderProjects(finalUpdates);
@@ -454,8 +473,6 @@ function InteractiveKanban({
     setPendingFinalize(null);
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   return (
     <>
       <DndContext
@@ -470,8 +487,7 @@ function InteractiveKanban({
         }}
       >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {/* Tres columnas activas */}
-          {ACTIVE_PHASES.map((phase) => (
+          {PROJECT_PHASES.map((phase) => (
             <KanbanColumn
               key={phase}
               phase={phase}
@@ -481,13 +497,6 @@ function InteractiveKanban({
               availableParents={availableParents}
             />
           ))}
-          {/* 4ª columna: Terminado — droppable + log por mes */}
-          <InteractiveTerminadoColumn
-            projects={columns["terminado"]}
-            editors={editors}
-            clients={clients}
-            availableParents={availableParents}
-          />
         </div>
         <DragOverlay>
           {activeProject ? (
@@ -496,7 +505,6 @@ function InteractiveKanban({
         </DragOverlay>
       </DndContext>
 
-      {/* AlertDialog: re-terminar con fecha distinta */}
       {pendingFinalize ? (
         <AlertDialog
           open
@@ -539,7 +547,7 @@ function InteractiveKanban({
   );
 }
 
-// ─── Columna activa ───────────────────────────────────────────────────────────
+// ─── Columna ──────────────────────────────────────────────────────────────────
 
 function KanbanColumn({
   phase,
@@ -556,6 +564,11 @@ function KanbanColumn({
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: phase });
   const itemIds = useMemo(() => items.map((p) => p.id), [items]);
+
+  const emptyLabel =
+    phase === "terminado"
+      ? "Arrastrá una card acá"
+      : "Soltá una tarjeta acá";
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -582,7 +595,7 @@ function KanbanColumn({
         >
           {items.length === 0 ? (
             <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
-              Soltá una tarjeta acá
+              {emptyLabel}
             </p>
           ) : (
             items.map((p) => (
@@ -601,229 +614,7 @@ function KanbanColumn({
   );
 }
 
-// ─── Columna Terminado ────────────────────────────────────────────────────────
-
-/** Contenido compartido de la columna Terminado (estático e interactivo) */
-function TerminadoColumnContent({
-  projects,
-  editors,
-  clients,
-  availableParents = [],
-  interactive,
-  isOver = false,
-  setNodeRef,
-}: {
-  projects: ProjectWithRelations[];
-  editors: EditorMini[];
-  clients: ClientForProject[];
-  availableParents?: ParentOption[];
-  interactive: boolean;
-  isOver?: boolean;
-  setNodeRef?: (el: HTMLElement | null) => void;
-}) {
-  const byMonth: Record<string, ProjectWithRelations[]> = {};
-  for (const p of projects) {
-    const mk = monthKey(p.finalized_at);
-    if (!byMonth[mk]) byMonth[mk] = [];
-    byMonth[mk].push(p);
-  }
-  const sortedMonths = Object.keys(byMonth).sort().reverse();
-  const currentMk = monthKey(new Date().toISOString());
-
-  return (
-    <div className="flex min-w-0 flex-col gap-3">
-      {/* Encabezado — igual a las columnas activas */}
-      <div className="flex items-center justify-between px-1">
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium ${PHASE_CLASS.terminado}`}
-        >
-          {PHASE_LABEL.terminado}
-        </span>
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {projects.length}
-        </span>
-      </div>
-
-      {/* Zona droppable / contenido */}
-      <div
-        ref={setNodeRef}
-        className={`flex min-h-24 flex-col gap-2 rounded-lg p-1 transition-colors ${
-          isOver ? "bg-emerald-500/10 ring-2 ring-emerald-500/30" : ""
-        }`}
-      >
-        {projects.length === 0 ? (
-          <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
-            {interactive ? "Arrastrá una card acá" : "Sin proyectos"}
-          </p>
-        ) : (
-          sortedMonths.map((mk) => (
-            <MonthGroup
-              key={mk}
-              mk={mk}
-              projects={byMonth[mk]}
-              defaultOpen={mk === currentMk}
-              interactive={interactive}
-              editors={editors}
-              clients={clients}
-              availableParents={availableParents}
-            />
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Versión estática (SSR) de la columna Terminado */
-function StaticTerminadoColumn({
-  projects,
-  editors,
-  clients,
-  availableParents = [],
-}: {
-  projects: ProjectWithRelations[];
-  editors: EditorMini[];
-  clients: ClientForProject[];
-  availableParents?: ParentOption[];
-}) {
-  return (
-    <TerminadoColumnContent
-      projects={projects}
-      editors={editors}
-      clients={clients}
-      availableParents={availableParents}
-      interactive={false}
-    />
-  );
-}
-
-/** Versión interactiva (cliente) de la columna Terminado — incluye useDroppable */
-function InteractiveTerminadoColumn({
-  projects,
-  editors,
-  clients,
-  availableParents = [],
-}: {
-  projects: ProjectWithRelations[];
-  editors: EditorMini[];
-  clients: ClientForProject[];
-  availableParents?: ParentOption[];
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: "terminado" });
-  return (
-    <TerminadoColumnContent
-      projects={projects}
-      editors={editors}
-      clients={clients}
-      availableParents={availableParents}
-      interactive
-      isOver={isOver}
-      setNodeRef={setNodeRef}
-    />
-  );
-}
-
-/** Grupo de proyectos de un mes dentro del log de Terminado */
-function MonthGroup({
-  mk,
-  projects,
-  defaultOpen,
-  interactive,
-  editors,
-  clients,
-  availableParents = [],
-}: {
-  mk: string;
-  projects: ProjectWithRelations[];
-  defaultOpen: boolean;
-  interactive: boolean;
-  editors: EditorMini[];
-  clients: ClientForProject[];
-  availableParents?: ParentOption[];
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-border/40">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-accent/30"
-      >
-        {open ? (
-          <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
-        )}
-        <span>{monthLabel(mk)}</span>
-        <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-          {projects.length}
-        </span>
-      </button>
-
-      {open ? (
-        <div className="border-t border-border/40 p-2">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.map((p) =>
-              interactive ? (
-                <DraggableTerminadoCard
-                  key={p.id}
-                  project={p}
-                  editors={editors}
-                  clients={clients}
-                  availableParents={availableParents}
-                />
-              ) : (
-                <CardView
-                  key={p.id}
-                  project={p}
-                  editors={editors}
-                  clients={clients}
-                  availableParents={availableParents}
-                />
-              )
-            )}
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/** Card en la sección Terminado: draggable (puede volverse activa de nuevo) */
-function DraggableTerminadoCard({
-  project,
-  editors,
-  clients,
-  availableParents = [],
-}: {
-  project: ProjectWithRelations;
-  editors: EditorMini[];
-  clients: ClientForProject[];
-  availableParents?: ParentOption[];
-}) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({ id: project.id });
-  const style = { transform: CSS.Transform.toString(transform) };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={isDragging ? "opacity-30" : ""}
-    >
-      <CardView
-        project={project}
-        editors={editors}
-        clients={clients}
-        availableParents={availableParents}
-        dragHandleProps={{ ...attributes, ...listeners }}
-      />
-    </div>
-  );
-}
-
-// ─── Sortable card (columnas activas) ─────────────────────────────────────────
+// ─── Sortable card ────────────────────────────────────────────────────────────
 
 function SortableCard({
   project,
@@ -864,7 +655,7 @@ function SortableCard({
   );
 }
 
-// ─── Card view (compartida por ambas secciones) ───────────────────────────────
+// ─── Card view ────────────────────────────────────────────────────────────────
 
 function CardView({
   project,
@@ -898,7 +689,6 @@ function CardView({
         </div>
       ) : null}
 
-      {/* Drag handle */}
       <div
         className="relative -mt-3 cursor-grab border-b border-border/40 bg-muted/40 px-3 pt-5 pb-3 active:cursor-grabbing"
         {...dragHandleProps}

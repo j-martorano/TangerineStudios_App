@@ -12,6 +12,13 @@ import {
   formatPrice,
 } from "@/lib/projects/format";
 
+const PHASE_BAR_CLASS: Record<ProjectPhase, string> = {
+  por_asignar: "bg-stone-400 dark:bg-stone-500",
+  editando: "bg-blue-400 dark:bg-blue-500",
+  en_revision: "bg-amber-400 dark:bg-amber-500",
+  terminado: "bg-emerald-400 dark:bg-emerald-500",
+};
+
 import {
   MonthNav,
   currentMonthKey,
@@ -57,7 +64,9 @@ export default async function DashboardPage({
     (p) =>
       !p.finalized &&
       !p.archived &&
-      (p.phase === "por_asignar" || p.phase === "editando")
+      (p.phase === "por_asignar" ||
+        p.phase === "editando" ||
+        p.phase === "en_revision")
   );
 
   // MÃ©tricas del mes seleccionado y del previo.
@@ -183,7 +192,7 @@ export default async function DashboardPage({
         <StatCard
           label="Activos ahora"
           value={String(activeProjects.length)}
-          hint="Por asignar + Editando"
+          hint="Por asignar + Editando + En revisión"
           items={projectItems(activeProjects.slice(0, 3), "phase-label")}
           href="/kanban"
           hrefLabel="Ir al kanban"
@@ -239,7 +248,7 @@ export default async function DashboardPage({
         <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Por fase
         </h2>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           {PROJECT_PHASES.map((phase) => {
             const count = byPhase[phase] ?? 0;
             const pct =
@@ -260,7 +269,7 @@ export default async function DashboardPage({
                 </span>
                 <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full bg-primary transition-all"
+                    className={`h-full transition-all ${PHASE_BAR_CLASS[phase]}`}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
