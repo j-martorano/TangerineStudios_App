@@ -112,7 +112,6 @@ export function ClientForm({
       city: city.trim() || null,
       state: clientState.trim() || null,
       country: country.trim() || null,
-      billing_info: null,
       email: email.trim() || null,
       phone: phone.trim() || null,
       docs_url: docsUrl.trim() || null,

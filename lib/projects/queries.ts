@@ -478,7 +478,7 @@ export type ClientWithCount = ClientRow & {
 };
 
 const CLIENT_FULL_SELECT =
-  "id, name, color, payment_type, agreed_price, retainer_discount_pct, billing_info, email, phone, docs_url, created_at, projects(duration_minutes, archived), client_editors(editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount))), client_payments(id, amount, minutes_credited, paid_at, note)";
+  "id, name, color, payment_type, agreed_price, retainer_discount_pct, billing_name, tax_id, address, city, state, country, email, phone, docs_url, created_at, projects(duration_minutes, archived), client_editors(editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount))), client_payments(id, amount, minutes_credited, paid_at, note)";
 
 export async function fetchClientsWithCount(): Promise<ClientWithCount[]> {
   const supabase = await createClient();
@@ -497,7 +497,6 @@ function mapClient(c: {
   payment_type: ClientRow["payment_type"];
   agreed_price: number | null;
   retainer_discount_pct: number;
-  billing_info: string | null;
   billing_name?: string | null;
   tax_id?: string | null;
   address?: string | null;
@@ -532,7 +531,6 @@ function mapClient(c: {
     payment_type: c.payment_type,
     agreed_price: c.agreed_price,
     retainer_discount_pct: c.retainer_discount_pct,
-    billing_info: c.billing_info,
     billing_name: c.billing_name ?? null,
     tax_id: c.tax_id ?? null,
     address: c.address ?? null,

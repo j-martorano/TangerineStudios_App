@@ -40,8 +40,6 @@ const clientInputSchema = z.object({
   city: z.string().nullable().default(null),
   state: z.string().nullable().default(null),
   country: z.string().nullable().default(null),
-  // billing_info se mantiene en la DB pero ya no se usa en el form
-  billing_info: z.string().nullable().default(null),
   email: z.string().email("Email inválido").nullable().or(z.literal("")).default(null),
   phone: z.string().nullable().default(null),
   docs_url: z
@@ -130,7 +128,6 @@ export async function createClient(
       city: normalizeText(parsed.data.city),
       state: normalizeText(parsed.data.state),
       country: normalizeText(parsed.data.country),
-      billing_info: parsed.data.billing_info,
       email: normalizeText(parsed.data.email),
       phone: normalizeText(parsed.data.phone),
       docs_url: normalizeUrl(parsed.data.docs_url),
@@ -176,7 +173,6 @@ export async function updateClient(
       city: normalizeText(parsed.data.city),
       state: normalizeText(parsed.data.state),
       country: normalizeText(parsed.data.country),
-      billing_info: parsed.data.billing_info,
       email: normalizeText(parsed.data.email),
       phone: normalizeText(parsed.data.phone),
       docs_url: normalizeUrl(parsed.data.docs_url),

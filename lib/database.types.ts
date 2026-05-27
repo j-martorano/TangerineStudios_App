@@ -181,7 +181,6 @@ export type Database = {
         Row: {
           address: string | null
           agreed_price: number | null
-          billing_info: string | null
           billing_name: string | null
           city: string | null
           color: string
@@ -200,7 +199,6 @@ export type Database = {
         Insert: {
           address?: string | null
           agreed_price?: number | null
-          billing_info?: string | null
           billing_name?: string | null
           city?: string | null
           color?: string
@@ -219,7 +217,6 @@ export type Database = {
         Update: {
           address?: string | null
           agreed_price?: number | null
-          billing_info?: string | null
           billing_name?: string | null
           city?: string | null
           color?: string
