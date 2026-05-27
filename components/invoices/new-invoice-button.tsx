@@ -38,7 +38,7 @@ export function NewInvoiceButton({ projects, clients }: Props) {
         <PlusIcon className="size-4" />
         Nueva factura
       </DialogTrigger>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="sm:max-w-[min(50vw,680px)]">
         <DialogHeader>
           <DialogTitle>Nueva factura</DialogTitle>
           <DialogDescription>

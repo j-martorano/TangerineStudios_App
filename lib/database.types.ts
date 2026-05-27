@@ -179,9 +179,13 @@ export type Database = {
       }
       clients: {
         Row: {
+          address: string | null
           agreed_price: number | null
           billing_info: string | null
+          billing_name: string | null
+          city: string | null
           color: string
+          country: string | null
           created_at: string
           docs_url: string | null
           email: string | null
@@ -190,11 +194,17 @@ export type Database = {
           payment_type: Database["public"]["Enums"]["payment_type"]
           phone: string | null
           retainer_discount_pct: number
+          state: string | null
+          tax_id: string | null
         }
         Insert: {
+          address?: string | null
           agreed_price?: number | null
           billing_info?: string | null
+          billing_name?: string | null
+          city?: string | null
           color?: string
+          country?: string | null
           created_at?: string
           docs_url?: string | null
           email?: string | null
@@ -203,11 +213,17 @@ export type Database = {
           payment_type?: Database["public"]["Enums"]["payment_type"]
           phone?: string | null
           retainer_discount_pct?: number
+          state?: string | null
+          tax_id?: string | null
         }
         Update: {
+          address?: string | null
           agreed_price?: number | null
           billing_info?: string | null
+          billing_name?: string | null
+          city?: string | null
           color?: string
+          country?: string | null
           created_at?: string
           docs_url?: string | null
           email?: string | null
@@ -216,6 +232,8 @@ export type Database = {
           payment_type?: Database["public"]["Enums"]["payment_type"]
           phone?: string | null
           retainer_discount_pct?: number
+          state?: string | null
+          tax_id?: string | null
         }
         Relationships: []
       }

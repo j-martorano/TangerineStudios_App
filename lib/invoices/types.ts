@@ -54,7 +54,12 @@ export type InvoiceWithProjects = Invoice & {
 export type ClientForInvoice = {
   id: string;
   name: string;
-  billing_info: string | null;
+  billing_name: string | null;
+  tax_id: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
 };
 
 export type InvoiceSettings = {

@@ -93,8 +93,11 @@ export function InvoiceForm({ projects, clients, onSuccess }: Props) {
     }
     const c = clients.find((x) => x.id === clientId);
     if (!c) return;
-    setClientName(c.name);
-    setClientAddress(c.billing_info ?? "");
+    setClientName(c.billing_name || c.name);
+    setClientAddress(
+      [c.address, c.city, c.state].filter(Boolean).join("\n")
+    );
+    setClientCountry(c.country ?? "");
     // Limpiar proyectos seleccionados al cambiar cliente
     setSelectedProjectIds([]);
   }, [clientId, clients]);
@@ -220,7 +223,7 @@ export function InvoiceForm({ projects, clients, onSuccess }: Props) {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <div className="flex max-h-[75vh] flex-col gap-5 overflow-y-auto pr-1">
+      <div className="flex flex-col gap-5 overflow-y-auto pr-1" style={{ maxHeight: "calc(100svh - 18rem)" }}>
 
         {/* ── Fila superior: fecha + moneda ── */}
         <div className="grid grid-cols-2 gap-3">

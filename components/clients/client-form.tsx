@@ -7,7 +7,6 @@ import { RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -61,7 +60,12 @@ export function ClientForm({
       ? String(client.retainer_discount_pct)
       : "10"
   );
-  const [billingInfo, setBillingInfo] = useState(client?.billing_info ?? "");
+  const [billingName, setBillingName] = useState(client?.billing_name ?? "");
+  const [taxId, setTaxId] = useState(client?.tax_id ?? "");
+  const [address, setAddress] = useState(client?.address ?? "");
+  const [city, setCity] = useState(client?.city ?? "");
+  const [clientState, setClientState] = useState(client?.state ?? "");
+  const [country, setCountry] = useState(client?.country ?? "");
   const [email, setEmail] = useState(client?.email ?? "");
   const [phone, setPhone] = useState(client?.phone ?? "");
   const [docsUrl, setDocsUrl] = useState(client?.docs_url ?? "");
@@ -102,7 +106,13 @@ export function ClientForm({
       payment_type: paymentType,
       agreed_price: usesRate ? parsedPrice : null,
       retainer_discount_pct: parsedDiscount,
-      billing_info: billingInfo.trim() || null,
+      billing_name: billingName.trim() || null,
+      tax_id: taxId.trim() || null,
+      address: address.trim() || null,
+      city: city.trim() || null,
+      state: clientState.trim() || null,
+      country: country.trim() || null,
+      billing_info: null,
       email: email.trim() || null,
       phone: phone.trim() || null,
       docs_url: docsUrl.trim() || null,
@@ -302,18 +312,6 @@ export function ClientForm({
         </div>
 
         <Field
-          label="Datos de facturación"
-          hint="Texto libre: CUIT, razón social, dirección, condición IVA, etc."
-        >
-          <Textarea
-            rows={3}
-            value={billingInfo}
-            onChange={(e) => setBillingInfo(e.target.value)}
-            placeholder="CUIT 30-12345678-9 — Acme S.A. — Av. Siempre Viva 123"
-          />
-        </Field>
-
-        <Field
           label="Documentos"
           hint="URL a carpeta o archivo (Drive, Dropbox, etc.)"
         >
@@ -322,6 +320,61 @@ export function ClientForm({
             value={docsUrl}
             onChange={(e) => setDocsUrl(e.target.value)}
             placeholder="https://drive.google.com/..."
+          />
+        </Field>
+      </Section>
+
+      <Section title="Facturación">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field
+            label="Razón social"
+            hint="Nombre legal para facturar. Si es distinto del nombre del cliente."
+          >
+            <Input
+              value={billingName}
+              onChange={(e) => setBillingName(e.target.value)}
+              placeholder="Acme S.A."
+            />
+          </Field>
+          <Field label="CUIT / Tax ID">
+            <Input
+              value={taxId}
+              onChange={(e) => setTaxId(e.target.value)}
+              placeholder="30-12345678-9"
+            />
+          </Field>
+        </div>
+
+        <Field label="Dirección">
+          <Input
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Av. Siempre Viva 742"
+          />
+        </Field>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Ciudad / Localidad">
+            <Input
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="Buenos Aires"
+            />
+          </Field>
+          <Field label="Provincia / Estado">
+            <Input
+              value={clientState}
+              onChange={(e) => setClientState(e.target.value)}
+              placeholder="CABA"
+            />
+          </Field>
+        </div>
+
+        <Field label="País">
+          <Input
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            placeholder="Argentina"
           />
         </Field>
       </Section>

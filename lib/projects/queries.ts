@@ -498,6 +498,12 @@ function mapClient(c: {
   agreed_price: number | null;
   retainer_discount_pct: number;
   billing_info: string | null;
+  billing_name?: string | null;
+  tax_id?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
   email: string | null;
   phone: string | null;
   docs_url: string | null;
@@ -527,6 +533,12 @@ function mapClient(c: {
     agreed_price: c.agreed_price,
     retainer_discount_pct: c.retainer_discount_pct,
     billing_info: c.billing_info,
+    billing_name: c.billing_name ?? null,
+    tax_id: c.tax_id ?? null,
+    address: c.address ?? null,
+    city: c.city ?? null,
+    state: c.state ?? null,
+    country: c.country ?? null,
     email: c.email,
     phone: c.phone,
     docs_url: c.docs_url,
