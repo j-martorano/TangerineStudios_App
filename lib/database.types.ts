@@ -353,6 +353,155 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_projects: {
+        Row: {
+          created_at: string
+          invoice_id: string
+          project_id: string
+        }
+        Insert: {
+          created_at?: string
+          invoice_id: string
+          project_id: string
+        }
+        Update: {
+          created_at?: string
+          invoice_id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_projects_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_settings: {
+        Row: {
+          id: number
+          next_number: number
+          sender_address: string
+          sender_city: string
+          sender_country: string
+          sender_email: string
+          sender_name: string
+          sender_state: string
+        }
+        Insert: {
+          id?: number
+          next_number?: number
+          sender_address?: string
+          sender_city?: string
+          sender_country?: string
+          sender_email?: string
+          sender_name: string
+          sender_state?: string
+        }
+        Update: {
+          id?: number
+          next_number?: number
+          sender_address?: string
+          sender_city?: string
+          sender_country?: string
+          sender_email?: string
+          sender_name?: string
+          sender_state?: string
+        }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          client_address: string
+          client_country: string
+          client_id: string | null
+          client_name: string
+          created_at: string
+          currency_symbol: string
+          date: string
+          discount_amount: number
+          discount_enabled: boolean
+          discount_type: string
+          discount_value: number
+          id: string
+          invoice_code: string
+          invoice_number: number
+          items: Json
+          notes: string | null
+          pdf_storage_path: string | null
+          subtotal: number
+          total: number
+          upfront_amount: number
+          upfront_enabled: boolean
+          upfront_percentage: number
+        }
+        Insert: {
+          client_address?: string
+          client_country?: string
+          client_id?: string | null
+          client_name: string
+          created_at?: string
+          currency_symbol?: string
+          date: string
+          discount_amount?: number
+          discount_enabled?: boolean
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          invoice_code: string
+          invoice_number: number
+          items?: Json
+          notes?: string | null
+          pdf_storage_path?: string | null
+          subtotal?: number
+          total?: number
+          upfront_amount?: number
+          upfront_enabled?: boolean
+          upfront_percentage?: number
+        }
+        Update: {
+          client_address?: string
+          client_country?: string
+          client_id?: string | null
+          client_name?: string
+          created_at?: string
+          currency_symbol?: string
+          date?: string
+          discount_amount?: number
+          discount_enabled?: boolean
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          invoice_code?: string
+          invoice_number?: number
+          items?: Json
+          notes?: string | null
+          pdf_storage_path?: string | null
+          subtotal?: number
+          total?: number
+          upfront_amount?: number
+          upfront_enabled?: boolean
+          upfront_percentage?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       monthly_settlements: {
         Row: {
           party_id: string
@@ -627,6 +776,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_invoice_number: { Args: Record<never, never>; Returns: number }
       slugify: { Args: { input: string }; Returns: string }
       unaccent: { Args: { "": string }; Returns: string }
     }
