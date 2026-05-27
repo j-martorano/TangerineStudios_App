@@ -53,3 +53,28 @@ export async function fetchFixedServices(): Promise<FixedService[]> {
     created_at: s.created_at,
   }));
 }
+
+// ── Historial de gastos por servicio y mes ────────────────────────────────────
+// Meses pasados: se leen de esta tabla (editables, independientes del estado
+// actual del servicio). Mes actual: siempre derivado de los servicios activos.
+
+export type ServiceMonthEntry = {
+  service_id: string;
+  year_month: string; // 'YYYY-MM'
+  amount: number;
+};
+
+export async function fetchServiceMonthEntries(): Promise<ServiceMonthEntry[]> {
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from("service_month_entries")
+    .select("service_id, year_month, amount");
+  if (error) throw new Error(error.message);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((e: any) => ({
+    service_id: e.service_id,
+    year_month: e.year_month,
+    amount: Number(e.amount),
+  }));
+}

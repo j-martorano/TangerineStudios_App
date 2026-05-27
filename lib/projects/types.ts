@@ -113,9 +113,9 @@ export type ProjectWithRelations = ProjectRow & {
   editor_pagos: ProjectEditorPago[];
 };
 
-/** Un proyecto es "pack" cuando tiene al menos un hijo. */
+/** Un proyecto es "pack" cuando su tipo es explícitamente 'pack'. */
 export function isPack(p: ProjectWithRelations): boolean {
-  return (p.children?.length ?? 0) > 0;
+  return p.project_type === "pack";
 }
 
 /** Un proyecto es "hijo de un pack" si tiene parent_id seteado. */
@@ -131,18 +131,21 @@ export const PROJECT_PHASES: ProjectPhase[] = [
 ];
 
 export const PROJECT_TYPES: ProjectType[] = [
+  "pack",
   "long_form",
   "short_form",
   "other",
 ];
 
 export const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
+  pack: "Pack",
   long_form: "Long-form",
   short_form: "Short-form",
   other: "Otro",
 };
 
 export const PROJECT_TYPE_CLASS: Record<ProjectType, string> = {
+  pack: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
   long_form: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
   short_form:
     "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300",

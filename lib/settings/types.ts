@@ -99,6 +99,7 @@ export const FINANZAS_TABS = [
   "por_mes",
   "pagos",
   "por_proyecto",
+  "cobros_pendientes",
   "servicios",
 ] as const;
 export type FinanzasTabId = (typeof FINANZAS_TABS)[number];
@@ -108,6 +109,7 @@ export const FINANZAS_TAB_LABEL: Record<FinanzasTabId, string> = {
   por_mes: "Por mes",
   pagos: "Pagos retainer",
   por_proyecto: "Por proyecto",
+  cobros_pendientes: "Cobros pendientes",
   servicios: "Servicios fijos",
 };
 
@@ -138,6 +140,7 @@ const DEFAULT_PROJECTS_COLUMNS: ProjectsColumnId[] = [
   "type",
   "client",
   "price",
+  "cost",
   "profit",
   "actions",
   "finalized",
@@ -157,13 +160,45 @@ export const DEFAULT_PREFS: UserPrefs = {
   },
 };
 
+/**
+ * Garantiza que las columnas obligatorias del default (las que se agregaron
+ * después de que el usuario guardó sus preferencias) estén presentes.
+ * Inserta las nuevas columnas en la posición relativa correcta del default;
+ * si no se puede inferir la posición, las agrega al final (antes de "actions").
+ */
+function ensureDefaultColumns(
+  saved: ProjectsColumnId[],
+  defaults: ProjectsColumnId[]
+): ProjectsColumnId[] {
+  const missing = defaults.filter((c) => !saved.includes(c));
+  if (missing.length === 0) return saved;
+  const result = [...saved];
+  for (const col of missing) {
+    const defaultIdx = defaults.indexOf(col);
+    // Busca el primer vecino a la derecha que ya exista en result para insertar antes.
+    const insertBefore = defaults
+      .slice(defaultIdx + 1)
+      .find((c) => result.includes(c));
+    if (insertBefore) {
+      result.splice(result.indexOf(insertBefore), 0, col);
+    } else {
+      // Fallback: agrega antes de "actions" si existe, si no al final.
+      const actionsIdx = result.indexOf("actions");
+      result.splice(actionsIdx >= 0 ? actionsIdx : result.length, 0, col);
+    }
+  }
+  return result;
+}
+
 /** Mezcla preferencias parciales del DB con los defaults. */
 export function mergePrefs(partial: Partial<UserPrefs> | null): UserPrefs {
   if (!partial) return DEFAULT_PREFS;
   return {
     columns: {
-      projects:
+      projects: ensureDefaultColumns(
         partial.columns?.projects ?? DEFAULT_PREFS.columns.projects,
+        DEFAULT_PREFS.columns.projects
+      ),
       editors: partial.columns?.editors ?? DEFAULT_PREFS.columns.editors,
       clients: partial.columns?.clients ?? DEFAULT_PREFS.columns.clients,
     },

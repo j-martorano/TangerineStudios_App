@@ -15,10 +15,10 @@ import type {
 } from "@/lib/projects/types";
 import type { ProjectsColumnId } from "@/lib/settings/types";
 
-// Tinte de fondo de fila con el color del cliente (~12% de opacidad).
+// Tinte de fondo de fila con el color del cliente (~20% de opacidad).
 function clientTint(hex: string | null | undefined): string | undefined {
   if (!hex) return undefined;
-  return `${hex}1f`;
+  return `${hex}33`;
 }
 
 function rowAppearance(p: ProjectWithRelations): {

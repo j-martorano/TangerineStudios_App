@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { CheckIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { setProjectFinalized } from "@/lib/projects/actions";
@@ -16,10 +17,21 @@ type Props = {
  * Casillero clickeable de "finalizado". Al tildarlo el proyecto se cierra:
  * sale del kanban, se bloquea la edición y entra a Finanzas. Destildarlo lo
  * reabre.
+ *
+ * Usa router.refresh() tras cada cambio para que el server component
+ * re-renderice con datos frescos — así las cards hijas/padre también
+ * actualizan su estado visual sin necesidad de recargar la página.
  */
 export function FinalizeToggle({ id, title, finalized: initial }: Props) {
   const [finalized, setFinalized] = useState(initial);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
+
+  // Sincroniza el estado local cuando el server component re-renderiza
+  // (después de router.refresh()) y pasa un nuevo valor de `initial`.
+  useEffect(() => {
+    setFinalized(initial);
+  }, [initial]);
 
   function toggle() {
     const next = !finalized;
@@ -33,6 +45,9 @@ export function FinalizeToggle({ id, title, finalized: initial }: Props) {
         toast.success(
           next ? `«${title}» finalizado` : `«${title}» reabierto`
         );
+        // Refresca los server components para que hijos/padre también
+        // actualicen su chip de finalizado.
+        router.refresh();
       }
     });
   }

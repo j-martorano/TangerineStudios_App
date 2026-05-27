@@ -37,9 +37,9 @@ export default async function ProjectsPage({
 
   const projectsPerYear = prefs.limits.projects_per_year;
 
-  // Padres elegibles para asignar como pack: top-level no archivados.
+  // Padres elegibles: solo proyectos de tipo "pack" no archivados.
   const availableParents = projects
-    .filter((p) => !p.parent_id && !p.archived)
+    .filter((p) => p.project_type === "pack" && !p.archived)
     .map((p) => ({ id: p.id, title: p.title, client_id: p.client_id }));
 
   // AÃ±os con proyectos, del mÃ¡s reciente al mÃ¡s viejo. SÃ³lo top-level (los

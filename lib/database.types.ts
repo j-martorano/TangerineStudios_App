@@ -643,7 +643,7 @@ export type Database = {
         | "revising"
         | "done"
         | "invoiced"
-      project_type: "long_form" | "short_form" | "other"
+      project_type: "long_form" | "short_form" | "other" | "pack"
       settlement_party_type: "client_cobro" | "editor_pago"
     }
     CompositeTypes: {
@@ -788,7 +788,7 @@ export const Constants = {
         "done",
         "invoiced",
       ],
-      project_type: ["long_form", "short_form", "other"],
+      project_type: ["long_form", "short_form", "other", "pack"],
       settlement_party_type: ["client_cobro", "editor_pago"],
     },
   },

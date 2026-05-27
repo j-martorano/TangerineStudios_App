@@ -67,7 +67,10 @@ export function ProjectRow({
   const [expanded, setExpanded] = useState(false);
   const visible = new Set<ProjectsColumnId>(visibleColumns);
   const hidden = PROJECTS_COLUMNS.filter((c) => !visible.has(c));
-  const locked = project.finalized;
+  // Los hijos de un pack (nested) siempre son editables individualmente,
+  // independientemente de su estado de finalización. Su ciclo de vida es
+  // gestionado a través del pack, no por finalización individual.
+  const locked = nested ? false : project.finalized;
   const pack = isPack(project);
   const canExpand = pack || hidden.length > 0;
 
@@ -212,8 +215,8 @@ function renderValue(
           ) : null}
           <span>{p.title}</span>
           {pack ? (
-            <span className="inline-flex items-center rounded-full bg-purple-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-purple-600 dark:text-purple-300">
-              Pack · {p.children!.length} short
+            <span className="inline-flex items-center rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">
+              Pack · {p.children!.length} proyecto
               {p.children!.length === 1 ? "" : "s"}
             </span>
           ) : null}

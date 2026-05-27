@@ -3,12 +3,16 @@
 import { useState, useTransition } from "react";
 import {
   ArchiveIcon,
+  ClipboardCopyIcon,
+  CopyIcon,
   MoreVerticalIcon,
   PencilIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,6 +26,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -29,11 +34,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
 import { ProjectForm, type ParentOption } from "./project-form";
-import { setProjectArchived } from "@/lib/projects/actions";
+import { cloneProject, setProjectArchived } from "@/lib/projects/actions";
 import type {
   ClientForProject,
   EditorMini,
@@ -45,6 +51,8 @@ type Props = {
   editors: EditorMini[];
   clients: ClientForProject[];
   availableParents?: ParentOption[];
+  /** Llamado cuando el dropdown abre/cierra — usado para el efecto blur. */
+  onMenuOpenChange?: (open: boolean) => void;
 };
 
 export function KanbanCardActions({
@@ -52,10 +60,37 @@ export function KanbanCardActions({
   editors,
   clients,
   availableParents = [],
+  onMenuOpenChange,
 }: Props) {
   const [editOpen, setEditOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [cloneTitle, setCloneTitle] = useState("");
   const [pending, startTransition] = useTransition();
+
+  function handleCopyCode() {
+    navigator.clipboard
+      .writeText(project.project_code)
+      .then(() => toast.success(`Código «${project.project_code}» copiado`))
+      .catch(() => toast.error("No se pudo copiar el código"));
+  }
+
+  function openCloneDialog() {
+    setCloneTitle(project.title);
+    setCloneOpen(true);
+  }
+
+  function handleClone() {
+    startTransition(async () => {
+      const result = await cloneProject(project.id, cloneTitle);
+      if (result.ok) {
+        toast.success(`Proyecto clonado`);
+        setCloneOpen(false);
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
 
   function handleArchive() {
     startTransition(async () => {
@@ -71,7 +106,11 @@ export function KanbanCardActions({
 
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu
+        onOpenChange={(open) => {
+          onMenuOpenChange?.(open);
+        }}
+      >
         <DropdownMenuTrigger
           render={
             <Button
@@ -86,7 +125,15 @@ export function KanbanCardActions({
         >
           <MoreVerticalIcon className="size-4" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem
+            onClick={handleCopyCode}
+            className="cursor-pointer"
+          >
+            <ClipboardCopyIcon className="size-4" />
+            <span>Copiar código</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => setEditOpen(true)}
             className="cursor-pointer"
@@ -100,6 +147,14 @@ export function KanbanCardActions({
           >
             <ArchiveIcon className="size-4" />
             <span>Archivar</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={openCloneDialog}
+            className="cursor-pointer"
+          >
+            <CopyIcon className="size-4" />
+            <span>Clonar</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -138,6 +193,59 @@ export function KanbanCardActions({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de clonar — pide el nombre del nuevo proyecto */}
+      <Dialog
+        open={cloneOpen}
+        onOpenChange={(open) => {
+          if (!open) setCloneOpen(false);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clonar proyecto</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Se creará una copia exacta con todos los datos. El código se
+              genera automáticamente.
+            </p>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="clone-title">Nombre del nuevo proyecto</Label>
+              <Input
+                id="clone-title"
+                value={cloneTitle}
+                onChange={(e) => setCloneTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !pending && cloneTitle.trim()) {
+                    e.preventDefault();
+                    handleClone();
+                  }
+                }}
+                placeholder="Nombre del proyecto clonado"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCloneOpen(false)}
+              disabled={pending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleClone}
+              disabled={pending || !cloneTitle.trim()}
+            >
+              {pending ? "Clonando…" : "Clonar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

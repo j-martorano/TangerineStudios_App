@@ -34,6 +34,8 @@ import type {
 type Props = {
   project: ProjectWithRelations;
   disabled?: boolean;
+  /** Llamado después de cualquier mutación exitosa. */
+  onSuccess?: () => void;
 };
 
 function todayISO(): string {
@@ -55,14 +57,15 @@ function fmtDate(iso: string): string {
  * Cada editor del proyecto tiene su propia sub-sección con sus totales,
  * historial y form. Al pie, botones de estado global del proyecto.
  */
-export function PagoManagerPanel({ project, disabled = false }: Props) {
+export function PagoManagerPanel({ project, disabled = false, onSuccess }: Props) {
   const [pending, startTransition] = useTransition();
   const editorsInProject = project.editors.filter((e) => e.editor != null);
 
   function handleStatus(next: PagadoStatus) {
     startTransition(async () => {
       const result = await changePagado(project.id, next);
-      if (!result.ok) toast.error(result.error);
+      if (result.ok) onSuccess?.();
+      else toast.error(result.error);
     });
   }
 
@@ -86,6 +89,7 @@ export function PagoManagerPanel({ project, disabled = false }: Props) {
               pending={pending}
               startTransition={startTransition}
               disabled={disabled}
+              onSuccess={onSuccess}
             />
           ))}
         </div>
@@ -167,6 +171,7 @@ function EditorSection({
   pending,
   startTransition,
   disabled,
+  onSuccess,
 }: {
   project: ProjectWithRelations;
   editorId: string;
@@ -174,6 +179,7 @@ function EditorSection({
   pending: boolean;
   startTransition: (cb: () => void) => void;
   disabled: boolean;
+  onSuccess?: () => void;
 }) {
   const [amount, setAmount] = useState("");
   const [paidAt, setPaidAt] = useState(todayISO());
@@ -209,6 +215,7 @@ function EditorSection({
       if (result.ok) {
         toast.success(`Pago a ${editorName} registrado`);
         resetForm();
+        onSuccess?.();
       } else {
         toast.error(result.error);
       }
@@ -218,7 +225,8 @@ function EditorSection({
   function handleDelete(id: string) {
     startTransition(async () => {
       const result = await deleteEditorPago(id);
-      if (!result.ok) toast.error(result.error);
+      if (result.ok) onSuccess?.();
+      else toast.error(result.error);
     });
   }
 
@@ -237,6 +245,7 @@ function EditorSection({
           `Pago de ${formatPrice(remaining)} a ${editorName} registrado`
         );
         resetForm();
+        onSuccess?.();
       } else {
         toast.error(result.error);
       }

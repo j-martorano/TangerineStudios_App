@@ -30,10 +30,9 @@ export default async function KanbanPage({
   // sÃ­ aparecen, cada uno en su columna/secciÃ³n, con un chip que indica el pack.
   const projects = allProjects.filter((p) => !isPack(p));
 
-  // Padres disponibles para asignar como pack en el form: proyectos top-level
-  // (no hijos) no archivados.
+  // Padres disponibles: solo proyectos de tipo "pack" no archivados.
   const availableParents = allProjects
-    .filter((p) => !p.parent_id && !p.archived)
+    .filter((p) => p.project_type === "pack" && !p.archived)
     .map((p) => ({ id: p.id, title: p.title, client_id: p.client_id }));
 
   return (

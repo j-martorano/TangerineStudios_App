@@ -30,6 +30,8 @@ import type {
 type Props = {
   project: ProjectWithRelations;
   disabled?: boolean;
+  /** Llamado después de cualquier mutación exitosa (registrar, borrar, cambiar estado). */
+  onSuccess?: () => void;
 };
 
 function todayISO(): string {
@@ -51,7 +53,7 @@ function fmtDate(iso: string): string {
  * nuevo y botones de estado. Se usa tal cual dentro del diálogo
  * `CobroManager` o embedded en una fila (ej. Finanzas → Por proyecto).
  */
-export function CobroManagerPanel({ project, disabled = false }: Props) {
+export function CobroManagerPanel({ project, disabled = false, onSuccess }: Props) {
   const [amount, setAmount] = useState("");
   const [paidAt, setPaidAt] = useState(todayISO());
   const [note, setNote] = useState("");
@@ -86,6 +88,7 @@ export function CobroManagerPanel({ project, disabled = false }: Props) {
       if (result.ok) {
         toast.success("Cobro registrado");
         resetForm();
+        onSuccess?.();
       } else {
         toast.error(result.error);
       }
@@ -95,14 +98,16 @@ export function CobroManagerPanel({ project, disabled = false }: Props) {
   function handleDelete(id: string) {
     startTransition(async () => {
       const result = await deleteCobro(id);
-      if (!result.ok) toast.error(result.error);
+      if (result.ok) onSuccess?.();
+      else toast.error(result.error);
     });
   }
 
   function handleStatus(next: CobradoStatus) {
     startTransition(async () => {
       const result = await changeCobrado(project.id, next);
-      if (!result.ok) toast.error(result.error);
+      if (result.ok) onSuccess?.();
+      else toast.error(result.error);
     });
   }
 
@@ -118,6 +123,7 @@ export function CobroManagerPanel({ project, disabled = false }: Props) {
       if (result.ok) {
         toast.success(`Cobro de ${formatPrice(remaining)} registrado`);
         resetForm();
+        onSuccess?.();
       } else {
         toast.error(result.error);
       }

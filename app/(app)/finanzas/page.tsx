@@ -3,6 +3,7 @@ import { fetchClients, fetchProjects } from "@/lib/projects/queries";
 import {
   fetchClientPayments,
   fetchFixedServices,
+  fetchServiceMonthEntries,
 } from "@/lib/finanzas/queries";
 import { fetchUserPrefs } from "@/lib/settings/queries";
 import { FixedServicesSection } from "@/components/finanzas/fixed-services-section";
@@ -32,11 +33,10 @@ import type { ProjectWithRelations } from "@/lib/projects/types";
 import type { FinanzasPayment } from "@/lib/finanzas/queries";
 import { ProjectSettleButton } from "@/components/finanzas/project-settle-button";
 
-// Tinte de fondo basado en el color del cliente (mismo patrÃ³n que en
-// proyectos: hex de 8 dÃ­gitos = RRGGBB + alpha 0x1f).
+// Tinte de fondo basado en el color del cliente (hex de 8 dígitos = RRGGBB + alpha 0x33).
 function clientTint(hex: string | null | undefined): string | undefined {
   if (!hex) return undefined;
-  return `${hex}1f`;
+  return `${hex}33`;
 }
 
 export const dynamic = "force-dynamic";
@@ -102,6 +102,50 @@ function monthLabel(iso: string): string {
   return MONTH_FORMATTER.format(new Date(iso));
 }
 
+/**
+ * Rellena los meses sin actividad entre el primer bucket existente y el mes
+ * actual, para que los servicios fijos se descuenten también en esos meses.
+ * Devuelve todos los buckets ordenados de más nuevo a más viejo.
+ */
+function fillMonthGaps(buckets: MonthBucket[]): MonthBucket[] {
+  if (buckets.length === 0) return buckets;
+
+  const byKey = new Map(buckets.map((b) => [b.key, b]));
+
+  const now = new Date();
+  const cy = now.getUTCFullYear();
+  const cm = now.getUTCMonth() + 1;
+
+  // Mes de inicio: el más antiguo con actividad
+  const firstKey = [...byKey.keys()].sort()[0];
+  let [y, m] = firstKey.split("-").map(Number);
+
+  const result: MonthBucket[] = [];
+  while (y < cy || (y === cy && m <= cm)) {
+    const key = `${y}-${String(m).padStart(2, "0")}`;
+    result.push(
+      byKey.get(key) ?? {
+        key,
+        label: monthLabel(`${key}-01T00:00:00Z`),
+        projects: [],
+        collected: 0,
+        pendingCollect: 0,
+        paid: 0,
+        pendingPay: 0,
+        profit: 0,
+        servicesCost: 0,
+      }
+    );
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+  }
+
+  return result.sort((a, b) => b.key.localeCompare(a.key));
+}
+
 type BuildResult = {
   buckets: MonthBucket[];
   paymentItems: PaymentItem[];
@@ -158,7 +202,8 @@ function build(
   for (const p of projects) {
     if (!p.finalized) continue;
     if (p.parent_id) continue;
-    const monthIso = p.finalized_at ?? p.created_at;
+    if (!p.finalized_at) continue;
+    const monthIso = p.finalized_at;
     const key = monthKey(monthIso);
     const bucket = ensureBucket(key, monthIso);
     bucket.projects.push(p);
@@ -294,6 +339,7 @@ const ALLOWED_TABS = new Set([
   "por_mes",
   "pagos",
   "por_proyecto",
+  "cobros_pendientes",
   "servicios",
 ]);
 
@@ -310,16 +356,18 @@ export default async function FinanzasPage({
           | "por_mes"
           | "pagos"
           | "por_proyecto"
+          | "cobros_pendientes"
           | "servicios")
       : null;
 
-  const [projects, payments, fixedServices, prefs, clients] =
+  const [projects, payments, fixedServices, prefs, clients, serviceMonthEntries] =
     await Promise.all([
       fetchProjects(),
       fetchClientPayments(),
       fetchFixedServices(),
       fetchUserPrefs(),
       fetchClients(),
+      fetchServiceMonthEntries(),
     ]);
 
   const retainerClients: RetainerClient[] = clients
@@ -331,17 +379,78 @@ export default async function FinanzasPage({
       rate: c.agreed_price != null ? Number(c.agreed_price) : null,
       discountPct: Number(c.retainer_discount_pct),
     }));
-  const { buckets, paymentItems, projectItems } = build(projects, payments);
+  // Mes actual — definido aquí para usarlo tanto en los cálculos de servicios
+  // como en la UI (por_mes defaultOpen, Servicios tab, etc.).
+  const now = new Date();
+  const currentMonthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 
-  // Servicios fijos activos: su costo mensual se resta de la ganancia de
-  // cada mes con actividad.
-  const servicesMonthlyTotal = fixedServices
-    .filter((s) => s.active)
-    .reduce((sum, s) => sum + s.monthly_cost, 0);
-  for (const b of buckets) {
-    b.servicesCost = servicesMonthlyTotal;
-    b.profit -= servicesMonthlyTotal;
+  const { buckets: rawBuckets, paymentItems, projectItems } = build(projects, payments);
+
+  // ── Servicios fijos por mes ───────────────────────────────────────────────
+  // Meses pasados: se leen de service_month_entries (editables en la UI).
+  // Mes actual: se deriva en vivo de los servicios activos.
+  // Meses sin entradas en DB = no se descuenta nada (el usuario no los registró).
+
+  // Índice: year_month → service_id → amount
+  const entriesByMonth = new Map<string, Map<string, number>>();
+  for (const e of serviceMonthEntries) {
+    if (!entriesByMonth.has(e.year_month))
+      entriesByMonth.set(e.year_month, new Map());
+    entriesByMonth.get(e.year_month)!.set(e.service_id, e.amount);
   }
+
+  const activeServices = fixedServices.filter((s) => s.active);
+  const servicesMonthlyTotal = activeServices.reduce(
+    (sum, s) => sum + s.monthly_cost,
+    0
+  );
+
+  const buckets = fillMonthGaps(rawBuckets);
+  for (const b of buckets) {
+    if (b.key === currentMonthKey) {
+      // Mes actual: activos
+      if (servicesMonthlyTotal > 0) {
+        b.servicesCost = servicesMonthlyTotal;
+        b.profit -= servicesMonthlyTotal;
+      }
+    } else if (b.key < currentMonthKey) {
+      // Mes pasado: entradas guardadas en DB
+      const monthMap = entriesByMonth.get(b.key);
+      if (monthMap && monthMap.size > 0) {
+        const total = [...monthMap.values()].reduce((s, a) => s + a, 0);
+        if (total > 0) {
+          b.servicesCost = total;
+          b.profit -= total;
+        }
+      }
+    }
+  }
+
+  // ── monthlyApplication: prop para el tab Servicios ────────────────────────
+  type AppEntry = { service_id: string; name: string; amount: number };
+  const monthlyApplication = buckets.map((b) => {
+    const isPast = b.key < currentMonthKey;
+    const monthMap = isPast ? entriesByMonth.get(b.key) : null;
+    const isSeeded = monthMap != null && monthMap.size > 0;
+
+    let entries: AppEntry[];
+    if (!isPast) {
+      entries = activeServices.map((s) => ({
+        service_id: s.id,
+        name: s.name,
+        amount: s.monthly_cost,
+      }));
+    } else if (isSeeded) {
+      entries = [...monthMap!.entries()].map(([sid, amount]) => {
+        const svc = fixedServices.find((s) => s.id === sid);
+        return { service_id: sid, name: svc?.name ?? "Servicio eliminado", amount };
+      });
+    } else {
+      entries = [];
+    }
+
+    return { key: b.key, label: b.label, servicesCost: b.servicesCost, isPast, isSeeded, entries };
+  });
 
   const totalCollected = sumAcrossBuckets(buckets, "collected");
   const totalPendingCollect = sumAcrossBuckets(buckets, "pendingCollect");
@@ -554,9 +663,6 @@ export default async function FinanzasPage({
     </div>
   );
 
-  const now = new Date();
-  const currentMonthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-
   const porMesSection =
     buckets.length === 0 ? (
       <p className="text-sm italic text-muted-foreground">
@@ -604,7 +710,14 @@ export default async function FinanzasPage({
             />
           ),
           por_proyecto: <ProjectsSection items={projectItems} />,
-          servicios: <FixedServicesSection services={fixedServices} />,
+          cobros_pendientes: <PendingCobrosSection items={projectItems} />,
+          servicios: (
+            <FixedServicesSection
+              services={fixedServices}
+              monthlyApplication={monthlyApplication}
+              currentMonthKey={currentMonthKey}
+            />
+          ),
         }}
       />
     </main>
@@ -792,6 +905,58 @@ function ProjectList({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ── Cobros pendientes ──────────────────────────────────────────────────────────
+
+function PendingCobrosSection({ items }: { items: ProjectSettleItem[] }) {
+  // Solo cobros no saldados, ordenados de más viejo a más nuevo.
+  const pending = [...items]
+    .filter((i) => i.field === "cobrado" && !i.settled)
+    .sort((a, b) => {
+      if (a.yearMonth !== b.yearMonth)
+        return a.yearMonth.localeCompare(b.yearMonth); // más viejo primero
+      return (b.remaining ?? 0) - (a.remaining ?? 0); // más monto primero en el mismo mes
+    });
+
+  const total = pending.reduce((s, i) => s + (i.remaining ?? 0), 0);
+
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Cobros pendientes
+          </h2>
+          {pending.length > 0 ? (
+            <span className="text-xs text-muted-foreground">
+              {pending.length} proyecto{pending.length === 1 ? "" : "s"} Â·{" "}
+              <span className="text-amber-500 tabular-nums">
+                {formatPrice(total)} por cobrar
+              </span>
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      {pending.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-14 text-muted-foreground">
+          <span className="text-2xl">✓</span>
+          <p className="text-sm italic">
+            ¡Todo cobrado! No hay cobros pendientes.
+          </p>
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="divide-y divide-border/40 p-0">
+            {pending.map((it) => (
+              <SettleRow key={`${it.projectId}-cobrado`} item={it} />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+    </section>
   );
 }
 

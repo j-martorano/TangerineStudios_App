@@ -117,8 +117,13 @@ const projectInputSchema = z
           id: z.string().regex(uuidRegex, "ID hijo inválido").optional(),
           title: z
             .string()
-            .min(1, "El título del short es obligatorio")
+            .min(1, "El título del proyecto hijo es obligatorio")
             .max(120),
+          // Los hijos de un pack pueden ser cualquier tipo excepto "pack"
+          // (no soportamos anidación de packs).
+          project_type: projectTypeEnum
+            .exclude(["pack"])
+            .default("long_form"),
         })
       )
       .default([]),
@@ -193,13 +198,13 @@ export async function createProject(
     if (editorError) return { ok: false, error: editorError.message };
   }
 
-  // Si vino con shorts (pack), creamos cada hijo con defaults.
+  // Si vino con hijos (pack), creamos cada uno con su tipo y defaults mínimos.
   if (children.length > 0) {
     const childRows = children.map((c) => ({
       title: c.title,
       client_id: projectData.client_id,
       client_name: clientName,
-      project_type: "short_form" as const,
+      project_type: c.project_type,
       parent_id: created.id,
       phase: "por_asignar" as const,
       cobrado: "no" as const,
@@ -241,7 +246,8 @@ export async function updateProject(
       : new Date().toISOString()
     : undefined; // no tocar finalized_at si no es terminado
 
-  const updatePayload: Record<string, unknown> = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updatePayload: any = {
     ...projectData,
     client_name: clientName,
     finalized: isTerminado,
@@ -256,6 +262,16 @@ export async function updateProject(
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
+
+  // Si el hijo sale de "terminado" (no finalizado) y tiene pack padre,
+  // reabrir el padre también (un pack no puede estar terminado con hijos abiertos).
+  if (!isTerminado && projectData.parent_id) {
+    const { error: parentReopenErr } = await supabase
+      .from("projects")
+      .update({ finalized: false, finalized_at: null })
+      .eq("id", projectData.parent_id);
+    if (parentReopenErr) return { ok: false, error: parentReopenErr.message };
+  }
 
   // Sync editors: delete-then-insert para mantener la pivot consistente.
   const { error: deleteError } = await supabase
@@ -273,17 +289,25 @@ export async function updateProject(
     if (insertError) return { ok: false, error: insertError.message };
   }
 
-  // Sync de hijos del pack. Diff entre lo que mandó el form y lo que ya
-  // está en DB: borramos lo que ya no aparece, actualizamos los títulos
-  // de los que siguen y creamos los nuevos. No tocamos editor, phase,
-  // pagado, etc. de los hijos existentes — eso se edita por separado.
+  // ── Sync de hijos del pack ────────────────────────────────────────────────
+  // 1. Diff de la lista: borramos los que ya no están, actualizamos título y
+  //    tipo de los existentes, creamos los nuevos.
+  // 2. Propagación de contexto: cliente y editores del pack se aplican a
+  //    TODOS los hijos vigentes. Los campos individuales (fase, cobrado,
+  //    pagado, duración, etc.) se respetan — cada hijo puede editarse aparte.
   const { data: existingChildren, error: fetchChildErr } = await supabase
     .from("projects")
-    .select("id, title")
+    .select("id, title, project_type")
     .eq("parent_id", id);
   if (fetchChildErr) return { ok: false, error: fetchChildErr.message };
 
-  const existing = (existingChildren ?? []) as { id: string; title: string }[];
+  const existing = (existingChildren ?? []) as {
+    id: string;
+    title: string;
+    project_type: string;
+  }[];
+
+  // — 1a. Borrar hijos que el form ya no incluye —
   const sentIds = new Set(children.filter((c) => c.id).map((c) => c.id!));
   const idsToDelete = existing
     .filter((c) => !sentIds.has(c.id))
@@ -297,25 +321,27 @@ export async function updateProject(
     if (delErr) return { ok: false, error: delErr.message };
   }
 
+  // — 1b. Actualizar título y tipo de los existentes —
   for (const c of children) {
     if (!c.id) continue;
     const old = existing.find((e) => e.id === c.id);
-    if (old && old.title !== c.title) {
+    if (old && (old.title !== c.title || old.project_type !== c.project_type)) {
       const { error: updErr } = await supabase
         .from("projects")
-        .update({ title: c.title })
+        .update({ title: c.title, project_type: c.project_type })
         .eq("id", c.id);
       if (updErr) return { ok: false, error: updErr.message };
     }
   }
 
+  // — 1c. Crear nuevos hijos —
   const newChildren = children.filter((c) => !c.id);
   if (newChildren.length > 0) {
     const childRows = newChildren.map((c) => ({
       title: c.title,
       client_id: projectData.client_id,
       client_name: clientName,
-      project_type: "short_form" as const,
+      project_type: c.project_type,
       parent_id: id,
       phase: "por_asignar" as const,
       cobrado: "no" as const,
@@ -326,6 +352,54 @@ export async function updateProject(
       .from("projects")
       .insert(childRows as never);
     if (insErr) return { ok: false, error: insErr.message };
+  }
+
+  // — 2. Propagar contexto del pack a sus hijos —
+  // Reglas:
+  //   • Cliente     → siempre a TODOS los hijos (un pack es de un solo cliente).
+  //   • Editores    → solo a hijos NUEVOS (los existentes conservan los suyos).
+  //   • Finalizado  → si el pack pasa a terminado/reabierto, se propaga a TODOS.
+  if (projectData.project_type === "pack") {
+    // Fetch de todos los hijos vigentes (incluye los recién creados)
+    const { data: freshChildren } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("parent_id", id);
+    const allChildIds = (freshChildren ?? []).map((c) => c.id);
+
+    if (allChildIds.length > 0) {
+      // 2a. Propagar cliente a todos
+      const { error: clientPropErr } = await supabase
+        .from("projects")
+        .update({ client_id: projectData.client_id, client_name: clientName })
+        .in("id", allChildIds);
+      if (clientPropErr) return { ok: false, error: clientPropErr.message };
+
+      // 2b. Propagar finalización a todos los hijos
+      const { error: finalPropErr } = await supabase
+        .from("projects")
+        .update({
+          finalized: isTerminado,
+          ...(resolvedFinalizedAt !== undefined
+            ? { finalized_at: resolvedFinalizedAt }
+            : {}),
+        })
+        .in("id", allChildIds);
+      if (finalPropErr) return { ok: false, error: finalPropErr.message };
+
+      // 2c. Asignar editores solo a los hijos recién creados
+      const existingIds = new Set(existing.map((e) => e.id));
+      const newChildIds = allChildIds.filter((cid) => !existingIds.has(cid));
+      if (newChildIds.length > 0 && editors.length > 0) {
+        const childEditorRows = newChildIds.flatMap((childId) =>
+          buildEditorRows(childId, editors)
+        );
+        const { error: insEditorsErr } = await supabase
+          .from("project_editors")
+          .insert(childEditorRows);
+        if (insEditorsErr) return { ok: false, error: insEditorsErr.message };
+      }
+    }
   }
 
   revalidateAll();
@@ -575,6 +649,88 @@ export async function deleteEditorPago(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+// ====== Clonar proyecto ======
+
+export async function cloneProject(id: string, newTitle: string): Promise<ActionResult> {
+  if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
+  const trimmedTitle = newTitle.trim();
+  if (!trimmedTitle) return { ok: false, error: "El título no puede estar vacío" };
+
+  const supabase = await createClient();
+
+  // Traer el proyecto original con sus editores
+  const { data: orig, error: fetchErr } = await supabase
+    .from("projects")
+    .select(
+      "title, client_id, client_name, phase, cobrado, pagado, invoiced, price, cost, duration_minutes, parent_id, project_type, finalized, finalized_at"
+    )
+    .eq("id", id)
+    .single<{
+      title: string;
+      client_id: string | null;
+      client_name: string | null;
+      phase: ProjectPhase;
+      cobrado: CobradoStatus;
+      pagado: PagadoStatus;
+      invoiced: InvoicedStatus;
+      price: number | null;
+      cost: number | null;
+      duration_minutes: number | null;
+      parent_id: string | null;
+      project_type: ProjectType;
+      finalized: boolean;
+      finalized_at: string | null;
+    }>();
+
+  if (fetchErr || !orig) {
+    return { ok: false, error: fetchErr?.message ?? "Proyecto no encontrado" };
+  }
+
+  // Crear copia — project_code lo genera el trigger automáticamente
+  const { data: cloned, error: insertErr } = await supabase
+    .from("projects")
+    .insert({
+      title: trimmedTitle,
+      client_id: orig.client_id,
+      client_name: orig.client_name,
+      phase: orig.phase,
+      cobrado: orig.cobrado,
+      pagado: orig.pagado,
+      invoiced: orig.invoiced,
+      price: orig.price,
+      cost: orig.cost,
+      duration_minutes: orig.duration_minutes,
+      parent_id: orig.parent_id,
+      project_type: orig.project_type,
+      finalized: orig.finalized,
+      finalized_at: orig.finalized_at,
+    } as never)
+    .select("id")
+    .single<{ id: string }>();
+
+  if (insertErr || !cloned) {
+    return { ok: false, error: insertErr?.message ?? "Error al clonar" };
+  }
+
+  // Copiar editores del original
+  const { data: editorRows } = await supabase
+    .from("project_editors")
+    .select("editor_id, cost")
+    .eq("project_id", id);
+
+  if (editorRows && editorRows.length > 0) {
+    const { error: editorErr } = await supabase
+      .from("project_editors")
+      .insert(
+        editorRows.map((e) => ({ project_id: cloned.id, editor_id: e.editor_id, cost: e.cost }))
+      );
+    if (editorErr) return { ok: false, error: editorErr.message };
+  }
+
+  revalidateAll();
+  return { ok: true };
+}
+
 export async function changeProjectDuration(
   id: string,
   minutes: number | null
@@ -652,6 +808,11 @@ export async function setProjectArchived(
 /**
  * Marca un proyecto como finalizado (o lo reabre). Al finalizarlo se guarda
  * `finalized_at`: ese es el mes en el que el proyecto entra a Finanzas.
+ *
+ * Cascada bidireccional:
+ *   • Pack → hijos: al finalizar/reabrir un pack, todos sus hijos hacen lo mismo.
+ *   • Hijo → padre: al desmarcar un hijo, el pack padre también se reabre
+ *     (un pack no puede estar "terminado" si algún hijo no lo está).
  */
 export async function setProjectFinalized(
   id: string,
@@ -660,15 +821,52 @@ export async function setProjectFinalized(
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
 
   const supabase = await createClient();
+  const now = new Date().toISOString();
+  const payload = {
+    finalized,
+    finalized_at: finalized ? now : null,
+  };
+
+  // 1. Actualizar el proyecto principal
   const { error } = await supabase
     .from("projects")
-    .update({
-      finalized,
-      finalized_at: finalized ? new Date().toISOString() : null,
-    })
+    .update(payload)
     .eq("id", id);
-
   if (error) return { ok: false, error: error.message };
+
+  // 2. Propagar hacia abajo: si tiene hijos (pack), aplicarles el mismo cambio
+  const { data: children } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("parent_id", id);
+
+  if (children && children.length > 0) {
+    const childIds = children.map((c) => c.id);
+    const { error: childErr } = await supabase
+      .from("projects")
+      .update(payload)
+      .in("id", childIds);
+    if (childErr) return { ok: false, error: childErr.message };
+  }
+
+  // 3. Propagar hacia arriba: si se está desmarcando y el proyecto tiene
+  //    padre (es hijo de un pack), reabrir el pack padre también.
+  if (!finalized) {
+    const { data: self } = await supabase
+      .from("projects")
+      .select("parent_id")
+      .eq("id", id)
+      .single();
+
+    if (self?.parent_id) {
+      const { error: parentErr } = await supabase
+        .from("projects")
+        .update({ finalized: false, finalized_at: null })
+        .eq("id", self.parent_id);
+      if (parentErr) return { ok: false, error: parentErr.message };
+    }
+  }
+
   revalidateAll();
   return { ok: true };
 }
@@ -703,7 +901,8 @@ export async function reorderProjects(
   const supabase = await createClient();
   const results = await Promise.all(
     parsed.data.map((u) => {
-      const payload: Record<string, unknown> = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const payload: any = {
         phase: u.phase,
         position: u.position,
       };
