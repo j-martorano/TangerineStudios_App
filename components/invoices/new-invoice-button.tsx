@@ -15,11 +15,12 @@ import {
 } from "@/components/ui/dialog";
 
 import { InvoiceForm } from "./invoice-form";
-import type { ClientForProject, ProjectWithRelations } from "@/lib/projects/types";
+import type { ClientForInvoice } from "@/lib/invoices/types";
+import type { ProjectWithRelations } from "@/lib/projects/types";
 
 type Props = {
   projects: ProjectWithRelations[];
-  clients: ClientForProject[];
+  clients: ClientForInvoice[];
 };
 
 export function NewInvoiceButton({ projects, clients }: Props) {
@@ -37,12 +38,12 @@ export function NewInvoiceButton({ projects, clients }: Props) {
         <PlusIcon className="size-4" />
         Nueva factura
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Nueva factura</DialogTitle>
           <DialogDescription>
-            Completá los datos. Podés vincular proyectos para auto-rellenar
-            los ítems.
+            Elegí el cliente, vinculá proyectos para auto-rellenar los ítems, y
+            ajustá lo que necesites.
           </DialogDescription>
         </DialogHeader>
         <InvoiceForm

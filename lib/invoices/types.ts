@@ -50,6 +50,13 @@ export type InvoiceWithProjects = Invoice & {
   projects: InvoiceProject[];
 };
 
+/** Cliente liviano con los datos que necesita el formulario de factura */
+export type ClientForInvoice = {
+  id: string;
+  name: string;
+  billing_info: string | null;
+};
+
 export type InvoiceSettings = {
   next_number: number;
   sender_name: string;

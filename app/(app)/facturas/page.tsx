@@ -1,5 +1,5 @@
-import { fetchInvoices } from "@/lib/invoices/queries";
-import { fetchProjects, fetchClients } from "@/lib/projects/queries";
+import { fetchInvoices, fetchClientsForInvoice } from "@/lib/invoices/queries";
+import { fetchProjects } from "@/lib/projects/queries";
 
 import { InvoiceList } from "@/components/invoices/invoice-list";
 import { NewInvoiceButton } from "@/components/invoices/new-invoice-button";
@@ -10,7 +10,7 @@ export default async function FacturasPage() {
   const [invoices, projects, clients] = await Promise.all([
     fetchInvoices(),
     fetchProjects(),
-    fetchClients(),
+    fetchClientsForInvoice(),
   ]);
 
   return (

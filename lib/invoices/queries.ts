@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { InvoiceSettings, InvoiceWithProjects } from "./types";
+import type { ClientForInvoice, InvoiceSettings, InvoiceWithProjects } from "./types";
 
 // ── Facturas ──────────────────────────────────────────────────────────────────
 
@@ -33,6 +33,18 @@ export async function fetchInvoices(): Promise<InvoiceWithProjects[]> {
     const { invoice_projects: _ignored, ...rest } = r;
     return { ...(rest as object), items: r.items ?? [], projects } as InvoiceWithProjects;
   });
+}
+
+// ── Clientes para facturas ────────────────────────────────────────────────────
+
+export async function fetchClientsForInvoice(): Promise<ClientForInvoice[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id, name, billing_info")
+    .order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ClientForInvoice[];
 }
 
 // ── Configuración de facturación ──────────────────────────────────────────────
