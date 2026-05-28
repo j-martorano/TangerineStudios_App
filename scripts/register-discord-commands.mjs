@@ -55,7 +55,11 @@ const COMMANDS = [
   },
   {
     name: "proyectos",
-    description: "Lista tus proyectos activos (o todos si sos Joaco)",
+    description: "Lista tus proyectos activos",
+  },
+  {
+    name: "ayuda",
+    description: "Muestra los comandos disponibles",
   },
   {
     name: "estado",

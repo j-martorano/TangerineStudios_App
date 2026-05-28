@@ -13,6 +13,7 @@ import { handleVincular } from "./vincular";
 import { handleProyectos } from "./proyectos";
 import { handleEstado } from "./estado";
 import { handleMover } from "./mover";
+import { handleAyuda } from "./ayuda";
 import { autocompleteEstado } from "./estado";
 import { autocompleteMover } from "./mover";
 import { replyError } from "../respond";
@@ -24,6 +25,7 @@ export const COMMANDS: Record<string, CommandHandler> = {
   proyectos: handleProyectos,
   estado: handleEstado,
   mover: handleMover,
+  ayuda: handleAyuda,
 };
 
 // ── Autocomplete handlers (keyed by command name) ───────────────────────────
