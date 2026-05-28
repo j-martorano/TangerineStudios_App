@@ -28,8 +28,8 @@ export default async function KanbanPage({
     fetchClientsForInvoice(),
   ]);
 
-  // En el kanban no mostramos los packs como card propia â€” sus shorts hijos
-  // sÃ­ aparecen, cada uno en su columna/secciÃ³n, con un chip que indica el pack.
+  // En el kanban no mostramos los packs como card propia — sus shorts hijos
+  // sí aparecen, cada uno en su columna/sección, con un chip que indica el pack.
   const projects = allProjects.filter((p) => !isPack(p));
 
   // Padres disponibles: solo proyectos de tipo "pack" no archivados.
@@ -44,7 +44,7 @@ export default async function KanbanPage({
           <h1 className="text-2xl font-semibold tracking-tight">Kanban</h1>
           <p className="text-sm text-muted-foreground">
             {projects.length} proyecto{projects.length === 1 ? "" : "s"}
-            {query ? <> Â· filtro: Â«{query}Â»</> : null}
+            {query ? <> · filtro: «{query}»</> : null}
           </p>
         </div>
         <NewProjectButton
@@ -55,7 +55,7 @@ export default async function KanbanPage({
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <DataSearch placeholder="Buscar por tÃ­tulo o clienteâ€¦" />
+        <DataSearch placeholder="Buscar por título o cliente…" />
       </div>
 
       <ProjectsKanban

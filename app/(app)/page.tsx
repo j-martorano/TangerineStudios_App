@@ -54,8 +54,8 @@ export default async function DashboardPage({
   ]);
 
   // En el dashboard los stats se calculan sobre top-level (packs +
-  // proyectos sueltos). Los shorts hijos no se cuentan sueltos â€” su info
-  // aporta al pack vÃ­a computeCost.
+  // proyectos sueltos). Los shorts hijos no se cuentan sueltos — su info
+  // aporta al pack vía computeCost.
   const projects = allProjects.filter((p) => !p.parent_id);
 
   // Snapshot global (no depende del mes seleccionado).
@@ -69,7 +69,7 @@ export default async function DashboardPage({
         p.phase === "en_revision")
   );
 
-  // MÃ©tricas del mes seleccionado y del previo.
+  // Métricas del mes seleccionado y del previo.
   const monthMetrics = computeMonthMetrics(projects, payments, selectedMonth);
   const previousMetrics = computeMonthMetrics(
     projects,
@@ -133,8 +133,8 @@ export default async function DashboardPage({
       .filter((id): id is string => Boolean(id))
   );
 
-  // Resumen retainer: Ãºltimo pago + saldo por cliente mensual. `payments` de
-  // fetchClientPayments no expone client_id, asÃ­ que matcheamos por nombre.
+  // Resumen retainer: último pago + saldo por cliente mensual. `payments` de
+  // fetchClientPayments no expone client_id, así que matcheamos por nombre.
   const retainerClients: RetainerClientSummary[] = clients
     .filter((c) => c.payment_type === "mensual")
     .map((c) => {
@@ -158,14 +158,14 @@ export default async function DashboardPage({
         <div className="flex items-baseline gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            {clients.length} cliente{clients.length === 1 ? "" : "s"} Â·{" "}
+            {clients.length} cliente{clients.length === 1 ? "" : "s"} ·{" "}
             {projects.length} proyecto{projects.length === 1 ? "" : "s"}
           </p>
         </div>
         <MonthNav current={selectedMonth} />
       </header>
 
-      {/* Resumen del mes â€” nÃºmeros netos del mes con delta vs mes anterior. */}
+      {/* Resumen del mes — números netos del mes con delta vs mes anterior. */}
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <SummaryRow
           label="Cobrado del mes"
@@ -198,7 +198,7 @@ export default async function DashboardPage({
           hrefLabel="Ir al kanban"
         />
         <StatCard
-          label={`Por cobrar â€” ${monthLabelUpper(selectedMonth)}`}
+          label={`Por cobrar — ${monthLabelUpper(selectedMonth)}`}
           value={
             pendingCobroTotal > 0
               ? formatPrice(pendingCobroTotal)
@@ -216,7 +216,7 @@ export default async function DashboardPage({
           highlight={pendingCobroTotal > 0}
         />
         <StatCard
-          label={`Por pagar â€” ${monthLabelUpper(selectedMonth)}`}
+          label={`Por pagar — ${monthLabelUpper(selectedMonth)}`}
           value={
             pendingPagoTotal > 0
               ? formatPrice(pendingPagoTotal)
@@ -397,7 +397,7 @@ function moneyDelta(
 ): { raw: number; text: string } | undefined {
   const raw = current - previous;
   if (raw === 0 && previous === 0) return undefined;
-  const sign = raw > 0 ? "+" : raw < 0 ? "âˆ’" : "";
+  const sign = raw > 0 ? "+" : raw < 0 ? "−" : "";
   const abs = Math.abs(raw);
   return { raw, text: `${sign}${formatPrice(abs)}` };
 }
@@ -408,7 +408,7 @@ function countDelta(
 ): { raw: number; text: string } | undefined {
   const raw = current - previous;
   if (raw === 0) return undefined;
-  const sign = raw > 0 ? "+" : "âˆ’";
+  const sign = raw > 0 ? "+" : "−";
   return { raw, text: `${sign}${Math.abs(raw)}` };
 }
 

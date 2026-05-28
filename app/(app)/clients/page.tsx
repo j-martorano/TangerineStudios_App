@@ -39,7 +39,7 @@ export default async function ClientsPage({
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <DataSearch placeholder="Buscar cliente por nombreâ€¦" />
+        <DataSearch placeholder="Buscar cliente por nombre…" />
       </div>
 
       <div className="rounded-xl border bg-card p-2">

@@ -45,7 +45,7 @@ export default async function EditorsPage({
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <DataSearch placeholder="Buscar editor por nombreâ€¦" />
+        <DataSearch placeholder="Buscar editor por nombre…" />
       </div>
 
       <div className="rounded-xl border bg-card p-2">
