@@ -181,16 +181,34 @@ export async function handleMover(
     return replyError("Error al actualizar el proyecto. Intentá de nuevo.");
   }
 
-  // ── Notify Joaco ─────────────────────────────────────────────────────────
-  // Awaited before returning: in Vercel serverless the function terminates
-  // as soon as a Response is returned, so unawaited async calls get cancelled.
-  await notifyProjectMoved({
-    projectTitle: project.title,
-    projectId: project.id,
-    editorName,
-    fromPhase: project.phase,
-    toPhase: newPhase,
-  });
+  // ── Notify Joaco (debug mode) ────────────────────────────────────────────
+  const channelId = process.env.DISCORD_NOTIFY_CHANNEL_ID ?? "MISSING";
+  const botToken  = process.env.DISCORD_BOT_TOKEN ?? "MISSING";
+
+  let debugStatus = "";
+  try {
+    const notifyRes = await fetch(
+      `https://discord.com/api/v10/channels/${channelId}/messages`,
+      {
+        method:  "POST",
+        headers: {
+          Authorization:  `Bot ${botToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          embeds: [{
+            color: 0xf97316,
+            description: `🔄 **${editorName}** movió **${project.title}**`,
+            timestamp: new Date().toISOString(),
+          }],
+        }),
+      }
+    );
+    const notifyBody = await notifyRes.text();
+    debugStatus = `notify=${notifyRes.status} ch=${channelId.slice(-6)} token=${botToken.slice(-6)} body=${notifyBody.slice(0,80)}`;
+  } catch (e) {
+    debugStatus = `notify=THROW ${String(e).slice(0, 80)}`;
+  }
 
   // ── Confirm to editor ────────────────────────────────────────────────────
   const fromLabel = `${PHASE_EMOJI[project.phase] ?? "?"} ${PHASE_LABEL[project.phase] ?? project.phase}`;
@@ -198,6 +216,6 @@ export async function handleMover(
   const client = project.client_name ? ` *(${project.client_name})*` : "";
 
   return reply(
-    `✅ **${project.title}**${client}\n${fromLabel} → **${toLabel}**`
+    `✅ **${project.title}**${client}\n${fromLabel} → **${toLabel}**\n\`${debugStatus}\``
   );
 }
