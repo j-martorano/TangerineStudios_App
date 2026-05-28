@@ -11,7 +11,7 @@ import { isPack } from "@/lib/projects/types";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ q?: string }>;
+type SearchParams = Promise<{ q?: string; focus?: string }>;
 
 export default async function KanbanPage({
   searchParams,
@@ -20,6 +20,7 @@ export default async function KanbanPage({
 }) {
   const params = await searchParams;
   const query = params.q?.trim() || undefined;
+  const focusId = params.focus?.trim() || undefined;
 
   const [allProjects, editors, clients, clientsForInvoice] = await Promise.all([
     fetchProjects({ query }),
@@ -64,6 +65,7 @@ export default async function KanbanPage({
         clients={clients}
         clientsForInvoice={clientsForInvoice}
         availableParents={availableParents}
+        highlightId={focusId}
       />
     </main>
   );

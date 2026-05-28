@@ -201,7 +201,7 @@ export async function handleMover(
         embeds: [{
           color:       0xf97316,
           title:       "Ver en Kanban →",
-          url:         "https://tangerine-studios-app.vercel.app/kanban",
+          url:         `https://tangerine-studios-app.vercel.app/kanban?focus=${project.id}`,
           description: `🔄 **${editorName}** movió **${project.title}**\n${fromLabel} → **${toLabel}**`,
           footer:      { text: project.client_name ?? `ID: ${project.id}` },
           timestamp:   new Date().toISOString(),

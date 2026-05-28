@@ -83,6 +83,8 @@ type Props = {
   clients: ClientForProject[];
   clientsForInvoice?: ClientForInvoice[];
   availableParents?: ParentOption[];
+  /** ID del proyecto a resaltar (viene del param ?focus=ID del link de Discord) */
+  highlightId?: string;
 };
 
 type ColumnsMap = Record<ProjectPhase, ProjectWithRelations[]>;
@@ -151,6 +153,11 @@ const KanbanFocusCtx = createContext<{
   setFocusedId: (id: string | null) => void;
 }>({ focusedId: null, setFocusedId: () => {} });
 
+// ─── Context para highlight desde URL (?focus=ID) ─────────────────────────────
+// Cuando se llega desde el link del bot de Discord, se resalta la card.
+
+const KanbanHighlightCtx = createContext<string | null>(null);
+
 const KanbanInvoiceCtx = createContext<{
   onFacturar: (project: ProjectWithRelations) => void;
 }>({ onFacturar: () => {} });
@@ -202,6 +209,7 @@ export function ProjectsKanban(props: Props) {
   };
 
   return (
+    <KanbanHighlightCtx.Provider value={props.highlightId ?? null}>
     <KanbanFocusCtx.Provider value={{ focusedId, setFocusedId }}>
     <KanbanInvoiceCtx.Provider value={{ onFacturar: setFacturarProject }}>
       {/* Modal de nueva factura pre-cargado con el proyecto */}
@@ -246,6 +254,7 @@ export function ProjectsKanban(props: Props) {
       </div>
     </KanbanInvoiceCtx.Provider>
     </KanbanFocusCtx.Provider>
+    </KanbanHighlightCtx.Provider>
   );
 }
 
@@ -766,8 +775,22 @@ function CardView({
 }) {
   const { focusedId, setFocusedId } = useContext(KanbanFocusCtx);
   const { onFacturar } = useContext(KanbanInvoiceCtx);
+  const highlightedId = useContext(KanbanHighlightCtx);
   const isBlurred = focusedId !== null && focusedId !== project.id;
   const router = useRouter();
+
+  // ── Highlight desde link de Discord (?focus=ID) ───────────────────────────
+  const isHighlighted = highlightedId === project.id;
+  const [glowing, setGlowing] = useState(isHighlighted);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isHighlighted) return;
+    cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = setTimeout(() => setGlowing(false), 3500);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [expanded, setExpanded] = useState(false);
   const [openManager, setOpenManager] = useState<"cobrado" | "pagado" | null>(
@@ -792,10 +815,13 @@ function CardView({
 
   return (
     <Card
+      ref={cardRef}
       size="sm"
-      className={`relative transition-[filter,opacity] duration-200 ${
+      className={`relative transition-[filter,opacity,box-shadow,ring] duration-200 ${
         dragging ? "rotate-2 shadow-lg ring-2 ring-primary/40" : ""
-      } ${isBlurred ? "blur-[2px] opacity-35 pointer-events-none select-none" : ""}`}
+      } ${isBlurred ? "blur-[2px] opacity-35 pointer-events-none select-none" : ""} ${
+        glowing ? "ring-2 ring-orange-400/80 ring-offset-2 shadow-[0_0_18px_2px_theme(colors.orange.400/30%)]" : ""
+      }`}
       style={{ backgroundColor: clientTint(project.client?.color) }}
     >
       {/* ── Drag handle + header ──────────────────────────────────────────── */}
