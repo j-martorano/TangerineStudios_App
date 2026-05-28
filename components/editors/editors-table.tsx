@@ -12,6 +12,7 @@ import {
 import { EditEditorButton } from "./edit-editor-button";
 import { DeleteEditorButton } from "./delete-editor-button";
 import { PaymentMethodChips } from "./payment-method-chips";
+import { DiscordLinkCell } from "./discord-link-cell";
 import type { EditorWithCount } from "@/lib/projects/queries";
 import type { ClientMini } from "@/lib/projects/types";
 import type { PaymentMethod } from "@/lib/payment-methods/queries";
@@ -94,8 +95,12 @@ export function EditorsTable({
               </TableCell>
             )}
             {visible.has("discord") && (
-              <TableCell className="font-mono text-xs text-muted-foreground">
-                {e.discord_id ?? "—"}
+              <TableCell>
+                <DiscordLinkCell
+                  editorId={e.id}
+                  discordId={e.discord_id ?? null}
+                  linkToken={e.discord_link_token ?? null}
+                />
               </TableCell>
             )}
             {visible.has("payment_methods") && (

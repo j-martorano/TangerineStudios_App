@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       client_editor_payment_tiers: {
@@ -309,6 +284,7 @@ export type Database = {
         Row: {
           created_at: string
           discord_id: string | null
+          discord_link_token: string | null
           docs_url: string | null
           email: string | null
           flat_amount: number | null
@@ -321,6 +297,7 @@ export type Database = {
         Insert: {
           created_at?: string
           discord_id?: string | null
+          discord_link_token?: string | null
           docs_url?: string | null
           email?: string | null
           flat_amount?: number | null
@@ -333,6 +310,7 @@ export type Database = {
         Update: {
           created_at?: string
           discord_id?: string | null
+          discord_link_token?: string | null
           docs_url?: string | null
           email?: string | null
           flat_amount?: number | null
@@ -370,17 +348,14 @@ export type Database = {
       }
       invoice_projects: {
         Row: {
-          created_at: string
           invoice_id: string
           project_id: string
         }
         Insert: {
-          created_at?: string
           invoice_id: string
           project_id: string
         }
         Update: {
-          created_at?: string
           invoice_id?: string
           project_id?: string
         }
@@ -419,7 +394,7 @@ export type Database = {
           sender_city?: string
           sender_country?: string
           sender_email?: string
-          sender_name: string
+          sender_name?: string
           sender_state?: string
         }
         Update: {
@@ -463,7 +438,7 @@ export type Database = {
           client_address?: string
           client_country?: string
           client_id?: string | null
-          client_name: string
+          client_name?: string
           created_at?: string
           currency_symbol?: string
           date: string
@@ -768,6 +743,32 @@ export type Database = {
           },
         ]
       }
+      service_month_entries: {
+        Row: {
+          amount: number
+          service_id: string
+          year_month: string
+        }
+        Insert: {
+          amount?: number
+          service_id: string
+          year_month: string
+        }
+        Update: {
+          amount?: number
+          service_id?: string
+          year_month?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_month_entries_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "fixed_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_settings: {
         Row: {
           prefs: Json
@@ -791,7 +792,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      claim_invoice_number: { Args: Record<never, never>; Returns: number }
+      claim_invoice_number: { Args: never; Returns: number }
       slugify: { Args: { input: string }; Returns: string }
       unaccent: { Args: { "": string }; Returns: string }
     }
@@ -935,9 +936,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       cobrado_status: ["si", "no", "parcial"],

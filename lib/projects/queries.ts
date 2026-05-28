@@ -259,10 +259,12 @@ export type EditorWithCount = EditorRow & {
   client_pairs: ClientEditorPair[];
   payment_methods: EditorPaymentMethod[];
   tiers: PaymentTier[];
+  /** One-time token for Discord account linking. Cleared once used. */
+  discord_link_token: string | null;
 };
 
 const EDITOR_FULL_SELECT =
-  "id, name, email, phone, discord_id, docs_url, payment_type, rate, flat_amount, created_at, project_editors(count), client_editors(payment_type, rate, flat_amount, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct)), editor_payment_methods(method_id, info, method:payment_methods(id, name, icon, color)), editor_payment_tiers(min_minutes, max_minutes, amount)";
+  "id, name, email, phone, discord_id, discord_link_token, docs_url, payment_type, rate, flat_amount, created_at, project_editors(count), client_editors(payment_type, rate, flat_amount, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct)), editor_payment_methods(method_id, info, method:payment_methods(id, name, icon, color)), editor_payment_tiers(min_minutes, max_minutes, amount)";
 
 function mapEditor(
   e: {
@@ -271,6 +273,7 @@ function mapEditor(
     email: string | null;
     phone: string | null;
     discord_id: string | null;
+    discord_link_token?: string | null;
     docs_url: string | null;
     payment_type: EditorPaymentType;
     rate: number | null;
@@ -321,6 +324,7 @@ function mapEditor(
     email: e.email,
     phone: e.phone,
     discord_id: e.discord_id,
+    discord_link_token: e.discord_link_token ?? null,
     docs_url: e.docs_url,
     payment_type: e.payment_type,
     rate: e.rate,
