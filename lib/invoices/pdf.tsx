@@ -75,13 +75,13 @@ const C = {
 const S = StyleSheet.create({
   page: {
     fontFamily: "Helvetica",
-    fontSize: 13,
+    fontSize: 12,
     color: C.body,
     backgroundColor: C.white,
-    paddingTop: 48,
-    paddingBottom: 56,
-    paddingLeft: 52,
-    paddingRight: 52,
+    paddingTop: 32,
+    paddingBottom: 36,
+    paddingLeft: 44,
+    paddingRight: 44,
   },
 
   // Header
@@ -89,29 +89,29 @@ const S = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 10,
   },
   logo: {
-    height: 70,
+    height: 52,
     objectFit: "contain",
   },
   invTitleBlock: {
     alignItems: "flex-end",
   },
   invH1: {
-    fontSize: 52,
+    fontSize: 40,
     color: C.dark,
     lineHeight: 1,
   },
   invId: {
-    fontSize: 15,
+    fontSize: 13,
     color: C.gray,
-    marginTop: 6,
+    marginTop: 3,
   },
   dateRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 4,
   },
   dateLabel: {
     color: C.light,
@@ -122,7 +122,7 @@ const S = StyleSheet.create({
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 40,
+    marginBottom: 10,
   },
   infoLeft: {
     flex: 1,
@@ -130,24 +130,24 @@ const S = StyleSheet.create({
   },
   fromName: {
     fontFamily: "Helvetica-Bold",
-    marginBottom: 3,
+    marginBottom: 1,
   },
   fromDetails: {
     color: C.muted,
-    lineHeight: 1.75,
+    lineHeight: 1.2,
   },
   billLabel: {
     color: C.light,
-    fontSize: 12,
-    marginTop: 22,
-    marginBottom: 5,
+    fontSize: 11,
+    marginTop: 6,
+    marginBottom: 2,
   },
   clientName: {
     fontFamily: "Helvetica-Bold",
   },
   clientAddress: {
     color: C.muted,
-    lineHeight: 1.75,
+    lineHeight: 1.2,
   },
 
   // Balance Due box
@@ -175,7 +175,7 @@ const S = StyleSheet.create({
 
   // Tabla
   table: {
-    marginTop: 36,
+    marginTop: 16,
   },
   tableHeaderRow: {
     flexDirection: "row",
@@ -183,20 +183,20 @@ const S = StyleSheet.create({
   },
   thItem: {
     flex: 52,
-    paddingTop: 11,
-    paddingBottom: 11,
-    paddingLeft: 16,
-    paddingRight: 16,
-    fontSize: 12,
+    paddingTop: 7,
+    paddingBottom: 7,
+    paddingLeft: 12,
+    paddingRight: 12,
+    fontSize: 11,
     color: C.white,
   },
   thRight: {
     flex: 16,
-    paddingTop: 11,
-    paddingBottom: 11,
-    paddingLeft: 16,
-    paddingRight: 16,
-    fontSize: 12,
+    paddingTop: 7,
+    paddingBottom: 7,
+    paddingLeft: 12,
+    paddingRight: 12,
+    fontSize: 11,
     color: C.white,
     textAlign: "right",
   },
@@ -208,17 +208,17 @@ const S = StyleSheet.create({
   },
   tdItem: {
     flex: 52,
-    paddingTop: 15,
-    paddingBottom: 15,
-    paddingLeft: 16,
-    paddingRight: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    paddingLeft: 12,
+    paddingRight: 12,
   },
   tdRight: {
     flex: 16,
-    paddingTop: 15,
-    paddingBottom: 15,
-    paddingLeft: 16,
-    paddingRight: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    paddingLeft: 12,
+    paddingRight: 12,
     textAlign: "right",
   },
   itemName: {
@@ -226,21 +226,21 @@ const S = StyleSheet.create({
   },
   itemDesc: {
     color: C.light,
-    marginTop: 4,
-    fontSize: 12,
-    lineHeight: 1.5,
+    marginTop: 2,
+    fontSize: 11,
+    lineHeight: 1.3,
   },
 
   // Totales
   totals: {
     flexDirection: "column",
     alignItems: "flex-end",
-    marginTop: 28,
-    marginBottom: 48,
+    marginTop: 14,
+    marginBottom: 24,
   },
   trow: {
     flexDirection: "row",
-    marginBottom: 9,
+    marginBottom: 4,
   },
   tlabel: {
     color: C.light,

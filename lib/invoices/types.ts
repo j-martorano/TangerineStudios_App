@@ -60,6 +60,9 @@ export type ClientForInvoice = {
   city: string | null;
   state: string | null;
   country: string | null;
+  payment_type: "por_proyecto" | "por_rate" | "mensual";
+  agreed_price: number | null;
+  retainer_discount_pct: number;
 };
 
 export type InvoiceSettings = {

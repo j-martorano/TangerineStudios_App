@@ -36,6 +36,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { InvoiceForm } from "@/components/invoices/invoice-form";
+import type { ClientForInvoice } from "@/lib/invoices/types";
 
 import { KanbanCardActions } from "./kanban-card-actions";
 import type { ParentOption } from "./project-form";
@@ -73,6 +81,7 @@ type Props = {
   projects: ProjectWithRelations[];
   editors: EditorMini[];
   clients: ClientForProject[];
+  clientsForInvoice?: ClientForInvoice[];
   availableParents?: ParentOption[];
 };
 
@@ -142,11 +151,17 @@ const KanbanFocusCtx = createContext<{
   setFocusedId: (id: string | null) => void;
 }>({ focusedId: null, setFocusedId: () => {} });
 
+const KanbanInvoiceCtx = createContext<{
+  onFacturar: (project: ProjectWithRelations) => void;
+}>({ onFacturar: () => {} });
+
 // ─── Export ───────────────────────────────────────────────────────────────────
 
 export function ProjectsKanban(props: Props) {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [facturarProject, setFacturarProject] = useState<ProjectWithRelations | null>(null);
   useEffect(() => setMounted(true), []);
 
   // Selector de mes: "all" | "YYYY-MM"
@@ -188,6 +203,28 @@ export function ProjectsKanban(props: Props) {
 
   return (
     <KanbanFocusCtx.Provider value={{ focusedId, setFocusedId }}>
+    <KanbanInvoiceCtx.Provider value={{ onFacturar: setFacturarProject }}>
+      {/* Modal de nueva factura pre-cargado con el proyecto */}
+      {facturarProject ? (
+        <Dialog open onOpenChange={(o) => !o && setFacturarProject(null)}>
+          <DialogContent className="sm:max-w-[min(50vw,680px)]">
+            <DialogHeader>
+              <DialogTitle>Nueva factura — {facturarProject.title}</DialogTitle>
+            </DialogHeader>
+            <InvoiceForm
+              projects={props.projects}
+              clients={props.clientsForInvoice ?? []}
+              initialClientId={facturarProject.client_id ?? undefined}
+              initialProjectId={facturarProject.id}
+              onSuccess={() => {
+                setFacturarProject(null);
+                router.refresh();
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
       <div className="flex flex-col gap-4">
         {months.length > 1 ? (
           <div className="flex flex-wrap items-center gap-1.5">
@@ -207,6 +244,7 @@ export function ProjectsKanban(props: Props) {
           <StaticKanban {...boardProps} />
         )}
       </div>
+    </KanbanInvoiceCtx.Provider>
     </KanbanFocusCtx.Provider>
   );
 }
@@ -307,7 +345,7 @@ function InteractiveKanban({
       projects
         .map(
           (p) =>
-            `${p.id}:${p.phase}:${p.position}:${p.finalized}:${p.cobrado}:${p.pagado}:${p.cobros.length}:${p.editor_pagos.length}`
+            `${p.id}:${p.phase}:${p.position}:${p.finalized}:${p.cobrado}:${p.pagado}:${p.invoiced}:${p.cobros.length}:${p.editor_pagos.length}`
         )
         .join("|"),
     [projects]
@@ -727,6 +765,7 @@ function CardView({
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
   const { focusedId, setFocusedId } = useContext(KanbanFocusCtx);
+  const { onFacturar } = useContext(KanbanInvoiceCtx);
   const isBlurred = focusedId !== null && focusedId !== project.id;
   const router = useRouter();
 
@@ -913,8 +952,13 @@ function CardView({
               <FinancialBadge
                 label="Facturado"
                 pct={facturadoPct}
-                interactive={false}
-                title="Facturación — próximamente"
+                interactive
+                active={false}
+                onClick={() => {
+                  if (!expanded) setExpanded(true);
+                  onFacturar(project);
+                }}
+                title={facturadoPct === 100 ? "Facturado" : "Crear factura"}
               />
             </div>
 

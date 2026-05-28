@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArchiveIcon, ArchiveRestoreIcon } from "lucide-react";
+import { ArchiveIcon, ArchiveRestoreIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-import { setProjectArchived } from "@/lib/projects/actions";
+import { setProjectArchived, deleteProject } from "@/lib/projects/actions";
 
 type Props = {
   id: string;
@@ -25,46 +25,94 @@ type Props = {
   archived: boolean;
 };
 
-/**
- * Reemplaza al borrado de proyectos: los proyectos nunca se borran, se
- * archivan (borrado lógico). Si el proyecto ya está archivado, el botón lo
- * desarchiva directamente.
- */
 export function ArchiveProjectButton({ id, title, archived }: Props) {
-  const [open, setOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  function run(next: boolean) {
+  function runArchive(next: boolean) {
     startTransition(async () => {
       const result = await setProjectArchived(id, next);
       if (result.ok) {
-        toast.success(
-          next ? `«${title}» archivado` : `«${title}» desarchivado`
-        );
-        setOpen(false);
+        toast.success(next ? `«${title}» archivado` : `«${title}» desarchivado`);
+        setArchiveOpen(false);
       } else {
         toast.error(result.error);
       }
     });
   }
 
+  function runDelete() {
+    startTransition(async () => {
+      const result = await deleteProject(id);
+      if (result.ok) {
+        toast.success(`«${title}» eliminado permanentemente`);
+        setDeleteOpen(false);
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  // Proyecto archivado: botón de restaurar + botón de eliminar
   if (archived) {
     return (
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        type="button"
-        aria-label="Desarchivar proyecto"
-        disabled={pending}
-        onClick={() => run(false)}
-      >
-        <ArchiveRestoreIcon className="size-4" />
-      </Button>
+      <div className="flex items-center gap-0.5">
+        {/* Restaurar */}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          type="button"
+          aria-label="Desarchivar proyecto"
+          disabled={pending}
+          onClick={() => runArchive(false)}
+        >
+          <ArchiveRestoreIcon className="size-4" />
+        </Button>
+
+        {/* Eliminar permanentemente */}
+        <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <AlertDialogTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                aria-label="Eliminar proyecto permanentemente"
+                className="text-destructive/60 hover:text-destructive"
+              />
+            }
+          >
+            <Trash2Icon className="size-4" />
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar «{title}»?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción es <strong>permanente e irreversible</strong>. El
+                proyecto y todos sus datos (cobros, pagos a editores, vínculos
+                con facturas) se eliminarán definitivamente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={runDelete}
+                disabled={pending}
+              >
+                {pending ? "Eliminando…" : "Eliminar definitivamente"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     );
   }
 
+  // Proyecto activo: botón de archivar con confirmación
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
       <AlertDialogTrigger
         render={
           <Button
@@ -88,7 +136,7 @@ export function ArchiveProjectButton({ id, title, archived }: Props) {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={() => run(true)} disabled={pending}>
+          <AlertDialogAction onClick={() => runArchive(true)} disabled={pending}>
             {pending ? "Archivando…" : "Archivar"}
           </AlertDialogAction>
         </AlertDialogFooter>

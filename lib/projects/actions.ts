@@ -806,6 +806,29 @@ export async function setProjectArchived(
 }
 
 /**
+ * Elimina permanentemente un proyecto archivado y todos sus datos asociados.
+ * Solo disponible para proyectos que ya están archivados.
+ */
+export async function deleteProject(id: string): Promise<ActionResult> {
+  if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
+
+  const supabase = await createClient();
+
+  // Borrar hijos primero (packs)
+  const { error: childErr } = await supabase
+    .from("projects")
+    .delete()
+    .eq("parent_id", id);
+  if (childErr) return { ok: false, error: childErr.message };
+
+  const { error } = await supabase.from("projects").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidateAll();
+  return { ok: true };
+}
+
+/**
  * Marca un proyecto como finalizado (o lo reabre). Al finalizarlo se guarda
  * `finalized_at`: ese es el mes en el que el proyecto entra a Finanzas.
  *

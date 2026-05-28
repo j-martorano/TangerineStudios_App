@@ -6,6 +6,7 @@ import {
   fetchEditors,
   fetchProjects,
 } from "@/lib/projects/queries";
+import { fetchClientsForInvoice } from "@/lib/invoices/queries";
 import { isPack } from "@/lib/projects/types";
 
 export const dynamic = "force-dynamic";
@@ -20,10 +21,11 @@ export default async function KanbanPage({
   const params = await searchParams;
   const query = params.q?.trim() || undefined;
 
-  const [allProjects, editors, clients] = await Promise.all([
-    fetchProjects({ query }), // incluye finalizados â€” aparecen en la secciÃ³n Terminado
+  const [allProjects, editors, clients, clientsForInvoice] = await Promise.all([
+    fetchProjects({ query }),
     fetchEditors(),
     fetchClients(),
+    fetchClientsForInvoice(),
   ]);
 
   // En el kanban no mostramos los packs como card propia â€” sus shorts hijos
@@ -60,6 +62,7 @@ export default async function KanbanPage({
         projects={projects}
         editors={editors}
         clients={clients}
+        clientsForInvoice={clientsForInvoice}
         availableParents={availableParents}
       />
     </main>

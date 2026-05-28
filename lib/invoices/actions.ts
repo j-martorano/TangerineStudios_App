@@ -27,7 +27,7 @@ const invoiceInputSchema = z.object({
   client_name: z.string().trim().min(1, "El nombre del cliente es obligatorio"),
   client_address: z.string().default(""),
   client_country: z.string().default(""),
-  client_id: z.string().uuid().nullable(),
+  client_id: z.string().nullable(),
   items: z.array(itemSchema).min(1, "Debe tener al menos un ítem"),
   discount: z.object({
     enabled: z.boolean(),
@@ -39,7 +39,7 @@ const invoiceInputSchema = z.object({
     percentage: z.number().min(0).max(100),
   }),
   notes: z.string().default(""),
-  project_ids: z.array(z.string().uuid()).default([]),
+  project_ids: z.array(z.string()).default([]),
 });
 
 // ── Crear factura ─────────────────────────────────────────────────────────────
@@ -118,14 +118,14 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
       });
 
     if (uploadErr) {
-      console.error("Storage upload error:", uploadErr.message);
-      // No bloqueamos la creación si el storage falla — se guarda sin PDF
+      // DEBUG: surface storage errors
+      return { ok: false, error: `[Storage] ${uploadErr.message}` };
     } else {
       pdfStoragePath = filename;
     }
   } catch (pdfErr) {
-    console.error("PDF generation error:", pdfErr);
-    // Continuamos sin PDF
+    // DEBUG: surface PDF generation errors
+    return { ok: false, error: `[PDF] ${String(pdfErr)}` };
   }
 
   // 5. Insertar factura
@@ -160,7 +160,7 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     return { ok: false, error: invErr?.message ?? "Error al guardar la factura" };
   }
 
-  // 6. Vincular proyectos
+  // 6. Vincular proyectos y marcarlos como facturados
   if (d.project_ids.length > 0) {
     const links = d.project_ids.map((pid) => ({
       invoice_id: inv.id,
@@ -170,9 +170,17 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
       .from("invoice_projects")
       .insert(links);
     if (linkErr) console.error("Error linking projects:", linkErr.message);
+
+    // Marcar cada proyecto vinculado como facturado
+    await supabase
+      .from("projects")
+      .update({ invoiced: "si" })
+      .in("id", d.project_ids);
   }
 
   revalidatePath("/facturas");
+  revalidatePath("/kanban");
+  revalidatePath("/projects");
   return { ok: true, invoiceId: inv.id };
 }
 

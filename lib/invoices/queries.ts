@@ -41,7 +41,7 @@ export async function fetchClientsForInvoice(): Promise<ClientForInvoice[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("clients")
-    .select("id, name, billing_name, tax_id, address, city, state, country")
+    .select("id, name, billing_name, tax_id, address, city, state, country, payment_type, agreed_price, retainer_discount_pct")
     .order("name");
   if (error) throw new Error(error.message);
   return (data ?? []) as ClientForInvoice[];

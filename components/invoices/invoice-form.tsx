@@ -44,20 +44,22 @@ function emptyItem(): InvoiceItem {
 type Props = {
   projects: ProjectWithRelations[];
   clients: ClientForInvoice[];
+  initialClientId?: string;
+  initialProjectId?: string;
   onSuccess?: () => void;
 };
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
-export function InvoiceForm({ projects, clients, onSuccess }: Props) {
+export function InvoiceForm({ projects, clients, initialClientId, initialProjectId, onSuccess }: Props) {
   const [pending, startTransition] = useTransition();
 
   // — Campos base —
   const [date, setDate] = useState(today());
-  const [currency, setCurrency] = useState("$");
+  const [currency, setCurrency] = useState("US$");
 
   // — Cliente seleccionado —
-  const [clientId, setClientId] = useState<string>("");
+  const [clientId, setClientId] = useState<string>(initialClientId ?? "");
 
   // — Datos Bill To (editables, pre-rellenados desde el cliente) —
   const [clientName, setClientName] = useState("");
@@ -65,7 +67,9 @@ export function InvoiceForm({ projects, clients, onSuccess }: Props) {
   const [clientCountry, setClientCountry] = useState("");
 
   // — Proyectos vinculados —
-  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(
+    initialProjectId ? [initialProjectId] : []
+  );
 
   // — Ítems —
   const [items, setItems] = useState<InvoiceItem[]>([emptyItem()]);
@@ -89,6 +93,7 @@ export function InvoiceForm({ projects, clients, onSuccess }: Props) {
       setClientName("");
       setClientAddress("");
       setSelectedProjectIds([]);
+      setItems([emptyItem()]);
       return;
     }
     const c = clients.find((x) => x.id === clientId);
@@ -98,24 +103,81 @@ export function InvoiceForm({ projects, clients, onSuccess }: Props) {
       [c.address, c.city, c.state].filter(Boolean).join("\n")
     );
     setClientCountry(c.country ?? "");
-    // Limpiar proyectos seleccionados al cambiar cliente
-    setSelectedProjectIds([]);
+    // Nota: NO reseteamos selectedProjectIds aquí para que la pre-selección
+    // inicial (initialProjectId) funcione. El reset al cambiar cliente lo hace
+    // el onValueChange del Select.
+
+    // Pre-rellenar rate del ítem vacío según tipo de pago del cliente
+    if (c.agreed_price != null) {
+      if (c.payment_type === "por_rate") {
+        setItems([{ name: "", description: "", quantity: 0, rate: Number(c.agreed_price) }]);
+      } else if (c.payment_type === "mensual") {
+        const disc = Number(c.retainer_discount_pct ?? 10);
+        const effectiveRate = Number(c.agreed_price) * (1 - disc / 100);
+        setItems([{ name: "", description: "", quantity: 0, rate: effectiveRate }]);
+      } else {
+        setItems([emptyItem()]);
+      }
+    } else {
+      setItems([emptyItem()]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, clients]);
 
   // ── Auto-fill ítems desde proyectos seleccionados ───────────────────────────
 
   useEffect(() => {
     if (selectedProjectIds.length === 0) {
-      setItems([emptyItem()]);
+      // Restaurar ítem con rate pre-rellenado si hay cliente
+      const c = clients.find((x) => x.id === clientId);
+      if (c && c.agreed_price != null) {
+        if (c.payment_type === "por_rate") {
+          setItems([{ name: "", description: "", quantity: 0, rate: Number(c.agreed_price) }]);
+        } else if (c.payment_type === "mensual") {
+          const disc = Number(c.retainer_discount_pct ?? 10);
+          setItems([{ name: "", description: "", quantity: 0, rate: Number(c.agreed_price) * (1 - disc / 100) }]);
+        } else {
+          setItems([emptyItem()]);
+        }
+      } else {
+        setItems([emptyItem()]);
+      }
       return;
     }
+
     const sel = projects.filter((p) => selectedProjectIds.includes(p.id));
-    const autoItems: InvoiceItem[] = sel.map((p) => ({
-      name: p.title,
-      description: p.project_code ?? "",
-      quantity: 1,
-      rate: computePrice(p) ?? 0,
-    }));
+    const c = clients.find((x) => x.id === clientId);
+
+    const autoItems: InvoiceItem[] = sel.map((p) => {
+      // Por minutos: quantity = minutos del proyecto, rate = rate por minuto del cliente
+      if (c?.payment_type === "por_rate" && c.agreed_price != null) {
+        return {
+          name: p.title,
+          description: p.project_code ?? "",
+          quantity: p.duration_minutes ?? 0,
+          rate: Number(c.agreed_price),
+        };
+      }
+      // Mensual: misma lógica pero con descuento de retainer aplicado al rate
+      if (c?.payment_type === "mensual" && c.agreed_price != null) {
+        const disc = Number(c.retainer_discount_pct ?? 10);
+        const effectiveRate = Number(c.agreed_price) * (1 - disc / 100);
+        return {
+          name: p.title,
+          description: p.project_code ?? "",
+          quantity: p.duration_minutes ?? 0,
+          rate: effectiveRate,
+        };
+      }
+      // Por proyecto: precio fijo, quantity = 1
+      return {
+        name: p.title,
+        description: p.project_code ?? "",
+        quantity: 1,
+        rate: p.price != null ? Number(p.price) : (computePrice(p) ?? 0),
+      };
+    });
+
     setItems(autoItems);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectIds]);
@@ -266,10 +328,18 @@ export function InvoiceForm({ projects, clients, onSuccess }: Props) {
               <Label htmlFor="inv-client-select">Cliente</Label>
               <Select
                 value={clientId}
-                onValueChange={(v) => setClientId(v === "__none__" ? "" : (v ?? ""))}
+                onValueChange={(v) => {
+                  setClientId(v === "__none__" ? "" : (v ?? ""));
+                  setSelectedProjectIds([]); // reset proyectos al cambiar cliente
+                }}
               >
                 <SelectTrigger id="inv-client-select" className="w-full">
-                  <SelectValue placeholder="Seleccionar cliente…" />
+                  <SelectValue placeholder="Seleccionar cliente…">
+                    {(v: string | null) => {
+                      if (!v || v === "__none__") return null;
+                      return clients.find((c) => c.id === v)?.name ?? v;
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">
