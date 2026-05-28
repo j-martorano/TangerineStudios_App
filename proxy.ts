@@ -7,10 +7,11 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all paths except Next internals, favicon y assets públicos
-    // estáticos (logo, paleta, etc. dentro de /branding). Sin esto el
-    // middleware redirigía cada GET a /branding/Logo.png a /login para
-    // visitantes no autenticados, dejando la página de login sin imagen.
-    "/((?!_next/static|_next/image|favicon.ico|branding/).*)",
+    // Match all paths except:
+    // - Next internals (_next/static, _next/image)
+    // - Favicon y assets públicos (branding/)
+    // - API routes del bot de Discord (/api/discord/) — reciben requests
+    //   externos sin sesión, tienen su propia verificación de firma Ed25519
+    "/((?!_next/static|_next/image|favicon.ico|branding/|api/discord/).*)",
   ],
 };
