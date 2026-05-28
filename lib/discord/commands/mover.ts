@@ -181,41 +181,37 @@ export async function handleMover(
     return replyError("Error al actualizar el proyecto. Intentá de nuevo.");
   }
 
-  // ── Notify Joaco (debug mode) ────────────────────────────────────────────
-  const channelId = process.env.DISCORD_NOTIFY_CHANNEL_ID ?? "MISSING";
-  const botToken  = process.env.DISCORD_BOT_TOKEN ?? "MISSING";
+  // ── Labels para la respuesta y la notificación ──────────────────────────
+  const fromLabel = `${PHASE_EMOJI[project.phase] ?? "?"} ${PHASE_LABEL[project.phase] ?? project.phase}`;
+  const toLabel   = `${PHASE_EMOJI[newPhase]      ?? "?"} ${PHASE_LABEL[newPhase]      ?? newPhase}`;
 
-  let debugStatus = "";
-  try {
-    const notifyRes = await fetch(
-      `https://discord.com/api/v10/channels/${channelId}/messages`,
-      {
-        method:  "POST",
-        headers: {
-          Authorization:  `Bot ${botToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          embeds: [{
-            color: 0xf97316,
-            description: `🔄 **${editorName}** movió **${project.title}**`,
-            timestamp: new Date().toISOString(),
-          }],
-        }),
-      }
-    );
-    const notifyBody = await notifyRes.text();
-    debugStatus = `notify=${notifyRes.status} ch=${channelId.slice(-6)} token=${botToken.slice(-6)} body=${notifyBody.slice(0,80)}`;
-  } catch (e) {
-    debugStatus = `notify=THROW ${String(e).slice(0, 80)}`;
+  // ── Notify Joaco ──────────────────────────────────────────────────────────
+  // Direct fetch (proven reliable in serverless). The higher-level
+  // notifyProjectMoved() helper had a silent failure in production.
+  const notifyChannelId = process.env.DISCORD_NOTIFY_CHANNEL_ID;
+  const notifyToken     = process.env.DISCORD_BOT_TOKEN;
+  if (notifyChannelId && notifyToken) {
+    await fetch(`https://discord.com/api/v10/channels/${notifyChannelId}/messages`, {
+      method:  "POST",
+      headers: {
+        Authorization:  `Bot ${notifyToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        embeds: [{
+          color:       0xf97316,
+          description: `🔄 **${editorName}** movió **${project.title}**\n${fromLabel} → **${toLabel}**`,
+          footer:      { text: project.client_name ?? `ID: ${project.id}` },
+          timestamp:   new Date().toISOString(),
+        }],
+      }),
+    }).catch((e) => console.error("[discord:mover] notify failed:", e));
   }
 
   // ── Confirm to editor ────────────────────────────────────────────────────
-  const fromLabel = `${PHASE_EMOJI[project.phase] ?? "?"} ${PHASE_LABEL[project.phase] ?? project.phase}`;
-  const toLabel = `${PHASE_EMOJI[newPhase] ?? "?"} ${PHASE_LABEL[newPhase] ?? newPhase}`;
   const client = project.client_name ? ` *(${project.client_name})*` : "";
 
   return reply(
-    `✅ **${project.title}**${client}\n${fromLabel} → **${toLabel}**\n\`${debugStatus}\``
+    `✅ **${project.title}**${client}\n${fromLabel} → **${toLabel}**`
   );
 }
