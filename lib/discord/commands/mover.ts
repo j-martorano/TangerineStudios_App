@@ -181,8 +181,10 @@ export async function handleMover(
     return replyError("Error al actualizar el proyecto. Intentá de nuevo.");
   }
 
-  // ── Notify Joaco (fire-and-forget) ───────────────────────────────────────
-  notifyProjectMoved({
+  // ── Notify Joaco ─────────────────────────────────────────────────────────
+  // Awaited before returning: in Vercel serverless the function terminates
+  // as soon as a Response is returned, so unawaited async calls get cancelled.
+  await notifyProjectMoved({
     projectTitle: project.title,
     projectId: project.id,
     editorName,

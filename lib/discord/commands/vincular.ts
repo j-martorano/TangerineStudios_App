@@ -60,8 +60,8 @@ export async function handleVincular(
     return replyError("Hubo un error al vincular. Intentá de nuevo.");
   }
 
-  // Notify Joaco (fire-and-forget)
-  notifyEditorLinked({
+  // Notify Joaco (awaited — serverless terminates on return)
+  await notifyEditorLinked({
     editorName: editor.name,
     discordUsername: user.global_name ?? user.username,
   });

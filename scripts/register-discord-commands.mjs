@@ -96,26 +96,36 @@ const COMMANDS = [
   },
 ];
 
-// ── Register (guild-scoped for instant availability) ─────────────────────────
-const url = `https://discord.com/api/v10/applications/${APP_ID}/guilds/${GUILD_ID}/commands`;
+// ── 1. Register as GLOBAL commands (work in DMs + all servers) ───────────────
+// Global commands take up to 1 hour to propagate to all clients.
+const globalUrl = `https://discord.com/api/v10/applications/${APP_ID}/commands`;
 
-const res = await fetch(url, {
+const globalRes = await fetch(globalUrl, {
   method: "PUT",
-  headers: {
-    Authorization: `Bot ${BOT_TOKEN}`,
-    "Content-Type": "application/json",
-  },
+  headers: { Authorization: `Bot ${BOT_TOKEN}`, "Content-Type": "application/json" },
   body: JSON.stringify(COMMANDS),
 });
 
-if (!res.ok) {
-  const text = await res.text();
-  console.error(`❌ Failed to register commands (${res.status}):`, text);
+if (!globalRes.ok) {
+  const text = await globalRes.text();
+  console.error(`❌ Failed to register global commands (${globalRes.status}):`, text);
   process.exit(1);
 }
 
-const data = await res.json();
-console.log(`✅ Registered ${data.length} command(s):`);
-for (const cmd of data) {
-  console.log(`   /${cmd.name} — ${cmd.description}`);
+const globalData = await globalRes.json();
+console.log(`✅ Global commands registered (${globalData.length}):`);
+for (const cmd of globalData) console.log(`   /${cmd.name}`);
+
+// ── 2. Delete old guild-scoped commands (avoid duplicates) ────────────────────
+if (GUILD_ID) {
+  const guildUrl = `https://discord.com/api/v10/applications/${APP_ID}/guilds/${GUILD_ID}/commands`;
+  const delRes = await fetch(guildUrl, {
+    method: "PUT",
+    headers: { Authorization: `Bot ${BOT_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify([]), // empty array = delete all guild commands
+  });
+  if (delRes.ok) console.log(`🗑️  Guild commands cleared (no more duplicates)`);
 }
+
+console.log("\nℹ️  Global commands se propagan en hasta 1 hora.");
+console.log("   En DMs con el bot ya deberían funcionar antes.");
