@@ -167,9 +167,17 @@ const KanbanInvoiceCtx = createContext<{
 export function ProjectsKanban(props: Props) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [focusedId, setFocusedId] = useState<string | null>(props.highlightId ?? null);
   const [facturarProject, setFacturarProject] = useState<ProjectWithRelations | null>(null);
   useEffect(() => setMounted(true), []);
+
+  // Limpiar el focus del highlight después de 3.5s
+  useEffect(() => {
+    if (!props.highlightId) return;
+    const t = setTimeout(() => setFocusedId(null), 3500);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Selector de mes: "all" | "YYYY-MM"
   const [month, setMonth] = useState<string>("all");
@@ -779,16 +787,13 @@ function CardView({
   const isBlurred = focusedId !== null && focusedId !== project.id;
   const router = useRouter();
 
-  // ── Highlight desde link de Discord (?focus=ID) ───────────────────────────
+  // ── Scroll desde link de Discord (?focus=ID) ─────────────────────────────
   const isHighlighted = highlightedId === project.id;
-  const [glowing, setGlowing] = useState(isHighlighted);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isHighlighted) return;
     cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    const t = setTimeout(() => setGlowing(false), 3500);
-    return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -817,11 +822,9 @@ function CardView({
     <Card
       ref={cardRef}
       size="sm"
-      className={`relative transition-[filter,opacity,box-shadow,ring] duration-200 ${
+      className={`relative transition-[filter,opacity] duration-200 ${
         dragging ? "rotate-2 shadow-lg ring-2 ring-primary/40" : ""
-      } ${isBlurred ? "blur-[2px] opacity-35 pointer-events-none select-none" : ""} ${
-        glowing ? "ring-2 ring-orange-400/80 ring-offset-2 shadow-[0_0_18px_2px_theme(colors.orange.400/30%)]" : ""
-      }`}
+      } ${isBlurred ? "blur-[2px] opacity-35 pointer-events-none select-none" : ""}`}
       style={{ backgroundColor: clientTint(project.client?.color) }}
     >
       {/* ── Drag handle + header ──────────────────────────────────────────── */}
