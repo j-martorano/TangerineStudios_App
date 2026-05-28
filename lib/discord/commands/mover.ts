@@ -200,6 +200,8 @@ export async function handleMover(
       body: JSON.stringify({
         embeds: [{
           color:       0xf97316,
+          title:       "Ver en Kanban →",
+          url:         "https://tangerine-studios-app.vercel.app/kanban",
           description: `🔄 **${editorName}** movió **${project.title}**\n${fromLabel} → **${toLabel}**`,
           footer:      { text: project.client_name ?? `ID: ${project.id}` },
           timestamp:   new Date().toISOString(),
