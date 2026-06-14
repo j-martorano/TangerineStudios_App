@@ -17,8 +17,10 @@ import type { EditorMini } from "@/lib/projects/types";
 
 export function NewClientButton({
   availableEditors,
+  availableParents,
 }: {
   availableEditors: EditorMini[];
+  availableParents: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -35,6 +37,7 @@ export function NewClientButton({
         <ClientForm
           mode="create"
           availableEditors={availableEditors}
+          availableParents={availableParents}
           onSuccess={() => setOpen(false)}
         />
       </DialogContent>

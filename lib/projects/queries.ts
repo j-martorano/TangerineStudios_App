@@ -494,6 +494,19 @@ export async function fetchClientsWithCount(): Promise<ClientWithCount[]> {
   return (data ?? []).map((c) => mapClient(c));
 }
 
+/** Minimal fetch for parent-client selectors in forms. Only top-level clients (no parent). */
+export async function fetchClientsForParentSelect(): Promise<
+  { id: string; name: string }[]
+> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("clients")
+    .select("id, name")
+    .is("parent_id", null)
+    .order("name");
+  return data ?? [];
+}
+
 function mapClient(c: {
   id: string;
   name: string;

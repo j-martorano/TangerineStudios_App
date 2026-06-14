@@ -18,9 +18,11 @@ import type { ClientRow, EditorMini } from "@/lib/projects/types";
 export function EditClientButton({
   client,
   availableEditors,
+  availableParents,
 }: {
   client: ClientRow & { editors?: EditorMini[] };
   availableEditors: EditorMini[];
+  availableParents: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -41,6 +43,7 @@ export function EditClientButton({
           mode="edit"
           client={client}
           availableEditors={availableEditors}
+          availableParents={availableParents}
           onSuccess={() => setOpen(false)}
         />
       </DialogContent>

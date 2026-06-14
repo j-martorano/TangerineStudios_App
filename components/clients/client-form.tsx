@@ -30,6 +30,8 @@ import type {
   PaymentType,
 } from "@/lib/projects/types";
 
+type ParentOption = { id: string; name: string };
+
 type Props = {
   mode: "create" | "edit";
   client?: ClientRow & {
@@ -38,6 +40,7 @@ type Props = {
     payments?: ClientPayment[];
   };
   availableEditors: EditorMini[];
+  availableParents?: ParentOption[];
   onSuccess?: () => void;
 };
 
@@ -45,6 +48,7 @@ export function ClientForm({
   mode,
   client,
   availableEditors,
+  availableParents = [],
   onSuccess,
 }: Props) {
   const [name, setName] = useState(client?.name ?? "");
@@ -69,6 +73,10 @@ export function ClientForm({
   const [email, setEmail] = useState(client?.email ?? "");
   const [phone, setPhone] = useState(client?.phone ?? "");
   const [docsUrl, setDocsUrl] = useState(client?.docs_url ?? "");
+  const [discordChannelId, setDiscordChannelId] = useState(
+    client?.discord_channel_id ?? ""
+  );
+  const [parentId, setParentId] = useState(client?.parent_id ?? "");
   const [editorIds, setEditorIds] = useState<string[]>(
     client?.editors?.map((e) => e.id) ?? []
   );
@@ -115,6 +123,8 @@ export function ClientForm({
       email: email.trim() || null,
       phone: phone.trim() || null,
       docs_url: docsUrl.trim() || null,
+      discord_channel_id: discordChannelId.trim() || null,
+      parent_id: parentId || null,
       editor_ids: editorIds,
     };
 
@@ -272,6 +282,27 @@ export function ClientForm({
           </>
         ) : null}
 
+        {availableParents.length > 0 ? (
+          <Field
+            label="Cliente padre"
+            hint="Si este cliente pertenece a otro, seleccioná el padre."
+          >
+            <Select value={parentId} onValueChange={(v) => setParentId(v ?? "")}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Sin cliente padre" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Sin cliente padre</SelectItem>
+                {availableParents.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : null}
+
         <Field
           label="Editores asignados"
           hint="Si no aparece el editor en la lista, escribilo y elegí «Crear»."
@@ -319,6 +350,17 @@ export function ClientForm({
             value={docsUrl}
             onChange={(e) => setDocsUrl(e.target.value)}
             placeholder="https://drive.google.com/..."
+          />
+        </Field>
+
+        <Field
+          label="Discord Channel ID"
+          hint="ID del canal de Discord donde se notifican cambios de estado del proyecto."
+        >
+          <Input
+            value={discordChannelId}
+            onChange={(e) => setDiscordChannelId(e.target.value)}
+            placeholder="1234567890123456789"
           />
         </Field>
       </Section>

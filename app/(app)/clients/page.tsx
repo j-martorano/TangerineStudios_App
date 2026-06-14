@@ -2,7 +2,7 @@
 import { NewClientButton } from "@/components/clients/new-client-button";
 import { DataPagination } from "@/components/data-pagination";
 import { DataSearch } from "@/components/data-search";
-import { fetchClientsList, fetchEditors } from "@/lib/projects/queries";
+import { fetchClientsList, fetchEditors, fetchClientsForParentSelect } from "@/lib/projects/queries";
 import { fetchUserPrefs } from "@/lib/settings/queries";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +21,10 @@ export default async function ClientsPage({
   const prefs = await fetchUserPrefs();
   const perPage = prefs.limits.clients_per_page;
 
-  const [{ clients, total }, availableEditors] = await Promise.all([
+  const [{ clients, total }, availableEditors, availableParents] = await Promise.all([
     fetchClientsList({ query, page, perPage }),
     fetchEditors(),
+    fetchClientsForParentSelect(),
   ]);
 
   return (
@@ -35,7 +36,7 @@ export default async function ClientsPage({
             {total} cliente{total === 1 ? "" : "s"}
           </p>
         </div>
-        <NewClientButton availableEditors={availableEditors} />
+        <NewClientButton availableEditors={availableEditors} availableParents={availableParents} />
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -46,6 +47,7 @@ export default async function ClientsPage({
         <ClientsTable
           clients={clients}
           availableEditors={availableEditors}
+          availableParents={availableParents}
           visibleColumns={prefs.columns.clients}
         />
       </div>

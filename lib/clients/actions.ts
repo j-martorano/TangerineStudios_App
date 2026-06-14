@@ -45,6 +45,8 @@ const clientInputSchema = z.object({
   docs_url: z
     .union([z.string().url("URL inválida"), z.literal(""), z.null()])
     .default(null),
+  discord_channel_id: z.string().nullable().default(null),
+  parent_id: z.string().uuid("ID de cliente padre inválido").nullable().default(null),
   /** IDs de editores asignados. Si está definido, se sincroniza la pivot client_editors. */
   editor_ids: z.array(z.string()).optional(),
 });
@@ -131,6 +133,8 @@ export async function createClient(
       email: normalizeText(parsed.data.email),
       phone: normalizeText(parsed.data.phone),
       docs_url: normalizeUrl(parsed.data.docs_url),
+      discord_channel_id: normalizeText(parsed.data.discord_channel_id),
+      parent_id: parsed.data.parent_id,
     })
     .select(
       "id, name, color, payment_type, agreed_price, retainer_discount_pct"
@@ -176,6 +180,8 @@ export async function updateClient(
       email: normalizeText(parsed.data.email),
       phone: normalizeText(parsed.data.phone),
       docs_url: normalizeUrl(parsed.data.docs_url),
+      discord_channel_id: normalizeText(parsed.data.discord_channel_id),
+      parent_id: parsed.data.parent_id,
     })
     .eq("id", id);
 
