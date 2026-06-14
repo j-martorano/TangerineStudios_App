@@ -106,3 +106,58 @@ export async function notifyEditorLinked(opts: {
     ],
   });
 }
+
+/** Notifies a client's Discord channel when a project changes phase. */
+export async function notifyClientPhaseChange(opts: {
+  projectTitle: string;
+  projectId: string;
+  clientChannelId: string;
+  fromPhase: string;
+  toPhase: string;
+  clientName?: string;
+}): Promise<void> {
+  const isTerminado = opts.toPhase === "terminado";
+  const fromLabel = `${PHASE_EMOJI[opts.fromPhase] ?? "?"} ${PHASE_LABEL[opts.fromPhase] ?? opts.fromPhase}`;
+  const toLabel   = `${PHASE_EMOJI[opts.toPhase]   ?? "?"} ${PHASE_LABEL[opts.toPhase]   ?? opts.toPhase}`;
+
+  const description = isTerminado
+    ? `✅ ¡El proyecto **${opts.projectTitle}** ha sido terminado! 🎉`
+    : `🔄 El proyecto **${opts.projectTitle}** pasó de ${fromLabel} a **${toLabel}**`;
+
+  await notifyChannel({
+    channelId: opts.clientChannelId,
+    embeds: [
+      {
+        color: isTerminado ? COLORS.green : COLORS.blue,
+        title: "Ver en Kanban →",
+        url: `https://tangerine-studios-app.vercel.app/kanban?focus=${opts.projectId}`,
+        description,
+        footer: opts.clientName ? { text: opts.clientName } : undefined,
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  });
+}
+
+/** Notifies the internal channel when an editor submits a project for review via /terminar. */
+export async function notifyRevisionSubmitted(opts: {
+  projectTitle: string;
+  projectId: string;
+  editorName: string;
+  revisionNumber: number;
+  url: string;
+  clientName?: string;
+}): Promise<void> {
+  await notifyChannel({
+    embeds: [
+      {
+        color: COLORS.blue,
+        title: "Ver revisión →",
+        url: opts.url,
+        description: `🔍 **${opts.editorName}** envió **${opts.projectTitle}** a revisión\nRevisión ${opts.revisionNumber}: ${opts.url}`,
+        footer: { text: opts.clientName ?? `ID: ${opts.projectId}` },
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  });
+}

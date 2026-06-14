@@ -482,7 +482,7 @@ export type ClientWithCount = ClientRow & {
 };
 
 const CLIENT_FULL_SELECT =
-  "id, name, color, payment_type, agreed_price, retainer_discount_pct, billing_name, tax_id, address, city, state, country, email, phone, docs_url, created_at, projects(duration_minutes, archived), client_editors(editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount))), client_payments(id, amount, minutes_credited, paid_at, note)";
+  "id, name, color, payment_type, agreed_price, retainer_discount_pct, billing_name, tax_id, address, city, state, country, email, phone, docs_url, created_at, discord_channel_id, parent_id, projects(duration_minutes, archived), client_editors(editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount))), client_payments(id, amount, minutes_credited, paid_at, note)";
 
 export async function fetchClientsWithCount(): Promise<ClientWithCount[]> {
   const supabase = await createClient();
@@ -511,6 +511,8 @@ function mapClient(c: {
   phone: string | null;
   docs_url: string | null;
   created_at: string;
+  discord_channel_id?: string | null;
+  parent_id?: string | null;
   projects?: { duration_minutes: number | null; archived: boolean }[] | null;
   client_editors?: { editor: EditorMini | null }[] | null;
   client_payments?:
@@ -545,6 +547,8 @@ function mapClient(c: {
     phone: c.phone,
     docs_url: c.docs_url,
     created_at: c.created_at,
+    discord_channel_id: c.discord_channel_id ?? null,
+    parent_id: c.parent_id ?? null,
     project_count: projects.filter((p) => !p.archived).length,
     editors: (c.client_editors ?? [])
       .map((ce) => ce.editor)

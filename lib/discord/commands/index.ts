@@ -12,10 +12,10 @@ import type { CommandHandler, DiscordInteraction } from "../types";
 import { handleVincular } from "./vincular";
 import { handleProyectos } from "./proyectos";
 import { handleEstado } from "./estado";
-import { handleMover } from "./mover";
+import { handleTerminar } from "./terminar";
 import { handleAyuda } from "./ayuda";
 import { autocompleteEstado } from "./estado";
-import { autocompleteMover } from "./mover";
+import { autocompleteTerminar } from "./terminar";
 import { replyError } from "../respond";
 
 // ── Command handlers ────────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ export const COMMANDS: Record<string, CommandHandler> = {
   vincular: handleVincular,
   proyectos: handleProyectos,
   estado: handleEstado,
-  mover: handleMover,
+  terminar: handleTerminar,
   ayuda: handleAyuda,
 };
 
@@ -35,7 +35,7 @@ const AUTOCOMPLETE: Record<
   (interaction: DiscordInteraction) => Promise<Response>
 > = {
   estado: autocompleteEstado,
-  mover: autocompleteMover,
+  terminar: autocompleteTerminar,
 };
 
 // ── Dispatch ────────────────────────────────────────────────────────────────

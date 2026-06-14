@@ -23,6 +23,7 @@ import {
   editorCostInProject,
 } from "./format";
 import { PROJECT_SELECT } from "./queries";
+import { notifyClientPhaseChange } from "@/lib/discord/notify";
 
 async function getClientName(clientId: string | null): Promise<string | null> {
   if (!clientId) return null;
@@ -414,6 +415,14 @@ export async function changePhase(
   if (!parsed.success) return { ok: false, error: "Fase inválida" };
 
   const supabase = await createClient();
+
+  // Fetch current phase + client channel before updating
+  const { data: before } = await supabase
+    .from("projects")
+    .select("title, phase, client:clients(name, discord_channel_id)")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("projects")
     .update({ phase: parsed.data })
@@ -421,6 +430,22 @@ export async function changePhase(
 
   if (error) return { ok: false, error: error.message };
   revalidateAll();
+
+  // Notify client's Discord channel if phase actually changed
+  if (before && before.phase !== parsed.data) {
+    const client = before.client as { name: string; discord_channel_id: string | null } | null;
+    if (client?.discord_channel_id) {
+      await notifyClientPhaseChange({
+        projectTitle: before.title,
+        projectId: id,
+        clientChannelId: client.discord_channel_id,
+        fromPhase: before.phase,
+        toPhase: parsed.data,
+        clientName: client.name,
+      });
+    }
+  }
+
   return { ok: true };
 }
 
@@ -922,6 +947,15 @@ export async function reorderProjects(
   if (parsed.data.length === 0) return { ok: true };
 
   const supabase = await createClient();
+
+  // Fetch current phases to detect actual phase changes for notifications
+  const ids = parsed.data.map((u) => u.id);
+  const { data: before } = await supabase
+    .from("projects")
+    .select("id, title, phase, client:clients(name, discord_channel_id)")
+    .in("id", ids);
+  const beforeMap = new Map((before ?? []).map((p) => [p.id, p]));
+
   const results = await Promise.all(
     parsed.data.map((u) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -939,5 +973,28 @@ export async function reorderProjects(
   if (failure?.error) return { ok: false, error: failure.error.message };
 
   revalidateAll();
+
+  // Notify client channels for projects whose phase actually changed
+  const phaseChanges = parsed.data.filter((u) => {
+    const old = beforeMap.get(u.id);
+    return old && old.phase !== u.phase;
+  });
+  await Promise.all(
+    phaseChanges.map(async (u) => {
+      const old = beforeMap.get(u.id)!;
+      const client = old.client as { name: string; discord_channel_id: string | null } | null;
+      if (client?.discord_channel_id) {
+        await notifyClientPhaseChange({
+          projectTitle: old.title,
+          projectId: u.id,
+          clientChannelId: client.discord_channel_id,
+          fromPhase: old.phase,
+          toPhase: u.phase,
+          clientName: client.name,
+        });
+      }
+    })
+  );
+
   return { ok: true };
 }

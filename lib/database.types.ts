@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -161,10 +161,12 @@ export type Database = {
           color: string
           country: string | null
           created_at: string
+          discord_channel_id: string | null
           docs_url: string | null
           email: string | null
           id: string
           name: string
+          parent_id: string | null
           payment_type: Database["public"]["Enums"]["payment_type"]
           phone: string | null
           retainer_discount_pct: number
@@ -179,10 +181,12 @@ export type Database = {
           color?: string
           country?: string | null
           created_at?: string
+          discord_channel_id?: string | null
           docs_url?: string | null
           email?: string | null
           id?: string
           name: string
+          parent_id?: string | null
           payment_type?: Database["public"]["Enums"]["payment_type"]
           phone?: string | null
           retainer_discount_pct?: number
@@ -197,17 +201,27 @@ export type Database = {
           color?: string
           country?: string | null
           created_at?: string
+          discord_channel_id?: string | null
           docs_url?: string | null
           email?: string | null
           id?: string
           name?: string
+          parent_id?: string | null
           payment_type?: Database["public"]["Enums"]["payment_type"]
           phone?: string | null
           retainer_discount_pct?: number
           state?: string | null
           tax_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       editor_payment_methods: {
         Row: {
@@ -646,6 +660,48 @@ export type Database = {
           },
           {
             foreignKeyName: "project_editors_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_revisions: {
+        Row: {
+          created_at: string
+          editor_id: string | null
+          id: string
+          project_id: string
+          revision_number: number
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          editor_id?: string | null
+          id?: string
+          project_id: string
+          revision_number: number
+          url: string
+        }
+        Update: {
+          created_at?: string
+          editor_id?: string | null
+          id?: string
+          project_id?: string
+          revision_number?: number
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_revisions_editor_id_fkey"
+            columns: ["editor_id"]
+            isOneToOne: false
+            referencedRelation: "editors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_revisions_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"

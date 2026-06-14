@@ -43,11 +43,11 @@ if (!APP_ID || !BOT_TOKEN || !GUILD_ID) {
 const COMMANDS = [
   {
     name: "vincular",
-    description: "Vincula tu cuenta de Discord con la app de TangerineStudios",
+    description: "Vincula tu cuenta de Discord con la app",
     options: [
       {
         name: "código",
-        description: "El código que te dio Joaco (ej: 7X4K9QMN)",
+        description: "El código de vinculación (ej: 7X4K9QMN)",
         type: 3, // STRING
         required: true,
       },
@@ -56,10 +56,6 @@ const COMMANDS = [
   {
     name: "proyectos",
     description: "Lista tus proyectos activos",
-  },
-  {
-    name: "ayuda",
-    description: "Muestra los comandos disponibles",
   },
   {
     name: "estado",
@@ -75,28 +71,27 @@ const COMMANDS = [
     ],
   },
   {
-    name: "mover",
-    description: "Mover un proyecto a otra fase",
+    name: "terminar",
+    description: "Enviar un proyecto a revisión con un link",
     options: [
       {
         name: "proyecto",
-        description: "El proyecto a mover",
+        description: "El proyecto a entregar",
         type: 3, // STRING
         required: true,
         autocomplete: true,
       },
       {
-        name: "fase",
-        description: "La nueva fase",
+        name: "url",
+        description: "Link de revisión (Google Drive, Frame.io, etc.)",
         type: 3, // STRING
         required: true,
-        choices: [
-          { name: "🎬 Editando", value: "editando" },
-          { name: "🔍 En revisión", value: "en_revision" },
-          { name: "✅ Terminado", value: "terminado" },
-        ],
       },
     ],
+  },
+  {
+    name: "ayuda",
+    description: "Muestra los comandos disponibles",
   },
 ];
 
