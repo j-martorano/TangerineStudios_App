@@ -4,7 +4,6 @@ import { AppSidebar } from "@/components/app-sidebar";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 export default async function AppLayout({
@@ -19,12 +18,6 @@ export default async function AppLayout({
     <SidebarProvider defaultOpen={defaultOpen}>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger />
-          <span className="text-xs text-muted-foreground">
-            Ctrl + B para colapsar
-          </span>
-        </header>
         <div className="flex-1">{children}</div>
       </SidebarInset>
     </SidebarProvider>

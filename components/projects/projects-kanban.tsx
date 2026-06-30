@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -22,7 +23,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronDownIcon, GripHorizontalIcon } from "lucide-react";
+import { ArrowUpRightIcon, ChevronDownIcon, PackageIcon, PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -46,12 +47,13 @@ import { InvoiceForm } from "@/components/invoices/invoice-form";
 import type { ClientForInvoice } from "@/lib/invoices/types";
 
 import { KanbanCardActions } from "./kanban-card-actions";
-import type { ParentOption } from "./project-form";
+import { ProjectForm, type ParentOption } from "./project-form";
 import { QuickDurationEditor } from "./quick-duration-editor";
 
 import {
   PROJECT_PHASES,
   PROJECT_TYPE_LABEL,
+  isPack,
 } from "@/lib/projects/types";
 import {
   CARD_CHIP_BASE,
@@ -70,7 +72,6 @@ import type {
   ProjectWithRelations,
 } from "@/lib/projects/types";
 import {
-  PHASE_CLASS,
   PHASE_LABEL,
   computeCost,
   computePrice,
@@ -96,11 +97,6 @@ type PendingFinalize = {
   baseUpdates: ReorderUpdate[];
 };
 
-function clientTint(hex: string | null | undefined): string | undefined {
-  if (!hex) return undefined;
-  return `${hex}33`;
-}
-
 const MONTH_NAMES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -116,6 +112,36 @@ function monthLabel(key: string): string {
   const [year, month] = key.split("-");
   const name = MONTH_NAMES[Number(month) - 1] ?? "Sin fecha";
   return year === "0000" ? "Sin fecha" : `${name} ${year}`;
+}
+
+const statCurrencyFmt = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+
+function formatStat(value: number): string {
+  if (value < 0) return `-${statCurrencyFmt.format(Math.abs(value))}`;
+  return statCurrencyFmt.format(value);
+}
+
+function groupTerminadoByMonth(
+  items: ProjectWithRelations[]
+): { key: string; label: string; items: ProjectWithRelations[] }[] {
+  const map = new Map<string, ProjectWithRelations[]>();
+  for (const p of items) {
+    const key = monthKey(p.finalized_at);
+    const arr = map.get(key);
+    if (arr) arr.push(p);
+    else map.set(key, [p]);
+  }
+  return [...map.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([key, groupItems]) => ({
+      key,
+      label: monthLabel(key).toUpperCase(),
+      items: groupItems,
+    }));
 }
 
 function todayUTC(): string {
@@ -144,6 +170,13 @@ function findContainer(cols: ColumnsMap, id: string): ProjectPhase | null {
   }
   return null;
 }
+
+const PHASE_BLOB: Record<ProjectPhase, string | null> = {
+  por_asignar: null,
+  editando: "#37ACFF20",
+  en_revision: "#FF373720",
+  terminado: "#37FF6220",
+};
 
 // ─── Context para efecto blur ─────────────────────────────────────────────────
 // Cuando una card abre su menú, las otras se blurean.
@@ -302,33 +335,71 @@ function StaticKanban({
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {PROJECT_PHASES.map((phase) => (
-        <div key={phase} className="flex min-w-0 flex-col gap-3">
-          <div className="flex items-center justify-between px-1">
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${PHASE_CLASS[phase]}`}
-            >
-              {PHASE_LABEL[phase]}
-            </span>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {columns[phase].length}
-            </span>
-          </div>
-          <div className="flex min-h-24 flex-col gap-2 rounded-lg p-1">
-            {columns[phase].length === 0 ? (
-              <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
-                Sin proyectos
-              </p>
-            ) : (
-              columns[phase].map((p) => (
-                <CardView
-                  key={p.id}
-                  project={p}
-                  editors={editors}
-                  clients={clients}
-                  availableParents={availableParents}
-                />
-              ))
-            )}
+        <div key={phase} className="relative flex min-w-0 flex-col overflow-hidden rounded-[10px] border border-white/[0.08] bg-[#1a1a1a] min-h-[70vh]">
+          {PHASE_BLOB[phase] ? (
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-48"
+              style={{ background: `radial-gradient(ellipse 100% 140px at 50% 0%, ${PHASE_BLOB[phase]}, transparent)` }}
+            />
+          ) : null}
+          <div className="relative flex flex-1 flex-col gap-3 px-[15px] py-[10px]">
+            <div className="flex items-center justify-between">
+              <span className="text-xl font-[200] uppercase tracking-tight">
+                {PHASE_LABEL[phase]}
+              </span>
+              <span className="text-xl font-semibold tabular-nums text-white">
+                {columns[phase].length}
+              </span>
+            </div>
+            <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
+              {phase === "terminado" && columns[phase].length > 0 ? (
+                <>
+                  <TerminadoStats items={columns[phase]} />
+                  {groupTerminadoByMonth(columns[phase]).map(({ key, label, items: monthItems }) => (
+                    <Fragment key={key}>
+                      <div className="px-1 pt-2 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
+                        {label}
+                      </div>
+                      {monthItems.map((p) => (
+                        <div key={p.id} className="flex flex-col">
+                          <PackBadge project={p} />
+                          <CardView
+                            project={p}
+                            editors={editors}
+                            clients={clients}
+                            availableParents={availableParents}
+                          />
+                        </div>
+                      ))}
+                    </Fragment>
+                  ))}
+                </>
+              ) : columns[phase].length === 0 ? (
+                <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
+                  Sin proyectos
+                </p>
+              ) : (
+                columns[phase].map((p) => (
+                  <div key={p.id} className="flex flex-col">
+                    <PackBadge project={p} />
+                    <CardView
+                      project={p}
+                      editors={editors}
+                      clients={clients}
+                      availableParents={availableParents}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+            {phase !== "terminado" ? (
+              <KanbanAddButton
+                phase={phase}
+                editors={editors}
+                clients={clients}
+                availableParents={availableParents}
+              />
+            ) : null}
           </div>
         </div>
       ))}
@@ -623,6 +694,102 @@ function InteractiveKanban({
   );
 }
 
+// ─── Badge de pack (aparece sobre la card de proyectos tipo pack) ────────────
+
+function PackBadge({ project }: { project: ProjectWithRelations }) {
+  if (!isPack(project)) return null;
+  return (
+    <div className="flex w-fit items-center gap-1 rounded-md border border-border/40 bg-muted/50 px-2 py-0.5">
+      <PackageIcon className="size-2.5 shrink-0 text-muted-foreground/60" />
+      <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
+        Pack
+      </span>
+    </div>
+  );
+}
+
+// ─── Botón agregar a columna ──────────────────────────────────────────────────
+
+function KanbanAddButton({
+  phase,
+  editors,
+  clients,
+  availableParents,
+}: {
+  phase: ProjectPhase;
+  editors: EditorMini[];
+  clients: ClientForProject[];
+  availableParents: ParentOption[];
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/40 py-2 text-xs text-muted-foreground transition-colors hover:border-border hover:bg-accent/20 hover:text-foreground"
+      >
+        <PlusIcon className="size-3.5" />
+        Agregar
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuevo proyecto</DialogTitle>
+          </DialogHeader>
+          <ProjectForm
+            mode="create"
+            editors={editors}
+            clients={clients}
+            availableParents={availableParents}
+            initialPhase={phase}
+            onSuccess={() => setOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// ─── Stats del terminado ─────────────────────────────────────────────────────
+
+function StatCard({
+  label,
+  value,
+  colorClass,
+}: {
+  label: string;
+  value: number;
+  colorClass: string;
+}) {
+  return (
+    <div className="rounded-[5px] border border-white/[0.08] bg-[#2c2c2c] px-4 py-[10px]">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        {label}
+      </p>
+      <p className={`text-2xl font-bold leading-tight ${colorClass}`}>{formatStat(value)}</p>
+    </div>
+  );
+}
+
+function TerminadoStats({ items }: { items: ProjectWithRelations[] }) {
+  if (items.length === 0) return null;
+  const total = items.reduce((s, p) => s + (computePrice(p) ?? 0), 0);
+  const cost = items.reduce((s, p) => s + (computeCost(p) ?? 0), 0);
+  const ganancia = total - cost;
+  return (
+    <div className="flex flex-col gap-1">
+      <StatCard label="Total" value={total} colorClass="text-foreground" />
+      <StatCard label="Costo" value={cost} colorClass="text-red-500" />
+      <StatCard
+        label="Ganancia"
+        value={ganancia}
+        colorClass={ganancia >= 0 ? "text-emerald-500" : "text-red-500"}
+      />
+    </div>
+  );
+}
+
 // ─── Columna ──────────────────────────────────────────────────────────────────
 
 function KanbanColumn({
@@ -647,32 +814,55 @@ function KanbanColumn({
       : "Soltá una tarjeta acá";
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex items-center justify-between px-1">
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium ${PHASE_CLASS[phase]}`}
-        >
-          {PHASE_LABEL[phase]}
-        </span>
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {items.length}
-        </span>
-      </div>
-      <SortableContext
-        id={phase}
-        items={itemIds}
-        strategy={verticalListSortingStrategy}
-      >
+    <div className="relative flex min-w-0 flex-col overflow-hidden rounded-[10px] border border-white/[0.08] bg-[#1a1a1a] min-h-[70vh]">
+      {PHASE_BLOB[phase] ? (
         <div
-          ref={setNodeRef}
-          className={`flex min-h-24 flex-col gap-2 rounded-lg p-1 transition-colors ${
-            isOver ? "bg-accent/40 ring-2 ring-primary/40" : ""
-          }`}
+          className="pointer-events-none absolute inset-x-0 top-0 h-48"
+          style={{ background: `radial-gradient(ellipse 100% 140px at 50% 0%, ${PHASE_BLOB[phase]}, transparent)` }}
+        />
+      ) : null}
+      <div className="relative flex flex-1 flex-col gap-3 px-[15px] py-[10px]">
+        <div className="flex items-center justify-between">
+          <span className="text-xl font-[200] uppercase tracking-tight">
+            {PHASE_LABEL[phase]}
+          </span>
+          <span className="text-xl font-semibold tabular-nums text-white">
+            {items.length}
+          </span>
+        </div>
+        {phase === "terminado" ? <TerminadoStats items={items} /> : null}
+        <SortableContext
+          id={phase}
+          items={itemIds}
+          strategy={verticalListSortingStrategy}
         >
+          <div
+            ref={setNodeRef}
+            className={`flex flex-1 flex-col gap-2 overflow-y-auto transition-colors ${
+              isOver ? "bg-accent/40 ring-2 ring-primary/40" : ""
+            }`}
+          >
           {items.length === 0 ? (
             <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
               {emptyLabel}
             </p>
+          ) : phase === "terminado" ? (
+            groupTerminadoByMonth(items).map(({ key, label, items: monthItems }) => (
+              <Fragment key={key}>
+                <div className="px-1 pt-2 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
+                  {label}
+                </div>
+                {monthItems.map((p) => (
+                  <SortableCard
+                    key={p.id}
+                    project={p}
+                    editors={editors}
+                    clients={clients}
+                    availableParents={availableParents}
+                  />
+                ))}
+              </Fragment>
+            ))
           ) : (
             items.map((p) => (
               <SortableCard
@@ -686,6 +876,15 @@ function KanbanColumn({
           )}
         </div>
       </SortableContext>
+        {phase !== "terminado" ? (
+          <KanbanAddButton
+            phase={phase}
+            editors={editors}
+            clients={clients}
+            availableParents={availableParents}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -720,6 +919,7 @@ function SortableCard({
       style={style}
       className={isDragging ? "opacity-30" : ""}
     >
+      <PackBadge project={project} />
       <CardView
         project={project}
         editors={editors}
@@ -822,88 +1022,90 @@ function CardView({
     <Card
       ref={cardRef}
       size="sm"
-      className={`relative transition-[filter,opacity] duration-200 ${
+      className={`relative !rounded-[5px] !py-0 !gap-0 !bg-[#2c2c2c] transition-[filter,opacity] duration-200 ${
         dragging ? "rotate-2 shadow-lg ring-2 ring-primary/40" : ""
       } ${isBlurred ? "blur-[2px] opacity-35 pointer-events-none select-none" : ""}`}
-      style={{ backgroundColor: clientTint(project.client?.color) }}
     >
       {/* ── Drag handle + header ──────────────────────────────────────────── */}
       <div
-        className="relative cursor-grab px-3 pt-5 pb-2 active:cursor-grabbing"
+        className="cursor-grab active:cursor-grabbing"
         {...dragHandleProps}
       >
-        <GripHorizontalIcon
-          aria-hidden
-          className="pointer-events-none absolute left-1/2 top-1 size-3.5 -translate-x-1/2 text-muted-foreground/50"
-        />
+        <div className="flex flex-col gap-2 px-4 pt-[10px] pb-2">
+          {/* Fila: chips de cliente + tipo, y acciones a la derecha */}
+          <div className="flex items-center gap-1.5">
+            {project.client ? (
+              <span
+                className={CARD_CLIENT_CHIP_BASE}
+                style={{
+                  backgroundColor: project.client.color,
+                  color: contrastColor(project.client.color),
+                }}
+              >
+                <span className="truncate">{project.client.name}</span>
+              </span>
+            ) : project.client_name ? (
+              <span className={`${CARD_CHIP_BASE} max-w-[110px] overflow-hidden bg-muted text-muted-foreground`}>
+                <span className="truncate">{project.client_name}</span>
+              </span>
+            ) : null}
+            {!isPack(project) ? (
+              <span className={`${CARD_CHIP_BASE} ${CARD_TYPE_CHIP[project.project_type]}`}>
+                {PROJECT_TYPE_LABEL[project.project_type]}
+              </span>
+            ) : null}
+            <div className="flex-1" />
+            {editors && clients ? (
+              <>
+                <KanbanCardActions
+                  project={project}
+                  editors={editors}
+                  clients={clients}
+                  availableParents={availableParents}
+                  onMenuOpenChange={(open) =>
+                    setFocusedId(open ? project.id : null)
+                  }
+                />
+                <Link
+                  href={`/projects?highlight=${project.id}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label="Ver en proyectos"
+                >
+                  <ArrowUpRightIcon className="size-4" />
+                </Link>
+              </>
+            ) : null}
+          </div>
 
-        {/* Pack chip */}
-        {project.parent ? (
-          <span
-            className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-purple-500/20 px-2 py-0.5 text-[10px] font-medium text-purple-600 dark:text-purple-300"
-            title={`Pack «${project.parent.title}»`}
-          >
-            <span className="max-w-[120px] truncate">
-              Pack · {project.parent.title}
-            </span>
-            <span className="opacity-70">
-              · {project.parent.finalizedChildren}/{project.parent.totalChildren}
-            </span>
-          </span>
-        ) : null}
+          {/* Título con bullet */}
+          <h3 className="text-[15px] font-bold leading-snug">
+            <span className="mr-1.5 text-muted-foreground/40">•</span>
+            {project.title}
+          </h3>
 
-        {/* Chips row: cliente + tipo */}
-        <div className="flex flex-wrap items-center gap-1.5 pr-8">
-          {project.client ? (
-            <span
-              className={CARD_CLIENT_CHIP_BASE}
-              style={{
-                backgroundColor: project.client.color,
-                color: contrastColor(project.client.color),
-              }}
-            >
-              {project.client.name}
-            </span>
-          ) : project.client_name ? (
-            <span
-              className={`${CARD_CHIP_BASE} bg-muted text-muted-foreground`}
-            >
-              {project.client_name}
-            </span>
+          {/* Lista de hijos para proyectos pack */}
+          {isPack(project) && project.children && project.children.length > 0 ? (
+            <div className="flex flex-col gap-0.5 pl-1">
+              {project.children.slice(0, 2).map((child) => (
+                <div key={child.id} className="flex items-center gap-2 text-[11px] text-muted-foreground/55">
+                  <span className="shrink-0 text-muted-foreground/30">—</span>
+                  <span className="truncate">{child.title}</span>
+                </div>
+              ))}
+              {project.children.length > 2 ? (
+                <div className="pl-4 text-[11px] text-muted-foreground/35">
+                  +{project.children.length - 2}...
+                </div>
+              ) : null}
+            </div>
           ) : null}
-          <span
-            className={`${CARD_CHIP_BASE} ${CARD_TYPE_CHIP[project.project_type]}`}
-          >
-            {PROJECT_TYPE_LABEL[project.project_type]}
-          </span>
-        </div>
 
-        {/* Código + título */}
-        <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
-          {project.project_code}
-        </p>
-        <h3 className="line-clamp-2 text-sm font-semibold leading-snug">
-          {project.title}
-        </h3>
+        </div>
       </div>
 
-      {/* ── Menu de acciones ──────────────────────────────────────────────── */}
-      {editors && clients ? (
-        <div className="absolute right-1 top-1 z-10">
-          <KanbanCardActions
-            project={project}
-            editors={editors}
-            clients={clients}
-            availableParents={availableParents}
-            onMenuOpenChange={(open) =>
-              setFocusedId(open ? project.id : null)
-            }
-          />
-        </div>
-      ) : null}
-
       {/* ── Body: editores + expand ───────────────────────────────────────── */}
-      <CardContent className="flex flex-col gap-2 pt-1">
+      <CardContent className="flex flex-col gap-2 !px-4 pt-0 pb-[10px]">
         <div className="flex items-center justify-between gap-2">
           {/* Editor chips */}
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">

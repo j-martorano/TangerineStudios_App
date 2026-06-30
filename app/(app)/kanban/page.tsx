@@ -29,9 +29,9 @@ export default async function KanbanPage({
     fetchClientsForInvoice(),
   ]);
 
-  // En el kanban no mostramos los packs como card propia — sus shorts hijos
-  // sí aparecen, cada uno en su columna/sección, con un chip que indica el pack.
-  const projects = allProjects.filter((p) => !isPack(p));
+  // En el kanban mostramos packs (con lista de hijos adentro del card).
+  // Los proyectos hijos (parent_id != null) no aparecen como cards individuales.
+  const projects = allProjects.filter((p) => !p.parent_id);
 
   // Padres disponibles: solo proyectos de tipo "pack" no archivados.
   const availableParents = allProjects
@@ -39,20 +39,22 @@ export default async function KanbanPage({
     .map((p) => ({ id: p.id, title: p.title, client_id: p.client_id }));
 
   return (
-    <main className="flex w-full flex-col gap-6 p-4 md:p-5">
-      <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <div className="flex items-baseline gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight">Kanban</h1>
-          <p className="text-sm text-muted-foreground">
+    <main className="flex w-full flex-col gap-6 p-6 md:p-8">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <NewProjectButton
+            editors={editors}
+            clients={clients}
+            availableParents={availableParents}
+          />
+          <h1 className="mt-3 text-5xl font-bold uppercase tracking-tight">
+            Kanban
+          </h1>
+          <p className="mt-1 text-sm font-light text-muted-foreground">
             {projects.length} proyecto{projects.length === 1 ? "" : "s"}
             {query ? <> · filtro: «{query}»</> : null}
           </p>
         </div>
-        <NewProjectButton
-          editors={editors}
-          clients={clients}
-          availableParents={availableParents}
-        />
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">

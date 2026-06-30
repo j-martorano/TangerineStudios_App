@@ -65,6 +65,7 @@ type Props = {
   /** @deprecated Ya no se usa — quedó para no romper props existentes. */
   availableParents?: ParentOption[];
   project?: ProjectWithRelations;
+  initialPhase?: ProjectPhase;
   onSuccess?: () => void;
 };
 
@@ -80,6 +81,7 @@ export function ProjectForm({
   editors,
   clients,
   project,
+  initialPhase,
   onSuccess,
 }: Props) {
   const [title, setTitle] = useState(project?.title ?? "");
@@ -101,7 +103,7 @@ export function ProjectForm({
     project?.client?.id ?? null
   );
   const [phase, setPhase] = useState<ProjectPhase>(
-    project?.phase ?? "por_asignar"
+    project?.phase ?? initialPhase ?? "por_asignar"
   );
   // Fecha de terminado: mostrada cuando phase === "terminado"
   const [finalizedAt, setFinalizedAt] = useState<string>(

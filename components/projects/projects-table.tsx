@@ -1,25 +1,26 @@
-import { Fragment } from "react";
+"use client";
 
+import { Fragment, useState } from "react";
+
+import { PlusIcon } from "lucide-react";
+
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import { MonthGroup } from "./month-group";
-import type { ParentOption } from "./project-form";
+import { ProjectForm, type ParentOption } from "./project-form";
 
 import type {
   ClientForProject,
   EditorMini,
   ProjectWithRelations,
 } from "@/lib/projects/types";
-import {
-  PROJECTS_COLUMNS,
-  type ProjectsColumnId,
-} from "@/lib/settings/types";
 
 const MONTH_NAMES = [
   "Enero",
@@ -49,16 +50,9 @@ function monthLabel(key: string): string {
   return year === "0000" ? "Sin fecha" : `${name} ${year}`;
 }
 
-function currentMonthKey(): string {
-  const d = new Date();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
 function groupByMonth(
   projects: ProjectWithRelations[]
 ): [string, ProjectWithRelations[]][] {
-  // Solo proyectos top-level (sin parent). Los shorts hijos se renderizan
-  // dentro de su pack cuando se despliega.
   const topLevel = projects.filter((p) => !p.parent_id);
   const map = new Map<string, ProjectWithRelations[]>();
   for (const p of topLevel) {
@@ -70,98 +64,108 @@ function groupByMonth(
   return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 }
 
-function columnHeader(id: ProjectsColumnId): React.ReactNode {
-  switch (id) {
-    case "code":
-      return <TableHead className="w-32">Código</TableHead>;
-    case "title":
-      return <TableHead>Título</TableHead>;
-    case "type":
-      return <TableHead className="w-28">Tipo</TableHead>;
-    case "client":
-      return <TableHead>Cliente</TableHead>;
-    case "phase":
-      return <TableHead>Fase</TableHead>;
-    case "price":
-      return <TableHead className="text-right">Precio</TableHead>;
-    case "cost":
-      return <TableHead className="text-right">Costo</TableHead>;
-    case "profit":
-      return <TableHead className="text-right">Ganancia</TableHead>;
-    case "duration":
-      return <TableHead>Duración</TableHead>;
-    case "editor":
-      return <TableHead>Editor</TableHead>;
-    case "cobrado":
-      return <TableHead>Cobrado</TableHead>;
-    case "pagado":
-      return <TableHead>Pagado</TableHead>;
-    case "invoiced":
-      return <TableHead>Facturado</TableHead>;
-    case "updated":
-      return <TableHead>Actualizado</TableHead>;
-    case "actions":
-      return <TableHead className="w-24 text-right">Acciones</TableHead>;
-    case "finalized":
-      return <TableHead className="w-24 text-center">Finalizado</TableHead>;
-  }
-}
+const COL_SPAN = 12;
 
 type Props = {
   projects: ProjectWithRelations[];
   editors: EditorMini[];
   clients: ClientForProject[];
-  visibleColumns: ProjectsColumnId[];
   availableParents?: ParentOption[];
+  highlightId?: string;
 };
 
 export function ProjectsTable({
   projects,
   editors,
   clients,
-  visibleColumns,
   availableParents = [],
+  highlightId,
 }: Props) {
   if (projects.length === 0) {
     return (
-      <p className="px-2 py-6 text-sm text-muted-foreground italic">
+      <p className="px-4 py-8 text-sm italic text-muted-foreground">
         No hay proyectos cargados todavía.
       </p>
     );
   }
 
-  const showExpand = visibleColumns.length < PROJECTS_COLUMNS.length;
-  const colSpan = visibleColumns.length + (showExpand ? 1 : 0);
   const groups = groupByMonth(projects);
-  const currentKey = currentMonthKey();
 
   return (
     <Table>
-      <TableHeader>
-        <TableRow>
-          {showExpand ? <TableHead className="w-8" /> : null}
-          {visibleColumns.map((id) => (
-            <Fragment key={id}>{columnHeader(id)}</Fragment>
-          ))}
-        </TableRow>
-      </TableHeader>
       <TableBody>
-        {groups.map(([key, items]) => (
-          <MonthGroup
-            key={key}
-            monthKey={key}
-            monthLabel={monthLabel(key)}
-            items={items}
-            editors={editors}
-            clients={clients}
-            availableParents={availableParents}
-            visibleColumns={visibleColumns}
-            showExpand={showExpand}
-            colSpan={colSpan}
-            defaultOpen={key === currentKey}
-          />
+        {groups.map(([key, items], idx) => (
+          <Fragment key={key}>
+            <MonthGroup
+              monthKey={key}
+              monthLabel={monthLabel(key)}
+              items={items}
+              editors={editors}
+              clients={clients}
+              availableParents={availableParents}
+              highlightId={highlightId}
+            />
+            {/* Fila "nuevo proyecto" debajo del mes más reciente */}
+            {idx === 0 && (
+              <AddProjectRow
+                editors={editors}
+                clients={clients}
+                availableParents={availableParents}
+              />
+            )}
+          </Fragment>
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+// ── Inline "add project" row ───────────────────────────────────────────────
+
+function AddProjectRow({
+  editors,
+  clients,
+  availableParents,
+}: {
+  editors: EditorMini[];
+  clients: ClientForProject[];
+  availableParents: ParentOption[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <TableRow
+        className="cursor-pointer border-t border-white/[0.04] hover:bg-white/[0.03]"
+        style={{ backgroundColor: "#111111" }}
+        onClick={() => setOpen(true)}
+      >
+        <TableCell colSpan={COL_SPAN} className="px-4 py-3">
+          <span className="flex items-center gap-2 text-sm text-muted-foreground/40 transition-colors hover:text-muted-foreground/70">
+            <PlusIcon className="size-4" />
+            Nuevo proyecto
+          </span>
+        </TableCell>
+      </TableRow>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuevo proyecto</DialogTitle>
+            <DialogDescription>
+              Cargá los datos. Si el cliente no está en la lista, lo creás desde
+              el combobox.
+            </DialogDescription>
+          </DialogHeader>
+          <ProjectForm
+            mode="create"
+            editors={editors}
+            clients={clients}
+            availableParents={availableParents}
+            onSuccess={() => setOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -12,7 +12,7 @@ import { fetchUserPrefs } from "@/lib/settings/queries";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ q?: string; year?: string; archived?: string }>;
+type SearchParams = Promise<{ q?: string; year?: string; archived?: string; highlight?: string }>;
 
 function projectYear(iso: string | null | undefined): number {
   if (!iso) return 0;
@@ -27,6 +27,7 @@ export default async function ProjectsPage({
   const params = await searchParams;
   const query = params.q?.trim() || undefined;
   const showArchived = params.archived === "1";
+  const highlightId = params.highlight?.trim() || undefined;
 
   const [projects, editors, clients, prefs] = await Promise.all([
     fetchProjects({ query, includeArchived: showArchived }),
@@ -52,11 +53,15 @@ export default async function ProjectsPage({
 
   const currentYear = new Date().getUTCFullYear();
   const requestedYear = Number(params.year);
+  const highlightProject = highlightId ? projects.find((p) => p.id === highlightId) : undefined;
+  const highlightYear = highlightProject ? projectYear(highlightProject.created_at) : undefined;
   const selectedYear = years.includes(requestedYear)
     ? requestedYear
-    : years.includes(currentYear)
-      ? currentYear
-      : (years[0] ?? currentYear);
+    : highlightYear && years.includes(highlightYear)
+      ? highlightYear
+      : years.includes(currentYear)
+        ? currentYear
+        : (years[0] ?? currentYear);
 
   // Sólo top-level para el listado del año (los hijos se ven dentro del pack).
   const yearProjectsAll = projects.filter(
@@ -88,19 +93,21 @@ export default async function ProjectsPage({
   const archivedCount = projects.filter((p) => p.archived).length;
 
   return (
-    <main className="flex w-full flex-col gap-6 p-4 md:p-5">
-      <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <div className="flex items-baseline gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight">Proyectos</h1>
-          <p className="text-sm text-muted-foreground">
+    <main className="flex w-full flex-col gap-6 p-6 md:p-8">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <NewProjectButton
+            editors={editors}
+            clients={clients}
+            availableParents={availableParents}
+          />
+          <h1 className="mt-3 text-5xl font-bold uppercase tracking-tight">
+            Spreadsheet
+          </h1>
+          <p className="mt-1 text-sm font-light text-muted-foreground">
             {projects.length} proyecto{projects.length === 1 ? "" : "s"}
           </p>
         </div>
-        <NewProjectButton
-          editors={editors}
-          clients={clients}
-          availableParents={availableParents}
-        />
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -146,7 +153,7 @@ export default async function ProjectsPage({
           editors={editors}
           clients={clients}
           availableParents={availableParents}
-          visibleColumns={prefs.columns.projects}
+          highlightId={highlightId}
         />
       </div>
 

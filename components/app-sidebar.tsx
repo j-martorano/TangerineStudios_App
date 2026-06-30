@@ -16,6 +16,7 @@ import {
   UsersIcon,
   WalletIcon,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import {
   Sidebar,
@@ -31,20 +32,15 @@ import {
 
 import { signOut } from "@/lib/auth/actions";
 
-const items = [
+const items: { href: string; label: string; icon: LucideIcon; exact: boolean }[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboardIcon, exact: true },
   { href: "/kanban", label: "Kanban", icon: ColumnsIcon, exact: false },
-  { href: "/projects", label: "Proyectos", icon: TableIcon, exact: false },
+  { href: "/projects", label: "Spreadsheet", icon: TableIcon, exact: false },
   { href: "/clients", label: "Clientes", icon: UsersIcon, exact: false },
   { href: "/editors", label: "Editores", icon: FilmIcon, exact: false },
   { href: "/finanzas", label: "Finanzas", icon: WalletIcon, exact: false },
   { href: "/facturas", label: "Facturas", icon: ReceiptIcon, exact: false },
-  {
-    href: "/configuracion",
-    label: "Configuración",
-    icon: SettingsIcon,
-    exact: false,
-  },
+  { href: "/configuracion", label: "Configuración", icon: SettingsIcon, exact: false },
 ];
 
 export function AppSidebar() {
@@ -65,7 +61,6 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center">
-          {/* Expandido: logo con texto (gradient de marca) */}
           <Image
             src="/branding/Logo_Y_Texto_Transparente.png"
             alt="Tangerine Studios"
@@ -75,7 +70,6 @@ export function AppSidebar() {
             unoptimized
             className="h-9 w-auto object-contain group-data-[collapsible=icon]:hidden"
           />
-          {/* Colapsado: solo el icono */}
           <Image
             src="/branding/Logo_Icono.png"
             alt="Tangerine Studios"
@@ -90,9 +84,8 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
+            <SidebarMenu className="gap-0.5">
               {items.map((item) => {
-                const Icon = item.icon;
                 const isActive = item.exact
                   ? pathname === item.href
                   : pathname === item.href ||
@@ -104,7 +97,7 @@ export function AppSidebar() {
                       isActive={isActive}
                       tooltip={item.label}
                     >
-                      <Icon />
+                      <item.icon className="shrink-0" />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

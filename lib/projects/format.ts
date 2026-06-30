@@ -169,13 +169,10 @@ export const PHASE_LABEL: Record<ProjectPhase, string> = {
 };
 
 export const PHASE_CLASS: Record<ProjectPhase, string> = {
-  por_asignar:
-    "bg-stone-200 text-stone-800 dark:bg-stone-800 dark:text-stone-300",
-  editando: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  en_revision:
-    "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  terminado:
-    "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  por_asignar: "bg-[#2270FF] text-white",
+  editando: "bg-violet-600 text-white",
+  en_revision: "bg-amber-500 text-white",
+  terminado: "bg-[#37FF62] text-black",
 };
 
 export const COBRADO_LABEL: Record<CobradoStatus, string> = {
@@ -185,9 +182,9 @@ export const COBRADO_LABEL: Record<CobradoStatus, string> = {
 };
 
 export const PAGADO_LABEL: Record<PagadoStatus, string> = {
-  pago_total: "Pagado",
+  pago_total: "Si",
   parcial: "Parcial",
-  sin_pagar: "Sin pagar",
+  sin_pagar: "No",
 };
 
 export const INVOICED_LABEL: Record<InvoicedStatus, string> = {
@@ -197,22 +194,21 @@ export const INVOICED_LABEL: Record<InvoicedStatus, string> = {
 };
 
 export const COBRADO_CLASS: Record<CobradoStatus, string> = {
-  si: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-  no: "bg-stone-200 text-stone-800 dark:bg-stone-800 dark:text-stone-300",
-  parcial: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+  si: "bg-emerald-500 text-white",
+  no: "bg-red-500 text-white",
+  parcial: "bg-amber-500 text-white",
 };
 
 export const PAGADO_CLASS: Record<PagadoStatus, string> = {
-  pago_total:
-    "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-  sin_pagar: "bg-stone-200 text-stone-800 dark:bg-stone-800 dark:text-stone-300",
-  parcial: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+  pago_total: "bg-emerald-500 text-white",
+  sin_pagar: "bg-red-500 text-white",
+  parcial: "bg-amber-500 text-white",
 };
 
 export const INVOICED_CLASS: Record<InvoicedStatus, string> = {
-  si: "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300",
-  no: "bg-stone-200 text-stone-800 dark:bg-stone-800 dark:text-stone-300",
-  parcial: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+  si: "bg-emerald-500 text-white",
+  no: "bg-red-500 text-white",
+  parcial: "bg-amber-500 text-white",
 };
 
 const dateFormatter = new Intl.DateTimeFormat("es-AR", {

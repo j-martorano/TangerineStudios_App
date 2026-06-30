@@ -3,6 +3,7 @@ import { fetchProjects } from "@/lib/projects/queries";
 
 import { InvoiceList } from "@/components/invoices/invoice-list";
 import { NewInvoiceButton } from "@/components/invoices/new-invoice-button";
+import { PendingInvoicesPanel } from "@/components/invoices/pending-invoices-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,21 @@ export default async function FacturasPage() {
     fetchProjects(),
     fetchClientsForInvoice(),
   ]);
+
+  const pendingProjects = projects
+    .filter(
+      (p) =>
+        p.finalized &&
+        p.finalized_at &&
+        !p.parent_id &&
+        !p.archived &&
+        p.invoiced !== "si"
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.finalized_at as string).getTime() -
+        new Date(a.finalized_at as string).getTime()
+    );
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-5">
@@ -26,6 +42,12 @@ export default async function FacturasPage() {
         </div>
         <NewInvoiceButton projects={projects} clients={clients} />
       </header>
+
+      <PendingInvoicesPanel
+        pendingProjects={pendingProjects}
+        projects={projects}
+        clients={clients}
+      />
 
       <InvoiceList invoices={invoices} />
     </main>

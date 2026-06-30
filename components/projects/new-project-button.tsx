@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { PlusIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -29,9 +28,16 @@ export function NewProjectButton({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button />}>
+      <DialogTrigger
+        render={
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 border border-black/10 bg-white text-sm font-medium text-black shadow-sm transition-colors hover:bg-white/90 active:scale-[0.98]" style={{ borderRadius: "5px", padding: "5px 10px" }}
+          />
+        }
+      >
         <PlusIcon className="size-4" />
-        Nuevo proyecto
+        Nuevo Proyecto
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

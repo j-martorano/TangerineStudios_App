@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-geist-sans);
+  --font-sans: var(--font-outfit);
+  --font-mono: ui-monospace, monospace;
+  --font-heading: var(--font-outfit);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -86,41 +86,41 @@
 
 /* Dark theme oficial de Tangerine Studios.
    Paleta de marca:
-     #131200 — background dark (negro con tinte oliva)
+     #111111 — background dark (negro puro)
      #F7F7F2 — foreground crema
      #FFAC37 — primary (naranja cálido)
-     #FFB93F — accent (amarillo-naranja, para highlights/charts)
-     #ED254E — destructive (rosa-rojo intenso) */
+     #ED254E — destructive (rosa-rojo intenso)
+   Fuente: Outfit (Light 300, Regular 400, SemiBold 600, Bold 700) */
 .dark {
   /* Superficies */
-  --background: #131200;
+  --background: #111111;
   --foreground: #F7F7F2;
-  --card: oklch(0.215 0.025 100);             /* un pelín más claro que background */
+  --card: #1c1c1c;
   --card-foreground: #F7F7F2;
-  --popover: oklch(0.215 0.025 100);
+  --popover: #1c1c1c;
   --popover-foreground: #F7F7F2;
 
   /* Primario — naranja cálido de marca */
   --primary: #FFAC37;
-  --primary-foreground: #131200;
+  --primary-foreground: #111111;
 
-  /* Secundario y muted — tonos del background */
-  --secondary: oklch(0.275 0.025 100);
+  /* Secundario y muted */
+  --secondary: #242424;
   --secondary-foreground: #F7F7F2;
-  --muted: oklch(0.275 0.025 100);
-  --muted-foreground: oklch(0.72 0.018 95);
+  --muted: #242424;
+  --muted-foreground: #888888;
 
-  /* Acento — naranja oscuro con texto naranja claro */
-  --accent: oklch(0.32 0.10 60);
-  --accent-foreground: #FFB93F;
+  /* Acento — hover/focus sutil */
+  --accent: #242424;
+  --accent-foreground: #F7F7F2;
 
-  /* Destructive — rojo intenso para acciones destructivas (más fuerte que el rosa de marca) */
+  /* Destructive */
   --destructive: #DC2626;
   --destructive-foreground: #F7F7F2;
 
   /* Bordes e inputs */
-  --border: oklch(0.30 0.02 95);
-  --input: oklch(0.30 0.02 95);
+  --border: #2a2a2a;
+  --input: #2a2a2a;
   --ring: #FFAC37;
 
   /* Charts — gradient naranja → rosa */
@@ -131,13 +131,13 @@
   --chart-5: #ED254E;
 
   /* Sidebar */
-  --sidebar: oklch(0.18 0.02 100);
+  --sidebar: #0d0d0d;
   --sidebar-foreground: #F7F7F2;
   --sidebar-primary: #FFAC37;
-  --sidebar-primary-foreground: #131200;
-  --sidebar-accent: oklch(0.32 0.10 60);
-  --sidebar-accent-foreground: #FFB93F;
-  --sidebar-border: oklch(0.30 0.02 95);
+  --sidebar-primary-foreground: #111111;
+  --sidebar-accent: #FFFFFF1E;          /* fondo gris neutro para hover/activo */
+  --sidebar-accent-foreground: #FFAC37; /* texto/ícono naranja tangerine en hover/activo */
+  --sidebar-border: #1a1a1a;
   --sidebar-ring: #FFAC37;
 }
 

@@ -18,15 +18,17 @@ import type { EditorMini } from "@/lib/projects/types";
 export function NewClientButton({
   availableEditors,
   availableParents,
+  buttonClassName,
 }: {
   availableEditors: EditorMini[];
   availableParents: { id: string; name: string }[];
+  buttonClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button />}>
+      <DialogTrigger render={<Button className={buttonClassName} />}>
         <PlusIcon className="size-4" />
         Nuevo cliente
       </DialogTrigger>

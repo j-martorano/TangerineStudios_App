@@ -1,56 +1,82 @@
 "use client";
 
-import { Fragment, useState } from "react";
-import { ChevronRightIcon } from "lucide-react";
+import { Fragment, useEffect, useRef, useState, useTransition } from "react";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ClipboardIcon,
+  HardDriveIcon,
+  PlusIcon,
+  Trash2Icon,
+  XIcon,
+} from "lucide-react";
+import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { TableCell, TableRow } from "@/components/ui/table";
 
-import { ArchiveProjectButton } from "./archive-project-button";
 import { CobroManager } from "./cobro-manager";
-import { EditProjectButton } from "./edit-project-button";
-import { FinalizeToggle } from "./finalize-toggle";
 import { PagoManager } from "./pago-manager";
-import type { ParentOption } from "./project-form";
-import { QuickDurationEditor } from "./quick-duration-editor";
 import { QuickPhaseBadge } from "./quick-phase-badge";
 import { QuickPaymentBadge } from "./quick-payment-badge";
+import type { ParentOption } from "./project-form";
 
+import {
+  deleteProject,
+  setProjectArchived,
+  updateProject,
+} from "@/lib/projects/actions";
 import {
   computeCost,
   computePrice,
   computeProfit,
   formatDate,
-  formatPrice,
 } from "@/lib/projects/format";
-import {
-  editorNames,
-  isPack,
-  PROJECT_TYPE_CLASS,
-  PROJECT_TYPE_LABEL,
-} from "@/lib/projects/types";
+import { editorNames, isPack } from "@/lib/projects/types";
 import type {
   ClientForProject,
   EditorMini,
   ProjectWithRelations,
 } from "@/lib/projects/types";
-import {
-  PROJECTS_COLUMNS,
-  PROJECTS_COLUMN_LABEL,
-  type ProjectsColumnId,
-} from "@/lib/settings/types";
+
+// Compact "$250" format
+const balanceFmt = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+function fmt(v: number): string {
+  return v < 0 ? `-${balanceFmt.format(Math.abs(v))}` : balanceFmt.format(v);
+}
+
+const ROW_BG_EVEN = "#1e1e1e";
+const ROW_BG_ODD = "#232323";
 
 type Props = {
   project: ProjectWithRelations;
   editors: EditorMini[];
   clients: ClientForProject[];
   availableParents?: ParentOption[];
-  visibleColumns: ProjectsColumnId[];
-  /** Si false, no se renderiza la celda del chevron (no hay nada para expandir). */
-  showExpand: boolean;
-  rowClassName: string;
-  rowStyle?: React.CSSProperties;
-  /** True si esta fila es un short hijo de un pack (se indenta). */
-  nested?: boolean;
+  rowIndex: number;
+  highlightId?: string;
+  childIndex?: number;
+  isLastChild?: boolean;
+  forceBg?: string;
 };
 
 export function ProjectRow({
@@ -58,260 +84,525 @@ export function ProjectRow({
   editors,
   clients,
   availableParents = [],
-  visibleColumns,
-  showExpand,
-  rowClassName,
-  rowStyle,
-  nested = false,
+  rowIndex,
+  highlightId,
+  childIndex,
+  isLastChild = false,
+  forceBg,
 }: Props) {
-  const [expanded, setExpanded] = useState(false);
-  const visible = new Set<ProjectsColumnId>(visibleColumns);
-  const hidden = PROJECTS_COLUMNS.filter((c) => !visible.has(c));
-  // Los hijos de un pack (nested) siempre son editables individualmente,
-  // independientemente de su estado de finalización. Su ciclo de vida es
-  // gestionado a través del pack, no por finalización individual.
-  const locked = nested ? false : project.finalized;
+  const isHighlighted = project.id === highlightId;
+  const rowRef = useRef<HTMLTableRowElement>(null);
   const pack = isPack(project);
-  const canExpand = pack || hidden.length > 0;
+  const isChild = childIndex !== undefined;
+  const locked = isChild ? false : project.finalized;
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!isHighlighted) return;
+    rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const price = computePrice(project);
+  const cost = computeCost(project);
+  const profit = computeProfit(project);
+  const isRetainer = project.client?.payment_type === "mensual";
+
+  const rowBg = forceBg ?? (rowIndex % 2 === 0 ? ROW_BG_EVEN : ROW_BG_ODD);
 
   return (
     <Fragment>
-      <TableRow className={rowClassName} style={rowStyle}>
-        {showExpand ? (
-          <TableCell className="w-8 p-1 align-middle">
-            {canExpand ? (
+      <TableRow
+        ref={rowRef}
+        className={`border-b border-white/[0.04] transition-colors hover:brightness-110 ${
+          project.archived ? "opacity-50" : ""
+        } ${isHighlighted ? "ring-2 ring-inset ring-primary/50" : ""}`}
+        style={{ backgroundColor: rowBg }}
+      >
+        {/* ── Col 1: pack expand+actions | child branch | empty ── */}
+        <TableCell className="relative w-14 overflow-visible p-0 align-middle">
+          {pack ? (
+            <div className="flex items-center gap-0.5 px-2 py-2">
               <button
                 type="button"
                 onClick={() => setExpanded((v) => !v)}
-                aria-label={expanded ? "Colapsar fila" : "Expandir fila"}
-                aria-expanded={expanded}
-                className="flex size-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label={expanded ? "Colapsar" : "Expandir"}
+                className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-white/10 hover:text-muted-foreground"
               >
-                <ChevronRightIcon
-                  className={`size-4 transition-transform duration-200 ${
-                    expanded ? "rotate-90" : ""
+                <ChevronDownIcon
+                  className={`size-3.5 transition-transform duration-200 ${
+                    expanded ? "" : "-rotate-90"
                   }`}
                 />
               </button>
-            ) : null}
-          </TableCell>
-        ) : null}
-        {visibleColumns.map((id) => (
-          <TableCell key={id} className={cellClass(id)}>
-            {renderValue(
-              id,
-              project,
-              editors,
-              clients,
-              availableParents,
-              locked,
-              nested,
-              pack
-            )}
-          </TableCell>
-        ))}
+            </div>
+          ) : isChild ? (
+            <div className="relative py-2.5 pl-7 pr-2">
+              <div
+                className={`absolute left-4 w-px bg-white/10 ${
+                  isLastChild ? "top-0 h-[calc(50%+1px)]" : "inset-y-0"
+                }`}
+              />
+              <div className="absolute left-4 top-1/2 h-px w-3 -translate-y-px bg-white/10" />
+              <span className="text-sm font-bold tabular-nums text-muted-foreground/45">
+                {String(childIndex).padStart(2, "0")}
+              </span>
+            </div>
+          ) : null}
+        </TableCell>
+
+        {/* ── Col 2: Client chip ── */}
+        <TableCell className="w-32 p-2 align-middle">
+          {!isChild && project.client ? (
+            <span
+              className="inline-flex max-w-[116px] items-center overflow-hidden truncate rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white"
+              style={{ backgroundColor: project.client.color ?? "#555" }}
+            >
+              <span className="truncate">{project.client.name}</span>
+            </span>
+          ) : null}
+        </TableCell>
+
+        {/* ── Col 3: Phase ── */}
+        <TableCell className="w-36 p-2 align-middle">
+          <QuickPhaseBadge id={project.id} phase={project.phase} disabled={locked} />
+        </TableCell>
+
+        {/* ── Col 4: Code (click to copy) ── */}
+        <TableCell className="w-28 p-2 align-middle">
+          <CopyCodeButton code={project.project_code} />
+        </TableCell>
+
+        {/* ── Col 5: Title ── */}
+        <TableCell className="p-2 align-middle">
+          <span className="font-semibold">{project.title}</span>
+        </TableCell>
+
+        {/* ── Col 6: Balance badges (nowrap with dark bg container) ── */}
+        <TableCell className="w-44 p-2 align-middle">
+          {isRetainer ? (
+            <span className="text-xs text-muted-foreground/50">RETAINER</span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-md bg-black/20 px-1.5 py-1">
+              {price != null ? (
+                <span className="inline-flex items-center rounded border border-[#37ACFF]/30 bg-[#37ACFF]/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-[#37ACFF]">
+                  {fmt(price)}
+                </span>
+              ) : null}
+              {cost != null ? (
+                <span className="inline-flex items-center rounded border border-red-500/25 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-red-400">
+                  {fmt(cost)}
+                </span>
+              ) : null}
+              {profit != null ? (
+                <span
+                  className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                    profit >= 0
+                      ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
+                      : "border-red-500/25 bg-red-500/10 text-red-400"
+                  }`}
+                >
+                  {fmt(profit)}
+                </span>
+              ) : null}
+              {price == null && cost == null && profit == null ? (
+                <span className="text-xs text-muted-foreground/30">—</span>
+              ) : null}
+            </span>
+          )}
+        </TableCell>
+
+        {/* ── Col 7: Cobrado ── */}
+        <TableCell className="w-32 p-2 align-middle">
+          <span className="flex items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground/45">Cobrado</span>
+            <CobroManager project={project} disabled={locked} />
+          </span>
+        </TableCell>
+
+        {/* ── Col 8: Pagado ── */}
+        <TableCell className="w-32 p-2 align-middle">
+          <span className="flex items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground/45">Pagado</span>
+            <PagoManager project={project} disabled={locked} />
+          </span>
+        </TableCell>
+
+        {/* ── Col 9: Facturado — read-only (se actualiza desde Finanzas) ── */}
+        <TableCell className="w-36 p-2 align-middle">
+          <span className={`flex items-center gap-1.5 ${locked ? "opacity-50" : ""}`}>
+            <span className="text-[11px] text-muted-foreground/45">Facturado</span>
+            <QuickPaymentBadge
+              kind="invoiced"
+              id={project.id}
+              value={project.invoiced}
+              disabled={true}
+            />
+          </span>
+        </TableCell>
+
+        {/* ── Col 10: Creation date ── */}
+        <TableCell className="w-20 p-2 align-middle">
+          <span className="text-xs text-muted-foreground/55">
+            {project.created_at ? formatDate(project.created_at) : "—"}
+          </span>
+        </TableCell>
+
+        {/* ── Col 11: Editors (functional mini-dialog) ── */}
+        <TableCell className="w-44 p-2 align-middle">
+          <EditorBadge
+            project={project}
+            editors={editors}
+            locked={locked}
+          />
+        </TableCell>
+
+        {/* ── Col 12: Archive / Delete ── */}
+        <TableCell className="w-10 p-2 pr-3 align-middle">
+          <RowActionButton project={project} />
+        </TableCell>
       </TableRow>
-      {expanded && pack ? (
-        <Fragment>
-          {project.children!.map((child) => (
+
+      {/* Pack children */}
+      {pack && expanded && project.children && project.children.length > 0
+        ? project.children.map((child, idx) => (
             <ProjectRow
               key={child.id}
               project={child}
               editors={editors}
               clients={clients}
               availableParents={availableParents}
-              visibleColumns={visibleColumns}
-              showExpand={showExpand}
-              rowClassName={`bg-muted/50 border-l-2 border-l-border/60 animate-in fade-in slide-in-from-top-1 duration-200`}
-              rowStyle={rowStyle}
-              nested
+              rowIndex={rowIndex}
+              forceBg={rowBg}
+              highlightId={highlightId}
+              childIndex={idx + 1}
+              isLastChild={idx === project.children!.length - 1}
             />
-          ))}
-        </Fragment>
-      ) : null}
-      {expanded && !pack && hidden.length > 0 ? (
-        <TableRow className={rowClassName} style={rowStyle}>
-          {showExpand ? <TableCell className="w-8 p-1" /> : null}
-          <TableCell
-            colSpan={visibleColumns.length}
-            className="border-l-2 border-l-border/60 bg-muted/50 px-4 py-3 animate-in fade-in slide-in-from-top-1 duration-200"
-          >
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs sm:grid-cols-3 md:grid-cols-4">
-              {hidden.map((id) => (
-                <div key={id} className="flex flex-col gap-1">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                    {PROJECTS_COLUMN_LABEL[id]}
-                  </span>
-                  <div>
-                    {renderValue(
-                      id,
-                      project,
-                      editors,
-                      clients,
-                      availableParents,
-                      locked,
-                      nested,
-                      pack
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </TableCell>
-        </TableRow>
-      ) : null}
+          ))
+        : null}
     </Fragment>
   );
 }
 
-function cellClass(id: ProjectsColumnId): string {
-  switch (id) {
-    case "code":
-      return "font-mono text-xs text-muted-foreground";
-    case "title":
-      return "font-medium";
-    case "price":
-    case "profit":
-      return "text-right tabular-nums";
-    case "cost":
-      return "text-right tabular-nums text-muted-foreground";
-    case "duration":
-      return "tabular-nums";
-    case "updated":
-      return "text-muted-foreground";
-    case "actions":
-      return "text-right";
-    case "finalized":
-      return "text-center";
-    default:
-      return "";
+// ── Copy code button ──────────────────────────────────────────────────────
+
+function CopyCodeButton({ code }: { code: string | null }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
   }
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      title="Copiar código"
+      className="flex items-center gap-1.5 rounded px-1 py-0.5 transition-colors hover:bg-white/8"
+    >
+      {copied ? (
+        <CheckIcon className="size-3.5 shrink-0 text-emerald-400" />
+      ) : (
+        <ClipboardIcon className="size-3.5 shrink-0 text-muted-foreground/35" />
+      )}
+      <span className="max-w-[80px] truncate font-mono text-xs text-muted-foreground/65">
+        {code}
+      </span>
+    </button>
+  );
 }
 
-function renderValue(
-  id: ProjectsColumnId,
-  p: ProjectWithRelations,
-  editors: EditorMini[],
-  clients: ClientForProject[],
-  availableParents: ParentOption[],
-  locked: boolean,
-  nested: boolean,
-  pack: boolean
-): React.ReactNode {
-  switch (id) {
-    case "code":
-      return p.project_code;
-    case "title":
-      return (
-        <span
-          className={`inline-flex flex-wrap items-center gap-2 ${
-            nested ? "pl-4" : ""
-          }`}
-        >
-          {nested ? (
-            <span aria-hidden className="text-muted-foreground/60">
-              ↳
-            </span>
-          ) : null}
-          <span>{p.title}</span>
-          {pack ? (
-            <span className="inline-flex items-center rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">
-              Pack · {p.children!.length} proyecto
-              {p.children!.length === 1 ? "" : "s"}
-            </span>
-          ) : null}
-        </span>
-      );
-    case "type":
-      return (
-        <span
-          className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${PROJECT_TYPE_CLASS[p.project_type]}`}
-        >
-          {PROJECT_TYPE_LABEL[p.project_type]}
-        </span>
-      );
-    case "client":
-      return p.client ? (
-        <span className="inline-flex items-center gap-2">
-          <span
-            className="size-2.5 shrink-0 rounded-full"
-            style={{ backgroundColor: p.client.color }}
-          />
-          {p.client.name}
-        </span>
-      ) : (
-        (p.client_name ?? "—")
-      );
-    case "phase":
-      return <QuickPhaseBadge id={p.id} phase={p.phase} disabled={locked} />;
-    case "price":
-      if (p.client?.payment_type === "mensual") return "RETAINER";
-      const price = computePrice(p);
-      return price != null ? formatPrice(price) : "—";
-    case "cost": {
-      const c = computeCost(p);
-      return c != null ? formatPrice(c) : "—";
-    }
-    case "profit": {
-      const profit = computeProfit(p);
-      if (profit == null) return "—";
-      return (
-        <span className={profit < 0 ? "text-destructive" : ""}>
-          {formatPrice(profit)}
-        </span>
-      );
-    }
-    case "duration":
-      return (
-        <QuickDurationEditor
-          id={p.id}
-          value={p.duration_minutes}
-          disabled={locked}
-        />
-      );
-    case "editor":
-      return editorNames(p);
-    case "cobrado":
-      return <CobroManager project={p} disabled={locked} />;
-    case "pagado":
-      return <PagoManager project={p} disabled={locked} />;
-    case "invoiced":
-      return (
-        <QuickPaymentBadge
-          kind="invoiced"
-          id={p.id}
-          value={p.invoiced}
-          disabled={locked}
-        />
-      );
-    case "updated":
-      return formatDate(p.updated_at);
-    case "actions":
-      return (
-        <div className="flex items-center justify-end gap-1">
-          <EditProjectButton
-            project={p}
-            editors={editors}
-            clients={clients}
-            availableParents={availableParents}
-            disabled={locked}
-          />
-          <ArchiveProjectButton
-            id={p.id}
-            title={p.title}
-            archived={p.archived}
-          />
-        </div>
-      );
-    case "finalized":
-      return (
-        <div className="flex justify-center">
-          <FinalizeToggle
-            id={p.id}
-            title={p.title}
-            finalized={p.finalized}
-          />
-        </div>
-      );
+// ── Archive / Delete button ────────────────────────────────────────────────
+
+function RowActionButton({ project }: { project: ProjectWithRelations }) {
+  const [pending, startTransition] = useTransition();
+
+  function handleArchive() {
+    startTransition(async () => {
+      const r = await setProjectArchived(project.id, true);
+      if (r.ok) toast.success(`«${project.title}» archivado`);
+      else toast.error(r.error);
+    });
   }
+
+  function handleDeleteAttempt() {
+    toast.warning(`¿Eliminar «${project.title}» permanentemente?`, {
+      action: {
+        label: "Eliminar",
+        onClick: () => {
+          startTransition(async () => {
+            const r = await deleteProject(project.id);
+            if (r.ok) toast.success("Proyecto eliminado");
+            else toast.error(r.error);
+          });
+        },
+      },
+      cancel: { label: "Cancelar", onClick: () => {} },
+      duration: 8000,
+    });
+  }
+
+  if (project.archived) {
+    return (
+      <button
+        type="button"
+        onClick={handleDeleteAttempt}
+        disabled={pending}
+        aria-label="Eliminar proyecto"
+        className="flex size-7 cursor-pointer items-center justify-center rounded text-red-500 transition-colors hover:bg-red-500/15 disabled:opacity-40"
+      >
+        <Trash2Icon className="size-3.5" />
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleArchive}
+      disabled={pending}
+      aria-label="Archivar proyecto"
+      className="flex size-7 cursor-pointer items-center justify-center rounded text-red-500 transition-colors hover:bg-red-500/15 disabled:opacity-40"
+    >
+      <Trash2Icon className="size-3.5" />
+    </button>
+  );
+}
+
+// ── Editor badge → mini dialog ────────────────────────────────────────────
+
+type EditorBadgeProps = {
+  project: ProjectWithRelations;
+  editors: EditorMini[];
+  locked: boolean;
+};
+
+function EditorBadge({ project, editors, locked }: EditorBadgeProps) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => !locked && setOpen(true)}
+        disabled={locked}
+        className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-xs text-muted-foreground/65 transition-colors hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <HardDriveIcon className="size-3.5 shrink-0" />
+        <span className="max-w-[108px] truncate">
+          {editorNames(project) || "Sin editor"}
+        </span>
+        <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground/30" />
+      </button>
+
+      <EditorsDialog
+        project={project}
+        editors={editors}
+        open={open}
+        onOpenChange={setOpen}
+      />
+    </>
+  );
+}
+
+// ── Editors-only mini form ────────────────────────────────────────────────
+
+type EditorsDialogProps = {
+  project: ProjectWithRelations;
+  editors: EditorMini[];
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+};
+
+type EditorEntry = { id: string; costDraft: string };
+
+function EditorsDialog({ project, editors, open, onOpenChange }: EditorsDialogProps) {
+  const [entries, setEntries] = useState<EditorEntry[]>([]);
+  const [pending, startTransition] = useTransition();
+
+  // Reset state each time the dialog opens
+  useEffect(() => {
+    if (open) {
+      setEntries(
+        project.editors
+          .filter((e) => e.editor != null)
+          .map((e) => ({
+            id: e.editor!.id,
+            costDraft: e.cost != null ? String(e.cost) : "",
+          }))
+      );
+    }
+  }, [open, project.editors]);
+
+  const editorById = new Map(editors.map((ed) => [ed.id, ed.name]));
+  const selectedIds = entries.map((e) => e.id);
+
+  function addEditor() {
+    const next = editors.find((ed) => !selectedIds.includes(ed.id));
+    if (next) setEntries([...entries, { id: next.id, costDraft: "" }]);
+  }
+
+  function removeEditor(i: number) {
+    setEntries(entries.filter((_, idx) => idx !== i));
+  }
+
+  function changeEditor(i: number, id: string) {
+    setEntries(entries.map((e, idx) => (idx === i ? { ...e, id } : e)));
+  }
+
+  function changeCost(i: number, costDraft: string) {
+    setEntries(entries.map((e, idx) => (idx === i ? { ...e, costDraft } : e)));
+  }
+
+  function handleSave() {
+    const editorPayload: { id: string; cost: number | null }[] = [];
+    for (const entry of entries) {
+      const costStr = entry.costDraft.trim();
+      if (costStr !== "") {
+        const n = Number(costStr);
+        if (Number.isNaN(n) || n < 0) {
+          toast.error(`Costo inválido para ${editorById.get(entry.id) ?? "editor"}`);
+          return;
+        }
+        editorPayload.push({ id: entry.id, cost: n });
+      } else {
+        editorPayload.push({ id: entry.id, cost: null });
+      }
+    }
+
+    startTransition(async () => {
+      const r = await updateProject(project.id, {
+        title: project.title,
+        client_id: project.client_id,
+        phase: project.phase,
+        cobrado: project.cobrado,
+        pagado: project.pagado,
+        invoiced: project.invoiced,
+        price: project.price != null ? Number(project.price) : null,
+        cost: project.cost != null ? Number(project.cost) : null,
+        duration_minutes:
+          project.duration_minutes != null ? Number(project.duration_minutes) : null,
+        project_type: project.project_type,
+        parent_id: project.parent_id ?? null,
+        finalized_at:
+          project.phase === "terminado" ? (project.finalized_at ?? null) : null,
+        children:
+          project.project_type === "pack"
+            ? (project.children ?? []).map((c) => ({
+                id: c.id,
+                title: c.title,
+                project_type: (c.project_type !== "pack" ? c.project_type : "long_form") as
+                  | "long_form"
+                  | "short_form"
+                  | "other",
+              }))
+            : [],
+        editors: editorPayload,
+      });
+
+      if (r.ok) {
+        toast.success("Editores actualizados");
+        onOpenChange(false);
+      } else {
+        toast.error(r.error);
+      }
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            Editores —{" "}
+            <span className="font-normal text-muted-foreground">{project.title}</span>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-3">
+          {entries.length > 0 ? (
+            <>
+              <div className="grid grid-cols-[1fr_120px_auto] gap-2 px-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                <span>Editor</span>
+                <span>Costo (USD)</span>
+                <span className="w-7" />
+              </div>
+              {entries.map((entry, i) => (
+                <div key={i} className="grid grid-cols-[1fr_120px_auto] items-center gap-2">
+                  <Select
+                    value={entry.id}
+                    onValueChange={(v) => v && changeEditor(i, v)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue>
+                        {(v: string | null) => (v ? (editorById.get(v) ?? "—") : "—")}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {editors
+                        .filter((ed) => ed.id === entry.id || !selectedIds.includes(ed.id))
+                        .map((ed) => (
+                          <SelectItem key={ed.id} value={ed.id}>
+                            {ed.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    value={entry.costDraft}
+                    onChange={(e) => changeCost(i, e.target.value)}
+                    placeholder="auto"
+                    className="h-9 text-right tabular-nums"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => removeEditor(i)}
+                    aria-label="Quitar editor"
+                  >
+                    <XIcon className="size-4" />
+                  </Button>
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground">
+                Dejá el costo vacío para usar el cálculo automático.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs italic text-muted-foreground">Sin editores asignados.</p>
+          )}
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addEditor}
+            disabled={editors.length === 0 || selectedIds.length >= editors.length}
+            className="w-fit"
+          >
+            <PlusIcon className="size-4" />
+            Agregar editor
+          </Button>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={handleSave} disabled={pending}>
+            {pending ? "Guardando…" : "Guardar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }

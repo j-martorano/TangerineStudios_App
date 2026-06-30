@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from "react";
 import {
+  AlignJustifyIcon,
   ArchiveIcon,
   ClipboardCopyIcon,
   CopyIcon,
-  MoreVerticalIcon,
   PencilIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -53,6 +53,9 @@ type Props = {
   availableParents?: ParentOption[];
   /** Llamado cuando el dropdown abre/cierra — usado para el efecto blur. */
   onMenuOpenChange?: (open: boolean) => void;
+  /** Controlado externamente — permite que CardView maneje el diálogo de edición. */
+  editOpen?: boolean;
+  onEditOpenChange?: (v: boolean) => void;
 };
 
 export function KanbanCardActions({
@@ -61,8 +64,12 @@ export function KanbanCardActions({
   clients,
   availableParents = [],
   onMenuOpenChange,
+  editOpen: editOpenProp,
+  onEditOpenChange,
 }: Props) {
-  const [editOpen, setEditOpen] = useState(false);
+  const [editOpenInternal, setEditOpenInternal] = useState(false);
+  const editOpen = editOpenProp !== undefined ? editOpenProp : editOpenInternal;
+  const setEditOpen = onEditOpenChange ?? setEditOpenInternal;
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [cloneOpen, setCloneOpen] = useState(false);
   const [cloneTitle, setCloneTitle] = useState("");
@@ -123,7 +130,7 @@ export function KanbanCardActions({
             />
           }
         >
-          <MoreVerticalIcon className="size-4" />
+          <AlignJustifyIcon className="size-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuItem

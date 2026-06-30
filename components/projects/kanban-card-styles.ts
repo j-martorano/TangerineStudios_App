@@ -19,12 +19,10 @@ export const CARD_TYPE_CHIP: Record<ProjectType, string> = {
 
 // Base compartida de chips pequeños (tipo + cliente)
 export const CARD_CHIP_BASE =
-  "shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider leading-none";
+  "shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider leading-none";
 
-// Chip de cliente: fondo sólido con client.color, texto blanco.
-// Para revertir al dot + nombre: en CardView reemplazá <ClientChip> por el JSX anterior.
 export const CARD_CLIENT_CHIP_BASE =
-  "inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white leading-none";
+  "inline-flex min-w-0 max-w-[110px] items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white leading-none overflow-hidden";
 
 // ── Badges de estado financiero (COBRADO / PAGADO / FACTURADO) ─────────────────
 export function financialBadgeClass(pct: number): string {
