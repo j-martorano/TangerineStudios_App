@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type JSX } from "react";
+import { Fragment, useState, type JSX } from "react";
 import { ChevronDownIcon, ChevronRightIcon, ExternalLinkIcon } from "lucide-react";
 
 import {
@@ -74,8 +74,8 @@ export function ClientsTable({
     const isExpanded = expanded.has(c.id);
 
     return (
-      <>
-        <TableRow key={c.id} className={isChild ? "bg-muted/30" : undefined}>
+      <Fragment key={c.id}>
+        <TableRow className={isChild ? "bg-muted/30" : undefined}>
           {visible.has("color") && (
             <TableCell>
               <div className="flex items-center gap-1">
@@ -191,7 +191,7 @@ export function ClientsTable({
           )}
         </TableRow>
         {hasChildren && isExpanded && children.map((child) => renderRow(child, true))}
-      </>
+      </Fragment>
     );
   }
 
