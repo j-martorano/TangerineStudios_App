@@ -332,10 +332,16 @@ function StaticKanban({
   availableParents = [],
 }: Props) {
   const columns = buildColumns(projects);
+  const terminadoGroups = groupTerminadoByMonth(columns.terminado);
+  const currentGroup = terminadoGroups[0];
+  const historicalGroups = terminadoGroups.slice(1);
+  const activePhases = (["por_asignar", "editando", "en_revision"] as ProjectPhase[]);
+
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {PROJECT_PHASES.map((phase) => (
-        <div key={phase} className="relative flex min-w-0 flex-col overflow-hidden rounded-[10px] border border-white/[0.08] bg-[#1a1a1a] min-h-[70vh]">
+    <div className="flex gap-3 overflow-x-auto pb-3">
+      {/* Columnas activas */}
+      {activePhases.map((phase) => (
+        <div key={phase} className="relative flex w-[280px] shrink-0 flex-col overflow-hidden rounded-[10px] border border-white/[0.08] bg-[#1a1a1a] min-h-[70vh]">
           {PHASE_BLOB[phase] ? (
             <div
               className="pointer-events-none absolute inset-x-0 top-0 h-48"
@@ -344,65 +350,70 @@ function StaticKanban({
           ) : null}
           <div className="relative flex flex-1 flex-col gap-3 px-[15px] py-[10px]">
             <div className="flex items-center justify-between">
-              <span className="text-xl font-[200] uppercase tracking-tight">
-                {PHASE_LABEL[phase]}
-              </span>
-              <span className="text-xl font-semibold tabular-nums text-white">
-                {columns[phase].length}
-              </span>
+              <span className="text-xl font-[200] uppercase tracking-tight">{PHASE_LABEL[phase]}</span>
+              <span className="text-xl font-semibold tabular-nums text-white">{columns[phase].length}</span>
             </div>
             <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
-              {phase === "terminado" && columns[phase].length > 0 ? (
-                <>
-                  <TerminadoStats items={columns[phase]} />
-                  {groupTerminadoByMonth(columns[phase]).map(({ key, label, items: monthItems }) => (
-                    <Fragment key={key}>
-                      <div className="px-1 pt-2 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
-                        {label}
-                      </div>
-                      {monthItems.map((p) => (
-                        <div key={p.id} className="flex flex-col">
-                          <PackBadge project={p} />
-                          <CardView
-                            project={p}
-                            editors={editors}
-                            clients={clients}
-                            availableParents={availableParents}
-                          />
-                        </div>
-                      ))}
-                    </Fragment>
-                  ))}
-                </>
-              ) : columns[phase].length === 0 ? (
-                <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
-                  Sin proyectos
-                </p>
+              {columns[phase].length === 0 ? (
+                <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">Sin proyectos</p>
               ) : (
                 columns[phase].map((p) => (
                   <div key={p.id} className="flex flex-col">
                     <PackBadge project={p} />
-                    <CardView
-                      project={p}
-                      editors={editors}
-                      clients={clients}
-                      availableParents={availableParents}
-                    />
+                    <CardView project={p} editors={editors} clients={clients} availableParents={availableParents} />
                   </div>
                 ))
               )}
             </div>
-            {phase !== "terminado" ? (
-              <KanbanAddButton
-                phase={phase}
-                editors={editors}
-                clients={clients}
-                availableParents={availableParents}
-              />
-            ) : null}
+            <KanbanAddButton phase={phase} editors={editors} clients={clients} availableParents={availableParents} />
           </div>
         </div>
       ))}
+
+      {/* Columna terminado — mes actual */}
+      <div className="relative flex w-[280px] shrink-0 flex-col overflow-hidden rounded-[10px] border border-white/[0.08] bg-[#1a1a1a] min-h-[70vh]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-48"
+          style={{ background: "radial-gradient(ellipse 100% 140px at 50% 0%, #37FF6220, transparent)" }} />
+        <div className="relative flex flex-1 flex-col gap-3 px-[15px] py-[10px]">
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-[200] uppercase tracking-tight">
+              {currentGroup?.label ?? PHASE_LABEL.terminado}
+            </span>
+            <span className="text-xl font-semibold tabular-nums text-white">
+              {currentGroup?.items.length ?? 0}
+            </span>
+          </div>
+          {currentGroup && <TerminadoStats items={currentGroup.items} />}
+          <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
+            {!currentGroup || currentGroup.items.length === 0 ? (
+              <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">Sin proyectos</p>
+            ) : (
+              currentGroup.items.map((p) => (
+                <div key={p.id} className="flex flex-col">
+                  <PackBadge project={p} />
+                  <CardView project={p} editors={editors} clients={clients} availableParents={availableParents} />
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Histórico */}
+      {historicalGroups.length > 0 && (
+        <>
+          <HistoricoDivider />
+          {historicalGroups.map((group) => (
+            <HistoricalMonthColumn
+              key={group.key}
+              group={group}
+              editors={editors}
+              clients={clients}
+              availableParents={availableParents}
+            />
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -633,18 +644,48 @@ function InteractiveKanban({
           setActiveSourcePhase(null);
         }}
       >
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {PROJECT_PHASES.map((phase) => (
-            <KanbanColumn
-              key={phase}
-              phase={phase}
-              items={columns[phase]}
-              editors={editors}
-              clients={clients}
-              availableParents={availableParents}
-            />
-          ))}
-        </div>
+        {(() => {
+          const terminadoGroups = groupTerminadoByMonth(columns.terminado);
+          const currentGroup = terminadoGroups[0];
+          const historicalGroups = terminadoGroups.slice(1);
+          const activePhases = (["por_asignar", "editando", "en_revision"] as ProjectPhase[]);
+          return (
+            <div className="flex gap-3 overflow-x-auto pb-3">
+              {activePhases.map((phase) => (
+                <KanbanColumn
+                  key={phase}
+                  phase={phase}
+                  items={columns[phase]}
+                  editors={editors}
+                  clients={clients}
+                  availableParents={availableParents}
+                />
+              ))}
+              <KanbanColumn
+                phase="terminado"
+                items={currentGroup?.items ?? []}
+                monthLabel={currentGroup?.label}
+                editors={editors}
+                clients={clients}
+                availableParents={availableParents}
+              />
+              {historicalGroups.length > 0 && (
+                <>
+                  <HistoricoDivider />
+                  {historicalGroups.map((group) => (
+                    <HistoricalMonthColumn
+                      key={group.key}
+                      group={group}
+                      editors={editors}
+                      clients={clients}
+                      availableParents={availableParents}
+                    />
+                  ))}
+                </>
+              )}
+            </div>
+          );
+        })()}
         <DragOverlay>
           {activeProject ? (
             <CardView project={activeProject} dragging />
@@ -790,6 +831,60 @@ function TerminadoStats({ items }: { items: ProjectWithRelations[] }) {
   );
 }
 
+// ─── Divisor histórico ───────────────────────────────────────────────────────
+
+function HistoricoDivider() {
+  return (
+    <div className="flex w-10 shrink-0 flex-col items-center gap-3 py-[10px]">
+      <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/35 [writing-mode:vertical-rl]">
+        Histórico
+      </span>
+      <div className="w-px flex-1 bg-white/[0.06]" />
+    </div>
+  );
+}
+
+// ─── Columna histórica (solo lectura) ─────────────────────────────────────────
+
+function HistoricalMonthColumn({
+  group,
+  editors,
+  clients,
+  availableParents = [],
+}: {
+  group: { key: string; label: string; items: ProjectWithRelations[] };
+  editors: EditorMini[];
+  clients: ClientForProject[];
+  availableParents?: ParentOption[];
+}) {
+  return (
+    <div className="relative flex w-[280px] shrink-0 flex-col overflow-hidden rounded-[10px] border border-white/[0.08] bg-[#1a1a1a] min-h-[70vh]">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-48"
+        style={{ background: "radial-gradient(ellipse 100% 140px at 50% 0%, #37FF6210, transparent)" }}
+      />
+      <div className="relative flex flex-1 flex-col gap-3 overflow-y-auto px-[15px] py-[10px]">
+        <div className="flex items-center justify-between">
+          <span className="text-xl font-[200] uppercase tracking-tight">{group.label}</span>
+          <span className="text-xl font-semibold tabular-nums text-white">{group.items.length}</span>
+        </div>
+        <TerminadoStats items={group.items} />
+        {group.items.map((p) => (
+          <div key={p.id} className="flex flex-col">
+            <PackBadge project={p} />
+            <CardView
+              project={p}
+              editors={editors}
+              clients={clients}
+              availableParents={availableParents}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Columna ──────────────────────────────────────────────────────────────────
 
 function KanbanColumn({
@@ -798,12 +893,14 @@ function KanbanColumn({
   editors,
   clients,
   availableParents = [],
+  monthLabel,
 }: {
   phase: ProjectPhase;
   items: ProjectWithRelations[];
   editors: EditorMini[];
   clients: ClientForProject[];
   availableParents?: ParentOption[];
+  monthLabel?: string;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: phase });
   const itemIds = useMemo(() => items.map((p) => p.id), [items]);
@@ -814,7 +911,7 @@ function KanbanColumn({
       : "Soltá una tarjeta acá";
 
   return (
-    <div className="relative flex min-w-0 flex-col overflow-hidden rounded-[10px] border border-white/[0.08] bg-[#1a1a1a] min-h-[70vh]">
+    <div className="relative flex w-[280px] shrink-0 flex-col overflow-hidden rounded-[10px] border border-white/[0.08] bg-[#1a1a1a] min-h-[70vh]">
       {PHASE_BLOB[phase] ? (
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-48"
@@ -824,7 +921,7 @@ function KanbanColumn({
       <div className="relative flex flex-1 flex-col gap-3 px-[15px] py-[10px]">
         <div className="flex items-center justify-between">
           <span className="text-xl font-[200] uppercase tracking-tight">
-            {PHASE_LABEL[phase]}
+            {monthLabel ?? PHASE_LABEL[phase]}
           </span>
           <span className="text-xl font-semibold tabular-nums text-white">
             {items.length}
