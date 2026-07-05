@@ -1,6 +1,6 @@
 ﻿import Link from "next/link";
 
-import { NewProjectButton } from "@/components/projects/new-project-button";
+import { NewHistoricProjectButton, NewProjectButton } from "@/components/projects/new-project-button";
 import { ProjectsTable } from "@/components/projects/projects-table";
 import { DataSearch } from "@/components/data-search";
 import {
@@ -43,18 +43,23 @@ export default async function ProjectsPage({
     .filter((p) => p.project_type === "pack" && !p.archived)
     .map((p) => ({ id: p.id, title: p.title, client_id: p.client_id }));
 
+  // Para proyectos terminados, agrupamos por finalized_at en vez de created_at.
+  function effectiveIso(p: (typeof projects)[number]): string | null {
+    return p.phase === "terminado" && p.finalized_at ? p.finalized_at : p.created_at;
+  }
+
   // Años con proyectos, del más reciente al más viejo. Sólo top-level (los
   // shorts hijos se cuentan dentro de su pack).
   const years = Array.from(
     new Set(
-      projects.filter((p) => !p.parent_id).map((p) => projectYear(p.created_at))
+      projects.filter((p) => !p.parent_id).map((p) => projectYear(effectiveIso(p)))
     )
   ).sort((a, b) => b - a);
 
   const currentYear = new Date().getUTCFullYear();
   const requestedYear = Number(params.year);
   const highlightProject = highlightId ? projects.find((p) => p.id === highlightId) : undefined;
-  const highlightYear = highlightProject ? projectYear(highlightProject.created_at) : undefined;
+  const highlightYear = highlightProject ? projectYear(effectiveIso(highlightProject)) : undefined;
   const selectedYear = years.includes(requestedYear)
     ? requestedYear
     : highlightYear && years.includes(highlightYear)
@@ -65,7 +70,7 @@ export default async function ProjectsPage({
 
   // Sólo top-level para el listado del año (los hijos se ven dentro del pack).
   const yearProjectsAll = projects.filter(
-    (p) => !p.parent_id && projectYear(p.created_at) === selectedYear
+    (p) => !p.parent_id && projectYear(effectiveIso(p)) === selectedYear
   );
   const yearProjects = yearProjectsAll.slice(0, projectsPerYear);
   const yearTrimmed = yearProjectsAll.length - yearProjects.length;
@@ -96,11 +101,18 @@ export default async function ProjectsPage({
     <main className="flex w-full flex-col gap-6 p-6 md:p-8">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <NewProjectButton
-            editors={editors}
-            clients={clients}
-            availableParents={availableParents}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <NewProjectButton
+              editors={editors}
+              clients={clients}
+              availableParents={availableParents}
+            />
+            <NewHistoricProjectButton
+              editors={editors}
+              clients={clients}
+              availableParents={availableParents}
+            />
+          </div>
           <h1 className="mt-3 text-5xl font-bold uppercase tracking-tight">
             Spreadsheet
           </h1>

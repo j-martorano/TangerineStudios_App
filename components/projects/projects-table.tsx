@@ -50,13 +50,17 @@ function monthLabel(key: string): string {
   return year === "0000" ? "Sin fecha" : `${name} ${year}`;
 }
 
+function effectiveDate(p: ProjectWithRelations): string | null | undefined {
+  return p.phase === "terminado" && p.finalized_at ? p.finalized_at : p.created_at;
+}
+
 function groupByMonth(
   projects: ProjectWithRelations[]
 ): [string, ProjectWithRelations[]][] {
   const topLevel = projects.filter((p) => !p.parent_id);
   const map = new Map<string, ProjectWithRelations[]>();
   for (const p of topLevel) {
-    const key = monthKey(p.created_at);
+    const key = monthKey(effectiveDate(p));
     const arr = map.get(key);
     if (arr) arr.push(p);
     else map.set(key, [p]);
