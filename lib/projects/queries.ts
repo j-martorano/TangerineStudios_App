@@ -264,14 +264,13 @@ export type EditorWithCount = EditorRow & {
 };
 
 const EDITOR_FULL_SELECT =
-  "id, name, email, phone, discord_id, discord_link_token, docs_url, payment_type, rate, flat_amount, created_at, project_editors(count), client_editors(payment_type, rate, flat_amount, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct)), editor_payment_methods(method_id, info, method:payment_methods(id, name, icon, color)), editor_payment_tiers(min_minutes, max_minutes, amount)";
+  "id, name, contact_links, discord_id, discord_link_token, docs_url, payment_type, rate, flat_amount, created_at, project_editors(count), client_editors(payment_type, rate, flat_amount, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct)), editor_payment_methods(method_id, info, method:payment_methods(id, name, icon, color)), editor_payment_tiers(min_minutes, max_minutes, amount)";
 
 function mapEditor(
   e: {
     id: string;
     name: string;
-    email: string | null;
-    phone: string | null;
+    contact_links: unknown;
     discord_id: string | null;
     discord_link_token?: string | null;
     docs_url: string | null;
@@ -321,8 +320,7 @@ function mapEditor(
   return {
     id: e.id,
     name: e.name,
-    email: e.email,
-    phone: e.phone,
+    contact_links: e.contact_links as import("@/lib/database.types").Json,
     discord_id: e.discord_id,
     discord_link_token: e.discord_link_token ?? null,
     docs_url: e.docs_url,
@@ -448,7 +446,7 @@ export async function fetchClients(): Promise<ClientForProject[]> {
   const { data, error } = await supabase
     .from("clients")
     .select(
-      "id, name, color, payment_type, agreed_price, retainer_discount_pct, client_payments(minutes_credited), projects(duration_minutes, archived)"
+      "id, name, color, payment_type, agreed_price, retainer_discount_pct, client_payments(minutes_credited), projects(duration_minutes, archived), client_editors(editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))"
     )
     .order("name");
   if (error) throw new Error(error.message);
@@ -467,6 +465,9 @@ export async function fetchClients(): Promise<ClientForProject[]> {
       retainer_discount_pct: c.retainer_discount_pct,
       minute_balance:
         c.payment_type === "mensual" ? credited - consumed : null,
+      editors: (c.client_editors ?? [])
+        .map((ce: { editor: EditorMini | null }) => ce.editor)
+        .filter((e): e is EditorMini => e != null),
     };
   });
 }
@@ -482,7 +483,7 @@ export type ClientWithCount = ClientRow & {
 };
 
 const CLIENT_FULL_SELECT =
-  "id, name, color, payment_type, agreed_price, retainer_discount_pct, billing_name, tax_id, address, city, state, country, email, phone, docs_url, created_at, discord_channel_id, parent_id, projects(duration_minutes, archived), client_editors(editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount))), client_payments(id, amount, minutes_credited, paid_at, note)";
+  "id, name, color, payment_type, agreed_price, retainer_discount_pct, billing_name, tax_id, address, city, state, country, contact_links, docs_url, created_at, discord_channel_id, parent_id, projects(duration_minutes, archived), client_editors(editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount))), client_payments(id, amount, minutes_credited, paid_at, note)";
 
 export async function fetchClientsWithCount(): Promise<ClientWithCount[]> {
   const supabase = await createClient();
@@ -520,8 +521,7 @@ function mapClient(c: {
   city?: string | null;
   state?: string | null;
   country?: string | null;
-  email: string | null;
-  phone: string | null;
+  contact_links: unknown;
   docs_url: string | null;
   created_at: string;
   discord_channel_id?: string | null;
@@ -556,8 +556,7 @@ function mapClient(c: {
     city: c.city ?? null,
     state: c.state ?? null,
     country: c.country ?? null,
-    email: c.email,
-    phone: c.phone,
+    contact_links: c.contact_links as import("@/lib/database.types").Json,
     docs_url: c.docs_url,
     created_at: c.created_at,
     discord_channel_id: c.discord_channel_id ?? null,

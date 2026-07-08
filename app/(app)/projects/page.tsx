@@ -159,7 +159,7 @@ export default async function ProjectsPage({
         </div>
       ) : null}
 
-      <div className="rounded-xl border bg-card p-2">
+      <div>
         <ProjectsTable
           projects={yearProjects}
           editors={editors}

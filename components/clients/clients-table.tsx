@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { EditClientButton } from "./edit-client-button";
 import { DeleteClientButton } from "./delete-client-button";
 import type { ClientWithCount } from "@/lib/projects/queries";
-import type { EditorMini } from "@/lib/projects/types";
+import type { ContactLink, EditorMini } from "@/lib/projects/types";
 import { PAYMENT_TYPE_LABEL } from "@/lib/projects/types";
 import type { ClientsColumnId } from "@/lib/settings/types";
 
@@ -147,8 +147,8 @@ export function ClientsTable({
             </TableCell>
           )}
           {visible.has("contact") && (
-            <TableCell className="max-w-[18ch] truncate text-muted-foreground">
-              {c.email ?? c.phone ?? "—"}
+            <TableCell className="max-w-[22ch] truncate text-muted-foreground">
+              {((c.contact_links as ContactLink[] | null) ?? [])[0]?.value ?? "—"}
             </TableCell>
           )}
           {visible.has("docs") && (

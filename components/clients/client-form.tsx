@@ -17,6 +17,7 @@ import {
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 
 import { MultiCombobox } from "@/components/ui/multi-combobox";
+import { ContactLinksEditor } from "@/components/ui/contact-links-editor";
 import { ClientPaymentsSection } from "./client-payments-section";
 
 import { createClient, updateClient } from "@/lib/clients/actions";
@@ -26,6 +27,7 @@ import { PAYMENT_TYPES, PAYMENT_TYPE_LABEL } from "@/lib/projects/types";
 import type {
   ClientPayment,
   ClientRow,
+  ContactLink,
   EditorMini,
   PaymentType,
 } from "@/lib/projects/types";
@@ -70,8 +72,9 @@ export function ClientForm({
   const [city, setCity] = useState(client?.city ?? "");
   const [clientState, setClientState] = useState(client?.state ?? "");
   const [country, setCountry] = useState(client?.country ?? "");
-  const [email, setEmail] = useState(client?.email ?? "");
-  const [phone, setPhone] = useState(client?.phone ?? "");
+  const [contactLinks, setContactLinks] = useState<ContactLink[]>(
+    () => (client?.contact_links as ContactLink[] | null) ?? []
+  );
   const [docsUrl, setDocsUrl] = useState(client?.docs_url ?? "");
   const [discordChannelId, setDiscordChannelId] = useState(
     client?.discord_channel_id ?? ""
@@ -120,8 +123,7 @@ export function ClientForm({
       city: city.trim() || null,
       state: clientState.trim() || null,
       country: country.trim() || null,
-      email: email.trim() || null,
-      phone: phone.trim() || null,
+      contact_links: contactLinks.filter((l) => l.value.trim()),
       docs_url: docsUrl.trim() || null,
       discord_channel_id: discordChannelId.trim() || null,
       parent_id: parentId || null,
@@ -322,24 +324,9 @@ export function ClientForm({
       </Section>
 
       <Section title="Datos administrativos">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Email">
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="contacto@acme.com"
-            />
-          </Field>
-          <Field label="Teléfono / WhatsApp">
-            <Input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+54 11 5555-5555"
-            />
-          </Field>
-        </div>
+        <Field label="Contacto">
+          <ContactLinksEditor value={contactLinks} onChange={setContactLinks} />
+        </Field>
 
         <Field
           label="Documentos"

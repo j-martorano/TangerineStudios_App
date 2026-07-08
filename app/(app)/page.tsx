@@ -202,13 +202,14 @@ export default async function DashboardPage({
           availableParents={availableParents}
         />
         <NewClientButton
-          buttonClassName="bg-white text-black hover:bg-white/85"
+          buttonClassName="border border-white/15 bg-white/8 text-white/80 hover:bg-white/12 hover:text-white"
           availableEditors={editors}
           availableParents={clients.map((c) => ({ id: c.id, name: c.name }))}
         />
         <Link
           href="/facturas"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-white/85"
+          className="inline-flex items-center gap-1.5 border border-white/15 bg-white/8 px-3 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/12 hover:text-white"
+          style={{ borderRadius: "6px" }}
         >
           Crear Factura
           <ArrowUpRightIcon className="size-3.5" />

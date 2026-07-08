@@ -211,6 +211,35 @@ export const INVOICED_CLASS: Record<InvoicedStatus, string> = {
   parcial: "bg-amber-500 text-white",
 };
 
+/** Convierte minutos decimales a string "MM:SS" para mostrar/editar. */
+export function minutesToMMSS(minutes: number): string {
+  const totalSeconds = Math.round(minutes * 60);
+  const mm = Math.floor(totalSeconds / 60);
+  const ss = totalSeconds % 60;
+  return `${mm}:${ss.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Parsea "MM:SS" o "MM" a minutos decimales.
+ * Devuelve null si el formato es inválido o los segundos ≥ 60.
+ */
+export function mmssToMinutes(str: string): number | null {
+  const trimmed = str.trim();
+  if (trimmed === "") return null;
+  if (!trimmed.includes(":")) {
+    const mm = parseInt(trimmed, 10);
+    if (isNaN(mm) || mm < 0) return null;
+    return mm;
+  }
+  const colonIdx = trimmed.indexOf(":");
+  const mmStr = trimmed.slice(0, colonIdx);
+  const ssStr = trimmed.slice(colonIdx + 1);
+  const mm = parseInt(mmStr, 10);
+  const ss = parseInt(ssStr, 10);
+  if (isNaN(mm) || isNaN(ss) || mm < 0 || ss < 0 || ss >= 60) return null;
+  return mm + ss / 60;
+}
+
 const dateFormatter = new Intl.DateTimeFormat("es-AR", {
   day: "2-digit",
   month: "short",

@@ -40,8 +40,9 @@ const clientInputSchema = z.object({
   city: z.string().nullable().default(null),
   state: z.string().nullable().default(null),
   country: z.string().nullable().default(null),
-  email: z.string().email("Email inválido").nullable().or(z.literal("")).default(null),
-  phone: z.string().nullable().default(null),
+  contact_links: z
+    .array(z.object({ type: z.string(), value: z.string() }))
+    .default([]),
   docs_url: z
     .union([z.string().url("URL inválida"), z.literal(""), z.null()])
     .default(null),
@@ -130,8 +131,7 @@ export async function createClient(
       city: normalizeText(parsed.data.city),
       state: normalizeText(parsed.data.state),
       country: normalizeText(parsed.data.country),
-      email: normalizeText(parsed.data.email),
-      phone: normalizeText(parsed.data.phone),
+      contact_links: parsed.data.contact_links.filter((l) => l.value.trim()),
       docs_url: normalizeUrl(parsed.data.docs_url),
       discord_channel_id: normalizeText(parsed.data.discord_channel_id),
       parent_id: parsed.data.parent_id,
@@ -177,8 +177,7 @@ export async function updateClient(
       city: normalizeText(parsed.data.city),
       state: normalizeText(parsed.data.state),
       country: normalizeText(parsed.data.country),
-      email: normalizeText(parsed.data.email),
-      phone: normalizeText(parsed.data.phone),
+      contact_links: parsed.data.contact_links.filter((l) => l.value.trim()),
       docs_url: normalizeUrl(parsed.data.docs_url),
       discord_channel_id: normalizeText(parsed.data.discord_channel_id),
       parent_id: parsed.data.parent_id,

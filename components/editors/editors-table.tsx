@@ -14,7 +14,7 @@ import { DeleteEditorButton } from "./delete-editor-button";
 import { PaymentMethodChips } from "./payment-method-chips";
 import { DiscordLinkCell } from "./discord-link-cell";
 import type { EditorWithCount } from "@/lib/projects/queries";
-import type { ClientMini } from "@/lib/projects/types";
+import type { ClientMini, ContactLink } from "@/lib/projects/types";
 import type { PaymentMethod } from "@/lib/payment-methods/queries";
 import type { EditorsColumnId } from "@/lib/settings/types";
 
@@ -90,8 +90,8 @@ export function EditorsTable({
               </TableCell>
             )}
             {visible.has("contact") && (
-              <TableCell className="max-w-[18ch] truncate text-muted-foreground">
-                {e.email ?? e.phone ?? "—"}
+              <TableCell className="max-w-[22ch] truncate text-muted-foreground">
+                {((e.contact_links as ContactLink[] | null) ?? [])[0]?.value ?? "—"}
               </TableCell>
             )}
             {visible.has("discord") && (

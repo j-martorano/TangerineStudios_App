@@ -1,4 +1,4 @@
-﻿import { NewProjectButton } from "@/components/projects/new-project-button";
+﻿import { NewProjectButton, NewHistoricProjectButton } from "@/components/projects/new-project-button";
 import { ProjectsKanban } from "@/components/projects/projects-kanban";
 import { DataSearch } from "@/components/data-search";
 import {
@@ -42,11 +42,18 @@ export default async function KanbanPage({
     <main className="flex w-full flex-col gap-6 p-6 md:p-8">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <NewProjectButton
-            editors={editors}
-            clients={clients}
-            availableParents={availableParents}
-          />
+          <div className="flex items-center gap-2">
+            <NewProjectButton
+              editors={editors}
+              clients={clients}
+              availableParents={availableParents}
+            />
+            <NewHistoricProjectButton
+              editors={editors}
+              clients={clients}
+              availableParents={availableParents}
+            />
+          </div>
           <h1 className="mt-3 text-5xl font-bold uppercase tracking-tight">
             Kanban
           </h1>

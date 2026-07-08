@@ -16,10 +16,9 @@ const editorInputSchema = z.object({
     .trim()
     .min(1, "El nombre es obligatorio")
     .max(120, "El nombre no puede tener más de 120 caracteres"),
-  email: z
-    .union([z.string().email("Email inválido"), z.literal(""), z.null()])
-    .default(null),
-  phone: z.string().nullable().default(null),
+  contact_links: z
+    .array(z.object({ type: z.string(), value: z.string() }))
+    .default([]),
   discord_id: z.string().nullable().default(null),
   docs_url: z
     .union([z.string().url("URL inválida"), z.literal(""), z.null()])
@@ -261,8 +260,7 @@ export async function createEditor(
     .from("editors")
     .insert({
       name: parsed.data.name,
-      email: normalizeText(parsed.data.email),
-      phone: normalizeText(parsed.data.phone),
+      contact_links: parsed.data.contact_links.filter((l) => l.value.trim()),
       discord_id: normalizeText(parsed.data.discord_id),
       docs_url: normalizeText(parsed.data.docs_url),
       payment_type: parsed.data.payment_type,
@@ -312,8 +310,7 @@ export async function updateEditor(
     .from("editors")
     .update({
       name: parsed.data.name,
-      email: normalizeText(parsed.data.email),
-      phone: normalizeText(parsed.data.phone),
+      contact_links: parsed.data.contact_links.filter((l) => l.value.trim()),
       discord_id: normalizeText(parsed.data.discord_id),
       docs_url: normalizeText(parsed.data.docs_url),
       payment_type: parsed.data.payment_type,

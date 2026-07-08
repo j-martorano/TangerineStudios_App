@@ -16,8 +16,8 @@ import { ProjectForm, type ParentOption } from "./project-form";
 import type { ClientForProject, EditorMini } from "@/lib/projects/types";
 
 const btnBase =
-  "inline-flex items-center gap-2 border text-sm font-medium shadow-sm transition-colors active:scale-[0.98]";
-const btnStyle = { borderRadius: "5px", padding: "5px 10px" };
+  "inline-flex items-center gap-2 text-sm font-medium transition-colors active:scale-[0.98]";
+const btnStyle = { borderRadius: "6px", padding: "6px 12px" };
 
 export function NewProjectButton({
   editors,
@@ -36,7 +36,7 @@ export function NewProjectButton({
         render={
           <button
             type="button"
-            className={`${btnBase} border-black/10 bg-white text-black hover:bg-white/90`}
+            className={`${btnBase} bg-[#FFAC37] text-black hover:bg-[#FFAC37]/85`}
             style={btnStyle}
           />
         }
@@ -81,7 +81,7 @@ export function NewHistoricProjectButton({
         render={
           <button
             type="button"
-            className={`${btnBase} border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80`}
+            className={`${btnBase} border border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80`}
             style={btnStyle}
           />
         }

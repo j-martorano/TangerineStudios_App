@@ -10,6 +10,31 @@ export type PaymentType = Database["public"]["Enums"]["payment_type"];
 export type EditorPaymentType =
   Database["public"]["Enums"]["editor_payment_model"];
 
+// ── Contactos ────────────────────────────────────────────────────────────────
+
+export const CONTACT_TYPES = [
+  "email", "whatsapp", "phone", "instagram", "twitter",
+  "discord", "slack", "telegram", "linkedin", "other",
+] as const;
+export type ContactType = typeof CONTACT_TYPES[number];
+
+export const CONTACT_TYPE_LABEL: Record<ContactType, string> = {
+  email: "Email",
+  whatsapp: "WhatsApp",
+  phone: "Teléfono",
+  instagram: "Instagram",
+  twitter: "Twitter / X",
+  discord: "Discord",
+  slack: "Slack",
+  telegram: "Telegram",
+  linkedin: "LinkedIn",
+  other: "Otro",
+};
+
+export type ContactLink = { type: ContactType; value: string };
+
+// ── Pagos ────────────────────────────────────────────────────────────────────
+
 /** Tramo de FLAT variable: si la duración cae en [min, max), se cobra `amount`. */
 export type PaymentTier = {
   min_minutes: number;
@@ -45,6 +70,8 @@ export type ClientMini = Pick<
  */
 export type ClientForProject = ClientMini & {
   minute_balance: number | null;
+  /** Editores asignados a este cliente (para auto-popular al crear proyecto). */
+  editors: EditorMini[];
 };
 
 /** Pago de un cliente mensual: acredita `minutes_credited` minutos. */

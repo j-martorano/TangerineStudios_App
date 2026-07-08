@@ -146,8 +146,7 @@ export async function activateSeed(): Promise<SeedResult> {
         city: "Buenos Aires",
         state: "CABA",
         country: "Argentina",
-        email: "admin@acmestudios.com.ar",
-        phone: "+54 11 4444-1234",
+        contact_links: [{ type: "email", value: "admin@acmestudios.com.ar" }, { type: "whatsapp", value: "+54 11 4444-1234" }],
       },
       {
         id: CL2,
@@ -162,8 +161,7 @@ export async function activateSeed(): Promise<SeedResult> {
         city: "Córdoba",
         state: "Córdoba",
         country: "Argentina",
-        email: "contacto@naranjafilms.com",
-        phone: "+54 351 555-9876",
+        contact_links: [{ type: "email", value: "contacto@naranjafilms.com" }, { type: "whatsapp", value: "+54 351 555-9876" }],
       },
       {
         id: CL3,
@@ -178,8 +176,7 @@ export async function activateSeed(): Promise<SeedResult> {
         city: "Rosario",
         state: "Santa Fe",
         country: "Argentina",
-        email: "elchino@example.com",
-        phone: "+54 341 666-5555",
+        contact_links: [{ type: "email", value: "elchino@example.com" }, { type: "whatsapp", value: "+54 341 666-5555" }],
       },
       {
         id: CL4,
@@ -194,8 +191,7 @@ export async function activateSeed(): Promise<SeedResult> {
         city: "Manchester",
         state: "England",
         country: "United Kingdom",
-        email: "billing@policinguncut.com",
-        phone: "+44 161 000 1234",
+        contact_links: [{ type: "email", value: "billing@policinguncut.com" }, { type: "phone", value: "+44 161 000 1234" }],
       },
       {
         id: CL5,
@@ -210,8 +206,7 @@ export async function activateSeed(): Promise<SeedResult> {
         city: "Los Angeles",
         state: "California",
         country: "United States",
-        email: "dj@djsthoughts.com",
-        phone: "+1 310 555 4200",
+        contact_links: [{ type: "email", value: "dj@djsthoughts.com" }, { type: "phone", value: "+1 310 555 4200" }],
       },
     ],
     { onConflict: "id" }

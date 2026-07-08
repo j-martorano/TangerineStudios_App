@@ -6,21 +6,25 @@ import { toast } from "sonner";
 
 import { changeProjectDuration } from "@/lib/projects/actions";
 
+function toMMSS(minutes: number): { mm: number; ss: number } {
+  const total = Math.round(minutes * 60);
+  return { mm: Math.floor(total / 60), ss: total % 60 };
+}
+
+function fromMMSS(mm: number, ss: number): number {
+  return mm + ss / 60;
+}
+
 type Props = {
   id: string;
   value: number | null;
   /** Si está bloqueado (proyecto finalizado), muestra el valor como texto. */
   disabled?: boolean;
-  /** Cuánto suma/resta cada botón. Default 1. */
+  /** Cuántos minutos suma/resta cada botón. Default 1. */
   step?: number;
   size?: "default" | "compact";
 };
 
-/**
- * Editor en línea de la duración (en minutos) de un proyecto. Tiene botones
- * de + y −, e input numérico. Guarda en blur o al apretar los botones. Si
- * deja el input vacío y blurea, queda como null.
- */
 export function QuickDurationEditor({
   id,
   value,
@@ -28,52 +32,69 @@ export function QuickDurationEditor({
   step = 1,
   size = "default",
 }: Props) {
-  const [draft, setDraft] = useState<string>(
-    value != null ? String(value) : ""
-  );
+  const init = value != null ? toMMSS(value) : { mm: 0, ss: 0 };
+  const [mm, setMm] = useState(value != null ? init.mm : NaN);
+  const [ss, setSs] = useState(value != null ? init.ss : NaN);
   const [pending, startTransition] = useTransition();
 
-  // Sincronizamos el draft cuando cambia el valor del server (después de
-  // guardar, revalidar, etc.). React no resetea state en cada re-render.
   useEffect(() => {
-    setDraft(value != null ? String(value) : "");
+    if (value != null) {
+      const { mm: m, ss: s } = toMMSS(value);
+      setMm(m);
+      setSs(s);
+    } else {
+      setMm(NaN);
+      setSs(NaN);
+    }
   }, [value]);
 
-  function save(next: number | null) {
-    setDraft(next != null ? String(next) : "");
+  function save(nextMm: number, nextSs: number) {
+    const next = isNaN(nextMm) && isNaN(nextSs) ? null : fromMMSS(nextMm || 0, nextSs || 0);
     startTransition(async () => {
       const result = await changeProjectDuration(id, next);
       if (!result.ok) {
         toast.error(result.error);
-        setDraft(value != null ? String(value) : "");
+        if (value != null) {
+          const { mm: m, ss: s } = toMMSS(value);
+          setMm(m); setSs(s);
+        } else {
+          setMm(NaN); setSs(NaN);
+        }
       }
     });
   }
 
   function adjust(delta: number) {
-    const current = draft === "" ? 0 : Number(draft);
-    if (Number.isNaN(current)) return;
-    const next = Math.max(0, Number((current + delta).toFixed(2)));
-    save(next);
+    const currentMm = isNaN(mm) ? 0 : mm;
+    const currentSs = isNaN(ss) ? 0 : ss;
+    const totalSecs = Math.max(0, currentMm * 60 + currentSs + delta * 60);
+    const nextMm = Math.floor(totalSecs / 60);
+    const nextSs = totalSecs % 60;
+    setMm(nextMm);
+    setSs(nextSs);
+    save(nextMm, nextSs);
   }
 
-  function handleBlur() {
-    if (draft === "") {
-      if (value !== null) save(null);
-      return;
-    }
-    const n = Number(draft);
-    if (Number.isNaN(n) || n < 0) {
-      setDraft(value != null ? String(value) : "");
-      return;
-    }
-    if (n !== value) save(n);
+  function handleBlurMm(e: React.FocusEvent<HTMLInputElement>) {
+    const v = parseInt(e.target.value, 10);
+    const nextMm = isNaN(v) || v < 0 ? 0 : v;
+    setMm(nextMm);
+    save(nextMm, isNaN(ss) ? 0 : ss);
+  }
+
+  function handleBlurSs(e: React.FocusEvent<HTMLInputElement>) {
+    const v = parseInt(e.target.value, 10);
+    const nextSs = isNaN(v) || v < 0 ? 0 : Math.min(v, 59);
+    setSs(nextSs);
+    save(isNaN(mm) ? 0 : mm, nextSs);
   }
 
   if (disabled) {
+    if (value == null) return <span className="text-muted-foreground">—</span>;
+    const { mm: m, ss: s } = toMMSS(value);
     return (
       <span className="tabular-nums text-muted-foreground">
-        {value != null ? `${value} min` : "—"}
+        {m}:{s.toString().padStart(2, "0")}
       </span>
     );
   }
@@ -82,14 +103,14 @@ export function QuickDurationEditor({
   const btnClass = `inline-flex shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50 ${
     compact ? "size-5" : "size-6"
   }`;
-  // Sacamos las flechas nativas del input number en Chrome/Safari/Firefox.
   const noSpinner =
-    "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0";
-  const inputClass = `text-center tabular-nums bg-transparent focus:outline-none focus:ring-1 focus:ring-primary rounded ${noSpinner} ${
-    compact
-      ? "h-5 w-10 text-xs border-0"
-      : "h-7 w-14 text-xs border border-border/60"
+    "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+  const inputBase = `text-center tabular-nums bg-transparent focus:outline-none focus:ring-1 focus:ring-primary rounded ${noSpinner} ${
+    compact ? "h-5 text-xs border-0" : "h-7 text-xs border border-border/60"
   }`;
+
+  const mmVal = isNaN(mm) ? "" : String(mm);
+  const ssVal = isNaN(ss) ? "" : ss.toString().padStart(2, "0");
 
   return (
     <div
@@ -105,24 +126,38 @@ export function QuickDurationEditor({
       >
         <MinusIcon className={compact ? "size-3" : "size-3.5"} />
       </button>
+
       <input
         type="number"
-        inputMode="decimal"
+        inputMode="numeric"
         min={0}
-        step={step}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={handleBlur}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            (e.currentTarget as HTMLInputElement).blur();
-          }
-        }}
+        value={mmVal}
+        onChange={(e) => setMm(parseInt(e.target.value, 10))}
+        onBlur={handleBlurMm}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur(); }}
         disabled={pending}
-        className={inputClass}
-        aria-label="Duración en minutos"
+        placeholder="0"
+        aria-label="Minutos"
+        className={`${inputBase} ${compact ? "w-7" : "w-9"}`}
       />
+
+      <span className="text-xs text-muted-foreground select-none">:</span>
+
+      <input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        max={59}
+        value={ssVal}
+        onChange={(e) => setSs(parseInt(e.target.value, 10))}
+        onBlur={handleBlurSs}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur(); }}
+        disabled={pending}
+        placeholder="00"
+        aria-label="Segundos"
+        className={`${inputBase} ${compact ? "w-7" : "w-9"}`}
+      />
+
       <button
         type="button"
         onClick={() => adjust(step)}

@@ -28,6 +28,7 @@ import {
   type ClientPairDraft,
 } from "./editor-client-pairs";
 
+import { ContactLinksEditor } from "@/components/ui/contact-links-editor";
 import { createEditor, updateEditor } from "@/lib/editors/actions";
 import {
   EDITOR_PAYMENT_TYPES,
@@ -36,6 +37,7 @@ import {
 import type {
   ClientEditorPair,
   ClientMini,
+  ContactLink,
   EditorPaymentType,
   EditorRow,
   PaymentTier,
@@ -66,8 +68,9 @@ export function EditorForm({
   onSuccess,
 }: Props) {
   const [name, setName] = useState(editor?.name ?? "");
-  const [email, setEmail] = useState(editor?.email ?? "");
-  const [phone, setPhone] = useState(editor?.phone ?? "");
+  const [contactLinks, setContactLinks] = useState<ContactLink[]>(
+    () => (editor?.contact_links as ContactLink[] | null) ?? []
+  );
   const [discordId, setDiscordId] = useState(editor?.discord_id ?? "");
   const [methods, setMethods] = useState<EditorMethodValue[]>(
     () =>
@@ -236,8 +239,7 @@ export function EditorForm({
 
     const payload = {
       name: trimmed,
-      email: email.trim() || null,
-      phone: phone.trim() || null,
+      contact_links: contactLinks.filter((l) => l.value.trim()),
       discord_id: discordId.trim() || null,
       docs_url: docsUrl.trim() || null,
       payment_type: paymentType,
@@ -282,24 +284,9 @@ export function EditorForm({
           />
         </Field>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Email">
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="lucia@example.com"
-            />
-          </Field>
-          <Field label="Teléfono / WhatsApp">
-            <Input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+54 11 5555-5555"
-            />
-          </Field>
-        </div>
+        <Field label="Contacto">
+          <ContactLinksEditor value={contactLinks} onChange={setContactLinks} />
+        </Field>
 
         <Field
           label="Discord ID"

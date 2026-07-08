@@ -121,9 +121,11 @@ export function ProjectForm({
   const [manualPrice, setManualPrice] = useState<string>(
     project?.price != null ? String(project.price) : ""
   );
-  const [durationMinutes, setDurationMinutes] = useState<string>(
-    project?.duration_minutes != null ? String(project.duration_minutes) : ""
-  );
+  const initDur = project?.duration_minutes != null
+    ? (() => { const t = Math.round(project.duration_minutes! * 60); return { mm: Math.floor(t / 60), ss: t % 60 }; })()
+    : null;
+  const [durMm, setDurMm] = useState<string>(initDur != null ? String(initDur.mm) : "");
+  const [durSs, setDurSs] = useState<string>(initDur != null ? String(initDur.ss) : "");
   const [manualCost, setManualCost] = useState<string>(
     project?.cost != null ? String(project.cost) : ""
   );
@@ -202,12 +204,15 @@ export function ProjectForm({
       return;
     }
 
-    const parsedDuration =
-      durationMinutes === "" ? null : Number(durationMinutes);
-    if (parsedDuration !== null && Number.isNaN(parsedDuration)) {
+    const mmNum = durMm === "" ? null : parseInt(durMm, 10);
+    const ssNum = durSs === "" ? null : parseInt(durSs, 10);
+    if ((mmNum !== null && isNaN(mmNum)) || (ssNum !== null && (isNaN(ssNum) || ssNum > 59))) {
       toast.error("Duración inválida");
       return;
     }
+    const parsedDuration = (mmNum == null && ssNum == null)
+      ? null
+      : (mmNum ?? 0) + (ssNum ?? 0) / 60;
 
     const parsedCost = manualCost === "" ? null : Number(manualCost);
     if (parsedCost !== null && (Number.isNaN(parsedCost) || parsedCost < 0)) {
@@ -288,11 +293,10 @@ export function ProjectForm({
   }
 
   const selectedClient = clients.find((c) => c.id === clientId) ?? null;
-  const parsedDur = durationMinutes === "" ? null : Number(durationMinutes);
-  const validDur =
-    parsedDur != null && !Number.isNaN(parsedDur) && parsedDur > 0
-      ? parsedDur
-      : null;
+  const _mm = durMm === "" ? null : parseInt(durMm, 10);
+  const _ss = durSs === "" ? null : parseInt(durSs, 10);
+  const parsedDur = (_mm == null && _ss == null) ? null : (_mm ?? 0) + (_ss ?? 0) / 60;
+  const validDur = parsedDur != null && !isNaN(parsedDur) && parsedDur > 0 ? parsedDur : null;
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -430,7 +434,17 @@ export function ProjectForm({
           <ClientCombobox
             clients={clients}
             value={clientId}
-            onChange={(id) => setClientId(id)}
+            onChange={(id) => {
+              setClientId(id);
+              if (mode === "create" && id) {
+                const client = clients.find((c) => c.id === id);
+                if (client && client.editors.length > 0) {
+                  setEditorEntries(
+                    client.editors.map((e) => ({ id: e.id, costDraft: "" }))
+                  );
+                }
+              }
+            }}
           />
           {isChildOfPack ? (
             <p className="text-xs text-muted-foreground">
@@ -519,20 +533,34 @@ export function ProjectForm({
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="duration_minutes">
+              <Label>
                 Duración{" "}
-                <span className="text-xs text-muted-foreground">(min)</span>
+                <span className="text-xs text-muted-foreground">(min : seg)</span>
               </Label>
-              <Input
-                id="duration_minutes"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.5"
-                value={durationMinutes}
-                onChange={(e) => setDurationMinutes(e.target.value)}
-                placeholder="0"
-              />
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={durMm}
+                  onChange={(e) => setDurMm(e.target.value)}
+                  placeholder="0"
+                  aria-label="Minutos"
+                  className="w-20 text-center tabular-nums"
+                />
+                <span className="text-muted-foreground select-none font-medium">:</span>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={59}
+                  value={durSs}
+                  onChange={(e) => setDurSs(e.target.value)}
+                  placeholder="00"
+                  aria-label="Segundos"
+                  className="w-20 text-center tabular-nums"
+                />
+              </div>
             </div>
           </div>
 

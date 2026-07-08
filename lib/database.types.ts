@@ -159,16 +159,15 @@ export type Database = {
           billing_name: string | null
           city: string | null
           color: string
+          contact_links: Json
           country: string | null
           created_at: string
           discord_channel_id: string | null
           docs_url: string | null
-          email: string | null
           id: string
           name: string
           parent_id: string | null
           payment_type: Database["public"]["Enums"]["payment_type"]
-          phone: string | null
           retainer_discount_pct: number
           state: string | null
           tax_id: string | null
@@ -179,16 +178,15 @@ export type Database = {
           billing_name?: string | null
           city?: string | null
           color?: string
+          contact_links?: Json
           country?: string | null
           created_at?: string
           discord_channel_id?: string | null
           docs_url?: string | null
-          email?: string | null
           id?: string
           name: string
           parent_id?: string | null
           payment_type?: Database["public"]["Enums"]["payment_type"]
-          phone?: string | null
           retainer_discount_pct?: number
           state?: string | null
           tax_id?: string | null
@@ -199,16 +197,15 @@ export type Database = {
           billing_name?: string | null
           city?: string | null
           color?: string
+          contact_links?: Json
           country?: string | null
           created_at?: string
           discord_channel_id?: string | null
           docs_url?: string | null
-          email?: string | null
           id?: string
           name?: string
           parent_id?: string | null
           payment_type?: Database["public"]["Enums"]["payment_type"]
-          phone?: string | null
           retainer_discount_pct?: number
           state?: string | null
           tax_id?: string | null
@@ -296,42 +293,39 @@ export type Database = {
       }
       editors: {
         Row: {
+          contact_links: Json
           created_at: string
           discord_id: string | null
           discord_link_token: string | null
           docs_url: string | null
-          email: string | null
           flat_amount: number | null
           id: string
           name: string
           payment_type: Database["public"]["Enums"]["editor_payment_model"]
-          phone: string | null
           rate: number | null
         }
         Insert: {
+          contact_links?: Json
           created_at?: string
           discord_id?: string | null
           discord_link_token?: string | null
           docs_url?: string | null
-          email?: string | null
           flat_amount?: number | null
           id?: string
           name: string
           payment_type?: Database["public"]["Enums"]["editor_payment_model"]
-          phone?: string | null
           rate?: number | null
         }
         Update: {
+          contact_links?: Json
           created_at?: string
           discord_id?: string | null
           discord_link_token?: string | null
           docs_url?: string | null
-          email?: string | null
           flat_amount?: number | null
           id?: string
           name?: string
           payment_type?: Database["public"]["Enums"]["editor_payment_model"]
-          phone?: string | null
           rate?: number | null
         }
         Relationships: []

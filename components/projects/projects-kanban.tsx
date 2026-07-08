@@ -700,7 +700,7 @@ function InteractiveKanban({
             if (!open) handleCancelarFinalize();
           }}
         >
-          <AlertDialogContent>
+          <AlertDialogContent className="sm:max-w-md">
             <AlertDialogHeader>
               <AlertDialogTitle>
                 ¿Actualizar fecha de terminado?
@@ -713,7 +713,7 @@ function InteractiveKanban({
                 . ¿Querés guardar la fecha de hoy o mantener la anterior?
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
+            <AlertDialogFooter className="sm:flex-wrap sm:justify-end">
               <AlertDialogCancel onClick={handleCancelarFinalize}>
                 Cancelar
               </AlertDialogCancel>
@@ -721,8 +721,7 @@ function InteractiveKanban({
                 onClick={handleMantenerFecha}
                 className="bg-muted text-foreground hover:bg-muted/80"
               >
-                Mantener (
-                {formatShortDate(pendingFinalize.existingFinalizedAt)})
+                Mantener ({formatShortDate(pendingFinalize.existingFinalizedAt)})
               </AlertDialogAction>
               <AlertDialogAction onClick={handleUsarHoy}>
                 Usar fecha de hoy
