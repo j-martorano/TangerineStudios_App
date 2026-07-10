@@ -10,10 +10,8 @@ import { FixedServicesSection } from "@/components/finanzas/fixed-services-secti
 import { FinanzasTabs } from "@/components/finanzas/finanzas-tabs";
 import { MonthCard } from "@/components/finanzas/month-card";
 import { SettleRow } from "@/components/finanzas/settle-row";
-import {
-  MonthlyBarsChart,
-  type MonthlyDatum,
-} from "@/components/finanzas/monthly-bars-chart";
+import { FinanzasLineChart } from "@/components/finanzas/finanzas-line-chart";
+import type { MonthlyDatum } from "@/components/finanzas/monthly-bars-chart";
 import {
   ClientIncomeDonut,
   type ClientIncomeDatum,
@@ -470,8 +468,7 @@ export default async function FinanzasPage({
   }
 
   const sortedBuckets = [...buckets].sort((a, b) => a.key.localeCompare(b.key));
-  const last12 = sortedBuckets.slice(-12);
-  const monthlyData: MonthlyDatum[] = last12.map((b) => ({
+  const allMonthlyData: MonthlyDatum[] = sortedBuckets.map((b) => ({
     month: shortMonthLabel(b.key),
     cobrado: Math.round(b.collected),
     porCobrar: Math.round(b.pendingCollect),
@@ -563,58 +560,52 @@ export default async function FinanzasPage({
   clientProfitData.sort((a, b) => b.value - a.value);
 
   const resumenSection = (
-    <div className="flex flex-col gap-6">
-      {/* Fila 1: KPIs */}
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
-        <TotalCard
-          label="Cobrado"
+    <div className="flex flex-col gap-4">
+      {/* Fila 1: 4 stat cards grandes con blob de color */}
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <FinanzaStatCard
+          label="Total"
           value={formatPrice(totalCollected)}
-          tone="positive"
+          blobColor="#37ACFF80"
         />
-        <TotalCard
-          label="Por cobrar"
-          value={formatPrice(totalPendingCollect)}
-          tone="warning"
-        />
-        <TotalCard
-          label="Pagado"
+        <FinanzaStatCard
+          label="Costos"
           value={formatPrice(totalPaid)}
-          tone="neutral"
+          blobColor="#FF373780"
         />
-        <TotalCard
-          label="Por pagar"
-          value={formatPrice(totalPendingPay)}
-          tone="warning"
+        <FinanzaStatCard
+          label="Ganancias"
+          value={formatPrice(totalProfit)}
+          blobColor={totalProfit < 0 ? "#FF373780" : "#37FF6280"}
         />
-        <TotalCard
+        <FinanzaStatCard
           label="Servicios / mes"
           value={formatPrice(servicesMonthlyTotal)}
-          tone="neutral"
-        />
-        <TotalCard
-          label="Ganancia"
-          value={formatPrice(totalProfit)}
-          tone={totalProfit < 0 ? "negative" : "positive"}
         />
       </section>
 
-      {/* Fila 2: Gráfico de barras por mes */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">
-            Cobrado / Pagado / Ganancia por mes
-          </CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Últimos {monthlyData.length} mes
-            {monthlyData.length === 1 ? "" : "es"} con actividad.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <MonthlyBarsChart data={monthlyData} />
-        </CardContent>
-      </Card>
+      {/* Fila 2: 2 stat cards medianas */}
+      <section className="grid grid-cols-2 gap-3">
+        <FinanzaStatCard
+          label="Por cobrar"
+          value={formatPrice(totalPendingCollect)}
+          blobColor="#37ACFF50"
+          small
+        />
+        <FinanzaStatCard
+          label="Por pagar"
+          value={formatPrice(totalPendingPay)}
+          blobColor="#FF373750"
+          small
+        />
+      </section>
 
-      {/* Fila 3: Tres donuts por cliente */}
+      {/* Fila 3: Line chart con toggle Histórico | Mensual */}
+      <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
+        <FinanzasLineChart data={allMonthlyData} />
+      </div>
+
+      {/* Fila 4: Tres donuts por cliente */}
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
@@ -724,36 +715,43 @@ export default async function FinanzasPage({
   );
 }
 
-function TotalCard({
+function FinanzaStatCard({
   label,
   value,
-  tone,
+  blobColor,
+  small = false,
 }: {
   label: string;
   value: string;
-  tone: "positive" | "warning" | "neutral" | "negative";
+  blobColor?: string;
+  small?: boolean;
 }) {
-  const toneClass =
-    tone === "positive"
-      ? "text-emerald-500"
-      : tone === "warning"
-        ? "text-amber-500"
-        : tone === "negative"
-          ? "text-destructive"
-          : "text-foreground";
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+    <div className="relative flex flex-col overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10"
+      style={{ padding: small ? "14px 18px" : "20px" }}>
+      {blobColor && (
+        <div
+          className="pointer-events-none absolute"
+          style={{
+            width: small ? 140 : 200,
+            height: small ? 140 : 200,
+            borderRadius: "50%",
+            background: blobColor,
+            filter: "blur(50px)",
+            bottom: small ? -55 : -65,
+            right: small ? -45 : -55,
+          }}
+        />
+      )}
+      <div className="relative z-10 mt-auto flex flex-col gap-1">
+        <span className="text-xs font-light uppercase tracking-widest text-muted-foreground">
           {label}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <span className={`text-base font-semibold tabular-nums ${toneClass}`}>
+        </span>
+        <span className={`font-bold tabular-nums ${small ? "text-2xl" : "text-3xl"}`}>
           {value}
         </span>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
