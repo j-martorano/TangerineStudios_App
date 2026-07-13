@@ -165,10 +165,26 @@ function buildColumns(projects: ProjectWithRelations[]): ColumnsMap {
 
 function findContainer(cols: ColumnsMap, id: string): ProjectPhase | null {
   if ((PROJECT_PHASES as string[]).includes(id)) return id as ProjectPhase;
+  if (id.startsWith("hist:")) return "terminado";
   for (const phase of PROJECT_PHASES) {
     if (cols[phase].some((p) => p.id === id)) return phase;
   }
   return null;
+}
+
+/** Devuelve el mes histórico (YYYY-MM) si el drop target es una columna o
+ *  card de un mes pasado. Devuelve null si es el mes actual o no es terminado. */
+function getHistMonthFromDrop(
+  overId: string,
+  terminadoItems: ProjectWithRelations[]
+): string | null {
+  if (overId.startsWith("hist:")) return overId.slice(5);
+  const overProject = terminadoItems.find((p) => p.id === overId);
+  if (!overProject?.finalized_at) return null;
+  const now = new Date();
+  const currentMK = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const projectMK = monthKey(overProject.finalized_at);
+  return projectMK !== currentMK && projectMK !== "0000-00" ? projectMK : null;
 }
 
 const PHASE_BLOB: Record<ProjectPhase, string | null> = {
@@ -559,6 +575,22 @@ function InteractiveKanban({
 
     // Movido HACIA terminado
     if (overContainer === "terminado" && sourcePhase !== "terminado") {
+      const histMonth = getHistMonthFromDrop(overIdStr, next.terminado);
+
+      if (histMonth) {
+        // Drop directo a mes histórico — sin dialog, fecha = primer día del mes
+        const finalUpdates = updates.map((u) =>
+          u.id === activeIdStr
+            ? { ...u, finalized: true, finalized_at: `${histMonth}-01T12:00:00Z` }
+            : u
+        );
+        startTransition(async () => {
+          const result = await reorderProjects(finalUpdates);
+          if (!result.ok) toast.error(result.error);
+        });
+        return;
+      }
+
       const original = projects.find((p) => p.id === activeIdStr);
       const existingDate = original?.finalized_at
         ? original.finalized_at.slice(0, 10)
@@ -673,7 +705,7 @@ function InteractiveKanban({
                 <>
                   <HistoricoDivider />
                   {historicalGroups.map((group) => (
-                    <HistoricalMonthColumn
+                    <DroppableHistoricalMonthColumn
                       key={group.key}
                       group={group}
                       editors={editors}
@@ -843,7 +875,65 @@ function HistoricoDivider() {
   );
 }
 
-// ─── Columna histórica (solo lectura) ─────────────────────────────────────────
+// ─── Columna histórica droppable (modo interactivo) ──────────────────────────
+
+function DroppableHistoricalMonthColumn({
+  group,
+  editors,
+  clients,
+  availableParents = [],
+}: {
+  group: { key: string; label: string; items: ProjectWithRelations[] };
+  editors: EditorMini[];
+  clients: ClientForProject[];
+  availableParents?: ParentOption[];
+}) {
+  const droppableId = `hist:${group.key}`;
+  const { isOver, setNodeRef } = useDroppable({ id: droppableId });
+  const itemIds = useMemo(() => group.items.map((p) => p.id), [group.items]);
+
+  return (
+    <div className="relative flex w-[280px] shrink-0 flex-col overflow-hidden rounded-[10px] border border-white/[0.08] bg-[#1a1a1a] min-h-[70vh]">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-48"
+        style={{ background: "radial-gradient(ellipse 100% 140px at 50% 0%, #37FF6210, transparent)" }}
+      />
+      <div className="relative flex flex-1 flex-col gap-3 px-[15px] py-[10px]">
+        <div className="flex items-center justify-between">
+          <span className="text-xl font-[200] uppercase tracking-tight">{group.label}</span>
+          <span className="text-xl font-semibold tabular-nums text-white">{group.items.length}</span>
+        </div>
+        <TerminadoStats items={group.items} />
+        <SortableContext id={droppableId} items={itemIds} strategy={verticalListSortingStrategy}>
+          <div
+            ref={setNodeRef}
+            className={`flex flex-1 flex-col gap-2 overflow-y-auto transition-colors ${
+              isOver ? "bg-accent/40 ring-2 ring-primary/40 rounded-lg" : ""
+            }`}
+          >
+            {group.items.length === 0 ? (
+              <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
+                Arrastrá una card acá
+              </p>
+            ) : (
+              group.items.map((p) => (
+                <SortableCard
+                  key={p.id}
+                  project={p}
+                  editors={editors}
+                  clients={clients}
+                  availableParents={availableParents}
+                />
+              ))
+            )}
+          </div>
+        </SortableContext>
+      </div>
+    </div>
+  );
+}
+
+// ─── Columna histórica (solo lectura, SSR) ────────────────────────────────────
 
 function HistoricalMonthColumn({
   group,
