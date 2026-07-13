@@ -10,8 +10,7 @@ import { FixedServicesSection } from "@/components/finanzas/fixed-services-secti
 import { FinanzasTabs } from "@/components/finanzas/finanzas-tabs";
 import { MonthCard } from "@/components/finanzas/month-card";
 import { SettleRow } from "@/components/finanzas/settle-row";
-import { FinanzasLineChart } from "@/components/finanzas/finanzas-line-chart";
-import type { MonthlyDatum } from "@/components/finanzas/monthly-bars-chart";
+import { FinanzasLineChart, type ChartPoint } from "@/components/finanzas/finanzas-line-chart";
 import {
   ClientIncomeDonut,
   type ClientIncomeDatum,
@@ -468,13 +467,79 @@ export default async function FinanzasPage({
   }
 
   const sortedBuckets = [...buckets].sort((a, b) => a.key.localeCompare(b.key));
-  const allMonthlyData: MonthlyDatum[] = sortedBuckets.map((b) => ({
-    month: shortMonthLabel(b.key),
+
+  const monthlyChartData: ChartPoint[] = sortedBuckets.map((b) => ({
+    label: shortMonthLabel(b.key),
     cobrado: Math.round(b.collected),
-    porCobrar: Math.round(b.pendingCollect),
     pagado: Math.round(b.paid),
     ganancia: Math.round(b.profit),
   }));
+
+  // Datos diarios del mes actual para el modo Mensual del gráfico.
+  const dailyChartData: ChartPoint[] = (() => {
+    const [y, m] = currentMonthKey.split("-").map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const today = new Date();
+    const todayDay = today.getUTCFullYear() === y && today.getUTCMonth() + 1 === m
+      ? today.getUTCDate()
+      : daysInMonth;
+
+    const dailyMap = new Map<number, { cobrado: number; pagado: number; ganancia: number }>();
+    for (let d = 1; d <= todayDay; d++) {
+      dailyMap.set(d, { cobrado: 0, pagado: 0, ganancia: 0 });
+    }
+
+    for (const pay of payments) {
+      if (!pay.paid_at.startsWith(currentMonthKey)) continue;
+      const d = parseInt(pay.paid_at.slice(8, 10), 10);
+      const bucket = dailyMap.get(d);
+      if (bucket) { bucket.cobrado += pay.amount; bucket.ganancia += pay.amount; }
+    }
+
+    for (const p of projects) {
+      if (!p.finalized || !p.finalized_at || p.parent_id) continue;
+      if (!p.finalized_at.startsWith(currentMonthKey)) continue;
+      const d = parseInt(p.finalized_at.slice(8, 10), 10);
+      const bucket = dailyMap.get(d);
+      if (!bucket) continue;
+
+      const isMensual = p.client?.payment_type === "mensual";
+
+      if (!isMensual) {
+        const price = computePrice(p);
+        const cobrosSum = p.cobros.reduce((s, c) => s + Number(c.amount), 0);
+        const cobradoFlag = p.cobrado === "si";
+        const progress = cobradoFlag && cobrosSum === 0 && price != null ? price : cobrosSum;
+        bucket.cobrado += progress;
+      }
+
+      const hasEditor = p.editors.some((e) => e.editor != null);
+      if (hasEditor) {
+        const cost = computeCost(p);
+        const pagosSum = p.editor_pagos.reduce((s, e) => s + Number(e.amount), 0);
+        const pagoFlag = p.pagado === "pago_total";
+        const progress = pagoFlag && pagosSum === 0 && cost != null ? cost : pagosSum;
+        bucket.pagado += progress;
+      }
+
+      if (isMensual) {
+        const cost = computeCost(p);
+        if (cost != null) bucket.ganancia -= cost;
+      } else {
+        const profit = computeProfit(p);
+        if (profit != null) bucket.ganancia += profit;
+      }
+    }
+
+    return Array.from(dailyMap.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([day, vals]) => ({
+        label: String(day),
+        cobrado: Math.round(vals.cobrado),
+        pagado: Math.round(vals.pagado),
+        ganancia: Math.round(vals.ganancia),
+      }));
+  })();
 
   // ── Ingresos por cliente: pagos retainer + proyectos finalizados cobrados ──
   const incomeByClient = new Map<string, { color: string; total: number }>();
@@ -602,7 +667,7 @@ export default async function FinanzasPage({
 
       {/* Fila 3: Line chart con toggle Histórico | Mensual */}
       <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
-        <FinanzasLineChart data={allMonthlyData} />
+        <FinanzasLineChart monthly={monthlyChartData} daily={dailyChartData} />
       </div>
 
       {/* Fila 4: Tres donuts por cliente */}

@@ -11,7 +11,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { MonthlyDatum } from "./monthly-bars-chart";
+
+export type ChartPoint = {
+  label: string;
+  cobrado: number;
+  pagado: number;
+  ganancia: number;
+};
 
 type ViewMode = "historico" | "mensual";
 
@@ -58,39 +64,24 @@ function TooltipContent({
   );
 }
 
-function computeCumulative(data: MonthlyDatum[]): MonthlyDatum[] {
-  let cumCobrado = 0;
-  let cumPagado = 0;
-  let cumGanancia = 0;
-  let cumPorCobrar = 0;
-  return data.map((d) => {
-    cumCobrado += d.cobrado;
-    cumPagado += d.pagado;
-    cumGanancia += d.ganancia;
-    cumPorCobrar += d.porCobrar;
-    return {
-      month: d.month,
-      cobrado: cumCobrado,
-      pagado: cumPagado,
-      ganancia: cumGanancia,
-      porCobrar: cumPorCobrar,
-    };
-  });
-}
-
-export function FinanzasLineChart({ data }: { data: MonthlyDatum[] }) {
+export function FinanzasLineChart({
+  monthly,
+  daily,
+}: {
+  monthly: ChartPoint[];
+  daily: ChartPoint[];
+}) {
   const [mode, setMode] = useState<ViewMode>("historico");
 
-  if (data.length === 0) {
+  const data = mode === "historico" ? monthly : daily;
+
+  if (monthly.length === 0 && daily.length === 0) {
     return (
       <p className="text-sm italic text-muted-foreground">
         Sin meses con actividad para graficar.
       </p>
     );
   }
-
-  const chartData =
-    mode === "historico" ? computeCumulative(data) : data.slice(-12);
 
   return (
     <div className="flex flex-col gap-4">
@@ -122,7 +113,7 @@ export function FinanzasLineChart({ data }: { data: MonthlyDatum[] }) {
 
       <ResponsiveContainer width="100%" height={260}>
         <LineChart
-          data={chartData}
+          data={data}
           margin={{ top: 4, right: 12, bottom: 0, left: 0 }}
         >
           <CartesianGrid
@@ -131,10 +122,11 @@ export function FinanzasLineChart({ data }: { data: MonthlyDatum[] }) {
             className="text-muted-foreground/20"
           />
           <XAxis
-            dataKey="month"
+            dataKey="label"
             stroke="currentColor"
             className="text-muted-foreground"
             tick={{ fontSize: 11 }}
+            interval={mode === "mensual" ? 4 : "preserveStartEnd"}
           />
           <YAxis
             stroke="currentColor"
@@ -157,7 +149,7 @@ export function FinanzasLineChart({ data }: { data: MonthlyDatum[] }) {
             name="Ganancia"
             stroke="#37FF62"
             strokeWidth={2}
-            dot={{ r: 3 }}
+            dot={mode === "mensual" ? { r: 2 } : false}
             activeDot={{ r: 5 }}
             type="monotone"
           />
@@ -166,7 +158,7 @@ export function FinanzasLineChart({ data }: { data: MonthlyDatum[] }) {
             name="Pagos"
             stroke="#FF3737"
             strokeWidth={2}
-            dot={{ r: 3 }}
+            dot={mode === "mensual" ? { r: 2 } : false}
             activeDot={{ r: 5 }}
             type="monotone"
           />
@@ -175,7 +167,7 @@ export function FinanzasLineChart({ data }: { data: MonthlyDatum[] }) {
             name="Total"
             stroke="#37ACFF"
             strokeWidth={2}
-            dot={{ r: 3 }}
+            dot={mode === "mensual" ? { r: 2 } : false}
             activeDot={{ r: 5 }}
             type="monotone"
           />
