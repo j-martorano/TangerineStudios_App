@@ -175,7 +175,7 @@ export function ProjectRow({
 
         {/* ── Col 5: Title ── */}
         <TableCell className="p-2 align-middle">
-          <span className="font-semibold">{project.title}</span>
+          <InlineTitleCell project={project} locked={locked} />
         </TableCell>
 
         {/* ── Col 6: Balance badges (nowrap with dark bg container) ── */}
@@ -313,6 +313,114 @@ function CopyCodeButton({ code }: { code: string | null }) {
         {code}
       </span>
     </button>
+  );
+}
+
+// ── Inline title cell ─────────────────────────────────────────────────────
+
+function InlineTitleCell({
+  project,
+  locked,
+}: {
+  project: ProjectWithRelations;
+  locked: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(project.title);
+  const [pending, startTransition] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const skipBlurRef = useRef(false);
+
+  function startEditing() {
+    if (locked) return;
+    skipBlurRef.current = false;
+    setDraft(project.title);
+    setEditing(true);
+  }
+
+  function cancel() {
+    skipBlurRef.current = true;
+    setEditing(false);
+  }
+
+  function commit() {
+    if (skipBlurRef.current) {
+      skipBlurRef.current = false;
+      return;
+    }
+    const trimmed = draft.trim();
+    if (!trimmed || trimmed === project.title) {
+      setEditing(false);
+      return;
+    }
+    startTransition(async () => {
+      const r = await updateProject(project.id, {
+        title: trimmed,
+        client_id: project.client_id,
+        phase: project.phase,
+        cobrado: project.cobrado,
+        pagado: project.pagado,
+        invoiced: project.invoiced,
+        price: project.price != null ? Number(project.price) : null,
+        cost: project.cost != null ? Number(project.cost) : null,
+        duration_minutes:
+          project.duration_minutes != null ? Number(project.duration_minutes) : null,
+        project_type: project.project_type,
+        parent_id: project.parent_id ?? null,
+        finalized_at:
+          project.phase === "terminado" ? (project.finalized_at ?? null) : null,
+        children:
+          project.project_type === "pack"
+            ? (project.children ?? []).map((c) => ({
+                id: c.id,
+                title: c.title,
+                project_type: (c.project_type !== "pack"
+                  ? c.project_type
+                  : "long_form") as "long_form" | "short_form" | "other",
+              }))
+            : [],
+        editors: project.editors
+          .filter((e) => e.editor != null)
+          .map((e) => ({ id: e.editor!.id, cost: e.cost != null ? Number(e.cost) : null })),
+      });
+      if (r.ok) {
+        setEditing(false);
+      } else {
+        toast.error(r.error);
+      }
+    });
+  }
+
+  useEffect(() => {
+    if (editing) inputRef.current?.select();
+  }, [editing]);
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); inputRef.current?.blur(); }
+          if (e.key === "Escape") { e.preventDefault(); cancel(); }
+        }}
+        disabled={pending}
+        className="w-full min-w-0 rounded border border-primary/50 bg-background/60 px-1.5 py-0.5 text-sm font-semibold outline-none ring-1 ring-primary/30 disabled:opacity-60"
+        autoFocus
+      />
+    );
+  }
+
+  return (
+    <span
+      onDoubleClick={startEditing}
+      className={`font-semibold ${locked ? "" : "cursor-text"}`}
+      title={locked ? undefined : "Doble clic para editar"}
+    >
+      {project.title}
+    </span>
   );
 }
 
