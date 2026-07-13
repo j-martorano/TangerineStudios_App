@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Fragment, createContext, useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -59,11 +59,8 @@ import {
   CARD_CHIP_BASE,
   CARD_CLIENT_CHIP_BASE,
   CARD_TYPE_CHIP,
-  financialBadgeClass,
-  financialBadgeClassStatic,
 } from "./kanban-card-styles";
-import { CobroManagerPanel } from "./cobro-manager";
-import { PagoManagerPanel } from "./pago-manager";
+import { QuickPaymentBadge } from "./quick-payment-badge";
 import { contrastColor } from "@/lib/clients/palette";
 import type {
   ClientForProject,
@@ -1118,39 +1115,6 @@ function SortableCard({
   );
 }
 
-// ─── Helpers financieros ─────────────────────────────────────────────────────
-
-function computeFinancialPct(project: ProjectWithRelations) {
-  // Cobrado
-  const price = computePrice(project);
-  const cobrosSum = project.cobros.reduce((s, c) => s + Number(c.amount), 0);
-  const cobradoFlag = project.cobrado === "si";
-  let cobradoPct: number;
-  if (cobradoFlag && cobrosSum === 0 && price != null) cobradoPct = 100;
-  else if (price != null && price > 0)
-    cobradoPct = Math.min(100, Math.round((cobrosSum / price) * 100));
-  else cobradoPct = cobradoFlag ? 100 : 0;
-
-  // Pagado
-  const cost = computeCost(project);
-  const pagosSum = project.editor_pagos.reduce(
-    (s, e) => s + Number(e.amount),
-    0
-  );
-  const pagadoFlag = project.pagado === "pago_total";
-  let pagadoPct: number;
-  if (pagadoFlag && pagosSum === 0 && cost != null) pagadoPct = 100;
-  else if (cost != null && cost > 0)
-    pagadoPct = Math.min(100, Math.round((pagosSum / cost) * 100));
-  else pagadoPct = pagadoFlag ? 100 : 0;
-
-  // Facturado (enum solo, sin manager aún)
-  const facturadoPct =
-    project.invoiced === "si" ? 100 : project.invoiced === "parcial" ? 50 : 0;
-
-  return { cobradoPct, pagadoPct, facturadoPct };
-}
-
 // ─── Card view ────────────────────────────────────────────────────────────────
 
 function CardView({
@@ -1169,11 +1133,8 @@ function CardView({
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
   const { focusedId, setFocusedId } = useContext(KanbanFocusCtx);
-  const { onFacturar } = useContext(KanbanInvoiceCtx);
   const highlightedId = useContext(KanbanHighlightCtx);
   const isBlurred = focusedId !== null && focusedId !== project.id;
-  const router = useRouter();
-
   // ── Scroll desde link de Discord (?focus=ID) ─────────────────────────────
   const isHighlighted = highlightedId === project.id;
   const cardRef = useRef<HTMLDivElement>(null);
@@ -1185,23 +1146,8 @@ function CardView({
   }, []);
 
   const [expanded, setExpanded] = useState(false);
-  const [openManager, setOpenManager] = useState<"cobrado" | "pagado" | null>(
-    null
-  );
-
-  // Refresca los datos del servidor tras mutaciones en los managers.
-  const handleManagerSuccess = useCallback(() => {
-    router.refresh();
-  }, [router]);
 
   const isMensual = project.client?.payment_type === "mensual";
-  const { cobradoPct, pagadoPct, facturadoPct } =
-    computeFinancialPct(project);
-
-  function toggleManager(which: "cobrado" | "pagado") {
-    if (!expanded) setExpanded(true);
-    setOpenManager((prev) => (prev === which ? null : which));
-  }
 
   const editorEntries = project.editors.filter((e) => e.editor != null);
 
@@ -1316,11 +1262,7 @@ function CardView({
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => {
-              const next = !expanded;
-              setExpanded(next);
-              if (!next) setOpenManager(null);
-            }}
+            onClick={() => setExpanded((v) => !v)}
             className="shrink-0 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             aria-label={expanded ? "Colapsar" : "Expandir"}
           >
@@ -1349,47 +1291,24 @@ function CardView({
 
             {/* Badges financieros */}
             <div
-              className={`grid gap-1.5 ${isMensual ? "grid-cols-2" : "grid-cols-3"}`}
+              className={`grid gap-2 ${isMensual ? "grid-cols-2" : "grid-cols-3"}`}
+              onPointerDown={(e) => e.stopPropagation()}
             >
               {!isMensual ? (
-                <FinancialBadge
-                  label="Cobrado"
-                  pct={cobradoPct}
-                  interactive
-                  active={openManager === "cobrado"}
-                  onClick={() => toggleManager("cobrado")}
-                />
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] uppercase tracking-wider text-muted-foreground/55">Cobrado</span>
+                  <QuickPaymentBadge kind="cobrado" id={project.id} value={project.cobrado} />
+                </div>
               ) : null}
-              <FinancialBadge
-                label="Pagado"
-                pct={pagadoPct}
-                interactive
-                active={openManager === "pagado"}
-                onClick={() => toggleManager("pagado")}
-              />
-              <FinancialBadge
-                label="Facturado"
-                pct={facturadoPct}
-                interactive
-                active={false}
-                onClick={() => {
-                  if (!expanded) setExpanded(true);
-                  onFacturar(project);
-                }}
-                title={facturadoPct === 100 ? "Facturado" : "Crear factura"}
-              />
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/55">Pagado</span>
+                <QuickPaymentBadge kind="pagado" id={project.id} value={project.pagado} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/55">Facturado</span>
+                <QuickPaymentBadge kind="invoiced" id={project.id} value={project.invoiced} />
+              </div>
             </div>
-
-            {/* Manager inline */}
-            {openManager === "cobrado" ? (
-              <div className="rounded-lg border border-border/60 bg-muted/40 p-3 animate-in fade-in slide-in-from-top-1 duration-150">
-                <CobroManagerPanel project={project} onSuccess={handleManagerSuccess} />
-              </div>
-            ) : openManager === "pagado" ? (
-              <div className="rounded-lg border border-border/60 bg-muted/40 p-3 animate-in fade-in slide-in-from-top-1 duration-150">
-                <PagoManagerPanel project={project} onSuccess={handleManagerSuccess} />
-              </div>
-            ) : null}
           </div>
         ) : null}
       </CardContent>
@@ -1397,64 +1316,3 @@ function CardView({
   );
 }
 
-// ─── Badge financiero ─────────────────────────────────────────────────────────
-
-function FinancialBadge({
-  label,
-  pct,
-  interactive,
-  active,
-  onClick,
-  title: titleProp,
-}: {
-  label: string;
-  pct: number;
-  interactive: boolean;
-  active?: boolean;
-  onClick?: () => void;
-  title?: string;
-}) {
-  const colorClass = interactive
-    ? financialBadgeClass(pct)
-    : financialBadgeClassStatic(pct);
-
-  const ringClass =
-    active
-      ? "ring-2 ring-current ring-offset-1 ring-offset-background"
-      : "";
-
-  const inner = (
-    <>
-      <span className="text-[8px] uppercase tracking-wider opacity-60">
-        {label}
-      </span>
-      <span className="text-xs font-bold tabular-nums">{pct}%</span>
-    </>
-  );
-
-  if (interactive && onClick) {
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick();
-        }}
-        onPointerDown={(e) => e.stopPropagation()}
-        title={titleProp}
-        className={`flex flex-col items-center rounded-lg px-2 py-1.5 text-center transition-colors ${colorClass} ${ringClass}`}
-      >
-        {inner}
-      </button>
-    );
-  }
-
-  return (
-    <div
-      title={titleProp}
-      className={`flex flex-col items-center rounded-lg px-2 py-1.5 text-center cursor-default ${colorClass}`}
-    >
-      {inner}
-    </div>
-  );
-}
