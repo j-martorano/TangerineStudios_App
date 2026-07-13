@@ -397,19 +397,36 @@ function InlineTitleCell({
 
   if (editing) {
     return (
-      <input
-        ref={inputRef}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") { e.preventDefault(); inputRef.current?.blur(); }
-          if (e.key === "Escape") { e.preventDefault(); cancel(); }
-        }}
-        disabled={pending}
-        className="w-full min-w-0 rounded border border-primary/50 bg-background/60 px-1.5 py-0.5 text-sm font-semibold outline-none ring-1 ring-primary/30 disabled:opacity-60"
-        autoFocus
-      />
+      <span className="flex items-center gap-1">
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={(e) => {
+            // Don't commit if focus moves to the confirm button
+            if (e.relatedTarget?.getAttribute("data-confirm-title")) return;
+            commit();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); inputRef.current?.blur(); }
+            if (e.key === "Escape") { e.preventDefault(); cancel(); }
+          }}
+          disabled={pending}
+          className="min-w-0 flex-1 rounded border border-primary/50 bg-background/60 px-1.5 py-0.5 text-sm font-semibold outline-none ring-1 ring-primary/30 disabled:opacity-60"
+          autoFocus
+        />
+        <button
+          type="button"
+          data-confirm-title="1"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => { inputRef.current?.blur(); }}
+          disabled={pending}
+          aria-label="Confirmar"
+          className="flex size-5 shrink-0 items-center justify-center rounded bg-primary/15 text-primary transition-colors hover:bg-primary/30 disabled:opacity-40"
+        >
+          <CheckIcon className="size-3.5" />
+        </button>
+      </span>
     );
   }
 
