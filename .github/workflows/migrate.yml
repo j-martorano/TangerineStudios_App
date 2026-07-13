@@ -18,5 +18,23 @@ jobs:
         with:
           version: latest
 
-      - name: Apply migrations
+      - name: Sync migration history
+        # La DB fue creada manualmente, entonces la tabla de tracking está vacía.
+        # Este paso marca todas las migraciones pre-existentes como ya aplicadas
+        # para que db push solo ejecute las nuevas.
+        run: |
+          supabase migration repair --status applied \
+            20260511003331 20260511021858 20260511023407 20260511150331 \
+            20260511171828 20260511212709 20260511214212 20260511223111 \
+            20260512003705 20260512004749 20260512024458 20260512025157 \
+            20260514220613 20260514220616 20260515010257 20260515021813 \
+            20260519075221 20260519140000 20260519150000 20260519160000 \
+            20260519170000 20260519180000 20260519190000 20260519210000 \
+            20260519220000 20260519230000 20260521000000 20260525100000 \
+            20260527000000 20260527100000 20260527110000 20260527200000 \
+            20260527210000 20260527220000 20260527230000 20260528000000 \
+            20260528010000 20260528020000 \
+            --db-url "${{ secrets.SUPABASE_DB_URL }}"
+
+      - name: Apply new migrations
         run: supabase db push --db-url "${{ secrets.SUPABASE_DB_URL }}"
