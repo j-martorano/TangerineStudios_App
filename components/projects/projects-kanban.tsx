@@ -291,7 +291,8 @@ export function ProjectsKanban(props: Props) {
       ) : null}
 
       <div className="flex flex-col gap-4">
-        {months.length > 1 ? (
+        {/* Filtro de meses oculto — los meses se muestran como columnas */}
+        {false && months.length > 1 ? (
           <div className="flex flex-wrap items-center gap-1.5">
             <MonthTab active={month === "all"} onClick={() => setMonth("all")}>
               Todos
