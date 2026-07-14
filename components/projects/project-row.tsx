@@ -117,7 +117,7 @@ export function ProjectRow({
         } ${isHighlighted ? "ring-2 ring-inset ring-primary/50" : ""}`}
         style={{ backgroundColor: rowBg }}
       >
-        {/* ── Col 1: pack expand+actions | child branch | empty ── */}
+        {/* ── Col 1: pack expand+actions | child branch | regular actions ── */}
         <TableCell className="relative w-14 overflow-visible p-0 align-middle">
           {pack ? (
             <div className="flex items-center gap-0.5 px-2 py-2">
@@ -133,6 +133,12 @@ export function ProjectRow({
                   }`}
                 />
               </button>
+              <KanbanCardActions
+                project={project}
+                editors={editors}
+                clients={clients}
+                availableParents={availableParents}
+              />
             </div>
           ) : isChild ? (
             <div className="relative py-2.5 pl-7 pr-2">
@@ -146,7 +152,16 @@ export function ProjectRow({
                 {String(childIndex).padStart(2, "0")}
               </span>
             </div>
-          ) : null}
+          ) : (
+            <div className="flex items-center px-2 py-2">
+              <KanbanCardActions
+                project={project}
+                editors={editors}
+                clients={clients}
+                availableParents={availableParents}
+              />
+            </div>
+          )}
         </TableCell>
 
         {/* ── Col 2: Client chip ── */}
@@ -255,14 +270,16 @@ export function ProjectRow({
           />
         </TableCell>
 
-        {/* ── Col 12: Actions ── */}
+        {/* ── Col 12: Actions (solo children, que no tienen espacio en Col 1) ── */}
         <TableCell className="w-10 p-2 pr-3 align-middle">
-          <KanbanCardActions
-            project={project}
-            editors={editors}
-            clients={clients}
-            availableParents={availableParents}
-          />
+          {isChild ? (
+            <KanbanCardActions
+              project={project}
+              editors={editors}
+              clients={clients}
+              availableParents={availableParents}
+            />
+          ) : null}
         </TableCell>
       </TableRow>
 
