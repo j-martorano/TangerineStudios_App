@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { PlusIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -98,6 +98,7 @@ export function ProjectForm({
     project_type: (c.project_type === "pack" ? "long_form" : c.project_type) as ChildType,
   }));
   const [shorts, setShorts] = useState<Child[]>(initialChildren);
+  const lastChildType = useRef<ChildType>("short_form");
   const [newShortDraft, setNewShortDraft] = useState<string>("");
   const [clientId, setClientId] = useState<string | null>(
     project?.client?.id ?? null
@@ -151,7 +152,7 @@ export function ProjectForm({
   function addShort() {
     const t = newShortDraft.trim();
     if (t.length === 0) return;
-    setShorts([...shorts, { title: t, project_type: "long_form" as ChildType }]);
+    setShorts([...shorts, { title: t, project_type: lastChildType.current }]);
     setNewShortDraft("");
   }
 
@@ -164,6 +165,7 @@ export function ProjectForm({
   }
 
   function changeChildType(index: number, type: ChildType) {
+    lastChildType.current = type;
     setShorts(shorts.map((s, i) => (i === index ? { ...s, project_type: type } : s)));
   }
 
