@@ -7,7 +7,6 @@ import {
   ClipboardIcon,
   HardDriveIcon,
   PlusIcon,
-  Trash2Icon,
   XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,14 +30,13 @@ import {
 import { TableCell, TableRow } from "@/components/ui/table";
 
 import { CobroManager } from "./cobro-manager";
+import { KanbanCardActions } from "./kanban-card-actions";
 import { PagoManager } from "./pago-manager";
 import { QuickPhaseBadge } from "./quick-phase-badge";
 import { QuickPaymentBadge } from "./quick-payment-badge";
 import type { ParentOption } from "./project-form";
 
 import {
-  deleteProject,
-  setProjectArchived,
   updateProject,
 } from "@/lib/projects/actions";
 import {
@@ -257,9 +255,14 @@ export function ProjectRow({
           />
         </TableCell>
 
-        {/* ── Col 12: Archive / Delete ── */}
+        {/* ── Col 12: Actions ── */}
         <TableCell className="w-10 p-2 pr-3 align-middle">
-          <RowActionButton project={project} />
+          <KanbanCardActions
+            project={project}
+            editors={editors}
+            clients={clients}
+            availableParents={availableParents}
+          />
         </TableCell>
       </TableRow>
 
@@ -438,63 +441,6 @@ function InlineTitleCell({
     >
       {project.title}
     </span>
-  );
-}
-
-// ── Archive / Delete button ────────────────────────────────────────────────
-
-function RowActionButton({ project }: { project: ProjectWithRelations }) {
-  const [pending, startTransition] = useTransition();
-
-  function handleArchive() {
-    startTransition(async () => {
-      const r = await setProjectArchived(project.id, true);
-      if (r.ok) toast.success(`«${project.title}» archivado`);
-      else toast.error(r.error);
-    });
-  }
-
-  function handleDeleteAttempt() {
-    toast.warning(`¿Eliminar «${project.title}» permanentemente?`, {
-      action: {
-        label: "Eliminar",
-        onClick: () => {
-          startTransition(async () => {
-            const r = await deleteProject(project.id);
-            if (r.ok) toast.success("Proyecto eliminado");
-            else toast.error(r.error);
-          });
-        },
-      },
-      cancel: { label: "Cancelar", onClick: () => {} },
-      duration: 8000,
-    });
-  }
-
-  if (project.archived) {
-    return (
-      <button
-        type="button"
-        onClick={handleDeleteAttempt}
-        disabled={pending}
-        aria-label="Eliminar proyecto"
-        className="flex size-7 cursor-pointer items-center justify-center rounded text-red-500 transition-colors hover:bg-red-500/15 disabled:opacity-40"
-      >
-        <Trash2Icon className="size-3.5" />
-      </button>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={handleArchive}
-      disabled={pending}
-      aria-label="Archivar proyecto"
-      className="flex size-7 cursor-pointer items-center justify-center rounded text-red-500 transition-colors hover:bg-red-500/15 disabled:opacity-40"
-    >
-      <Trash2Icon className="size-3.5" />
-    </button>
   );
 }
 
