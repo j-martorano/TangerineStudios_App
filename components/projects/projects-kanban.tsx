@@ -1145,6 +1145,25 @@ function CardView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [editOpen, setEditOpen] = useState(false);
+  // Ref síncrono para que onMenuOpenChange no limpie focusedId cuando
+  // el dropdown cierra porque se clickeó "Editar".
+  const editOpenRef = useRef(false);
+
+  function handleEditOpenChange(open: boolean) {
+    setEditOpen(open);
+    editOpenRef.current = open;
+    setFocusedId(open ? project.id : null);
+  }
+
+  function handleMenuOpenChange(open: boolean) {
+    if (open) {
+      setFocusedId(project.id);
+    } else if (!editOpenRef.current) {
+      setFocusedId(null);
+    }
+  }
+
   const [expanded, setExpanded] = useState(false);
 
   const isMensual = project.client?.payment_type === "mensual";
@@ -1195,9 +1214,9 @@ function CardView({
                   editors={editors}
                   clients={clients}
                   availableParents={availableParents}
-                  onMenuOpenChange={(open) =>
-                    setFocusedId(open ? project.id : null)
-                  }
+                  onMenuOpenChange={handleMenuOpenChange}
+                  editOpen={editOpen}
+                  onEditOpenChange={handleEditOpenChange}
                 />
                 <Link
                   href={`/projects?highlight=${project.id}`}
