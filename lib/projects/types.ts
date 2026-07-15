@@ -74,6 +74,18 @@ export type ClientForProject = ClientMini & {
   editors: EditorMini[];
 };
 
+/** Plantilla de proyecto: auto-completa la configuración al crear. */
+export type ProjectTemplate = {
+  id: string;
+  name: string;
+  project_type: ProjectType;
+  phase: ProjectPhase;
+  price: number | null;
+  cost: number | null;
+  duration_minutes: number | null;
+  created_at: string;
+};
+
 /** Pago de un cliente mensual: acredita `minutes_credited` minutos. */
 export type ClientPayment = {
   id: string;

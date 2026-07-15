@@ -703,6 +703,39 @@ export type Database = {
           },
         ]
       }
+      project_templates: {
+        Row: {
+          id: string
+          name: string
+          project_type: Database["public"]["Enums"]["project_type"]
+          phase: Database["public"]["Enums"]["project_phase"]
+          price: number | null
+          cost: number | null
+          duration_minutes: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          project_type?: Database["public"]["Enums"]["project_type"]
+          phase?: Database["public"]["Enums"]["project_phase"]
+          price?: number | null
+          cost?: number | null
+          duration_minutes?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          project_type?: Database["public"]["Enums"]["project_type"]
+          phase?: Database["public"]["Enums"]["project_phase"]
+          price?: number | null
+          cost?: number | null
+          duration_minutes?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           archived: boolean

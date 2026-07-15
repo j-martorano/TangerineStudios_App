@@ -46,6 +46,8 @@ import {
   formatPrice,
 } from "@/lib/projects/format";
 import { createProject, updateProject } from "@/lib/projects/actions";
+import { TemplatePicker } from "./template-picker";
+import type { ProjectTemplate } from "@/lib/projects/types";
 
 /**
  * Mantenemos el tipo por compatibilidad con los componentes que ya lo
@@ -148,6 +150,27 @@ export function ProjectForm({
   // El proyecto en edición ES hijo de un pack (no podemos volverlo pack
   // padre — un short hijo no puede tener a su vez hijos).
   const isChildOfPack = project?.parent_id != null;
+
+  // ── Template picker ────────────────────────────────────────────────────────
+
+  function applyTemplate(t: ProjectTemplate) {
+    setProjectType(t.project_type);
+    setPhase(t.phase);
+    setManualPrice(t.price != null ? String(t.price) : "");
+    setManualCost(t.cost != null ? String(t.cost) : "");
+    if (t.duration_minutes != null) {
+      const totalSec = Math.round(t.duration_minutes * 60);
+      setDurMm(String(Math.floor(totalSec / 60)));
+      setDurSs(String(totalSec % 60));
+    } else {
+      setDurMm("");
+      setDurSs("");
+    }
+    // Pre-fill title only if still empty
+    if (!title.trim()) setTitle(t.name);
+    toast.success(`Plantilla «${t.name}» aplicada`);
+  }
+
 
   function addShort() {
     const t = newShortDraft.trim();
@@ -299,10 +322,28 @@ export function ProjectForm({
   const _ss = durSs === "" ? null : parseInt(durSs, 10);
   const parsedDur = (_mm == null && _ss == null) ? null : (_mm ?? 0) + (_ss ?? 0) / 60;
   const validDur = parsedDur != null && !isNaN(parsedDur) && parsedDur > 0 ? parsedDur : null;
+  const templateCurrentConfig = {
+    project_type: projectType,
+    phase,
+    price: manualPrice ? parseFloat(manualPrice) : null,
+    cost: manualCost ? parseFloat(manualCost) : null,
+    duration_minutes: validDur,
+  };
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div className="flex max-h-[60vh] flex-col gap-5 overflow-y-auto pr-1">
+        {mode === "create" ? (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+              Plantilla
+            </span>
+            <TemplatePicker
+              onApply={applyTemplate}
+              currentConfig={templateCurrentConfig}
+            />
+          </div>
+        ) : null}
         <div className="flex flex-col gap-2">
           <Label htmlFor="title">
             Título <span className="text-destructive">*</span>
