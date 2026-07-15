@@ -1,4 +1,4 @@
-﻿import { NewProjectButton, NewHistoricProjectButton } from "@/components/projects/new-project-button";
+﻿import { NewProjectButton, NewHistoricProjectButton, NewClientPaymentButton } from "@/components/projects/new-project-button";
 import { ProjectsKanban } from "@/components/projects/projects-kanban";
 import { DataSearch } from "@/components/data-search";
 import {
@@ -53,6 +53,7 @@ export default async function KanbanPage({
               clients={clients}
               availableParents={availableParents}
             />
+            <NewClientPaymentButton clients={clients} />
           </div>
           <h1 className="mt-3 text-5xl font-bold uppercase tracking-tight">
             Kanban
