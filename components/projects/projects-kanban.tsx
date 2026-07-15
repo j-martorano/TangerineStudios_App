@@ -1134,7 +1134,7 @@ function CardView({
 }) {
   const { focusedId, setFocusedId } = useContext(KanbanFocusCtx);
   const highlightedId = useContext(KanbanHighlightCtx);
-  const isBlurred = focusedId !== null && focusedId !== project.id;
+  const isBlurred = focusedId !== null && focusedId !== project.id && !editOpen;
   // ── Scroll desde link de Discord (?focus=ID) ─────────────────────────────
   const isHighlighted = highlightedId === project.id;
   const cardRef = useRef<HTMLDivElement>(null);
