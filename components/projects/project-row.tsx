@@ -104,7 +104,6 @@ export function ProjectRow({
   const price = computePrice(project);
   const cost = computeCost(project);
   const profit = computeProfit(project);
-  const isRetainer = project.client?.payment_type === "mensual";
 
   const rowBg = forceBg ?? (rowIndex % 2 === 0 ? ROW_BG_EVEN : ROW_BG_ODD);
 
@@ -193,36 +192,32 @@ export function ProjectRow({
 
         {/* ── Col 6: Balance badges (nowrap with dark bg container) ── */}
         <TableCell className="w-44 p-2 align-middle">
-          {isRetainer ? (
-            <span className="text-xs text-muted-foreground/50">RETAINER</span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-md bg-black/20 px-1.5 py-1">
-              {price != null ? (
-                <span className="inline-flex items-center rounded border border-[#37ACFF]/30 bg-[#37ACFF]/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-[#37ACFF]">
-                  {fmt(price)}
-                </span>
-              ) : null}
-              {cost != null ? (
-                <span className="inline-flex items-center rounded border border-red-500/25 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-red-400">
-                  {fmt(cost)}
-                </span>
-              ) : null}
-              {profit != null ? (
-                <span
-                  className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
-                    profit >= 0
-                      ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
-                      : "border-red-500/25 bg-red-500/10 text-red-400"
-                  }`}
-                >
-                  {fmt(profit)}
-                </span>
-              ) : null}
-              {price == null && cost == null && profit == null ? (
-                <span className="text-xs text-muted-foreground/30">—</span>
-              ) : null}
-            </span>
-          )}
+          <span className="inline-flex items-center gap-1 rounded-md bg-black/20 px-1.5 py-1">
+            {price != null ? (
+              <span className="inline-flex items-center rounded border border-[#37ACFF]/30 bg-[#37ACFF]/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-[#37ACFF]">
+                {fmt(price)}
+              </span>
+            ) : null}
+            {cost != null ? (
+              <span className="inline-flex items-center rounded border border-red-500/25 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-red-400">
+                {fmt(cost)}
+              </span>
+            ) : null}
+            {profit != null ? (
+              <span
+                className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                  profit >= 0
+                    ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
+                    : "border-red-500/25 bg-red-500/10 text-red-400"
+                }`}
+              >
+                {fmt(profit)}
+              </span>
+            ) : null}
+            {price == null && cost == null && profit == null ? (
+              <span className="text-xs text-muted-foreground/30">—</span>
+            ) : null}
+          </span>
         </TableCell>
 
         {/* ── Col 7: Cobrado ── */}

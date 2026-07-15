@@ -23,7 +23,7 @@ type ProjectForCalc = {
 // Precio calculado del proyecto según el payment_type del cliente:
 //   - por_proyecto : project.price (manual)
 //   - por_rate     : client.agreed_price * duration_minutes
-//   - mensual      : null (la facturación va a nivel mes en Finanzas)
+//   - mensual      : agreed_price * (1 - retainer_discount_pct/100) * duration_minutes
 //   - sin cliente o sin datos suficientes: null
 export function computePrice(p: ProjectForCalc): number | null {
   const client = p.client;
@@ -36,8 +36,11 @@ export function computePrice(p: ProjectForCalc): number | null {
     if (p.duration_minutes == null) return null;
     return Number(client.agreed_price) * Number(p.duration_minutes);
   }
-  // mensual
-  return null;
+  // mensual: precio efectivo por minuto (con descuento retainer) × duración
+  if (client.agreed_price == null) return null;
+  if (p.duration_minutes == null) return null;
+  const discount = Number(client.retainer_discount_pct ?? 0) / 100;
+  return Number(client.agreed_price) * (1 - discount) * Number(p.duration_minutes);
 }
 
 /**
@@ -146,14 +149,11 @@ export function editorCostInProject(
   return editorCost(entry.editor, duration);
 }
 
-// Ganancia calculada del proyecto:
-//   - por_proyecto / por_rate: precio - costo
-//   - mensual: null (la ganancia real se calcula a nivel mes en Finanzas)
+// Ganancia calculada del proyecto: precio - costo.
 // Si falta precio o costo, retorna null.
 export function computeProfit(p: ProjectForCalc): number | null {
   const client = p.client;
   if (!client) return null;
-  if (client.payment_type === "mensual") return null;
   const price = computePrice(p);
   if (price == null) return null;
   const cost = computeCost(p);
