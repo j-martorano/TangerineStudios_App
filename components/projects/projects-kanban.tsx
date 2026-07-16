@@ -1134,6 +1134,12 @@ function CardView({
 }) {
   const { focusedId, setFocusedId } = useContext(KanbanFocusCtx);
   const highlightedId = useContext(KanbanHighlightCtx);
+
+  const [editOpen, setEditOpen] = useState(false);
+  // Ref síncrono para que onMenuOpenChange no limpie focusedId cuando
+  // el dropdown cierra porque se clickeó "Editar".
+  const editOpenRef = useRef(false);
+
   const isBlurred = focusedId !== null && focusedId !== project.id && !editOpen;
   // ── Scroll desde link de Discord (?focus=ID) ─────────────────────────────
   const isHighlighted = highlightedId === project.id;
@@ -1144,11 +1150,6 @@ function CardView({
     cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const [editOpen, setEditOpen] = useState(false);
-  // Ref síncrono para que onMenuOpenChange no limpie focusedId cuando
-  // el dropdown cierra porque se clickeó "Editar".
-  const editOpenRef = useRef(false);
 
   function handleEditOpenChange(open: boolean) {
     setEditOpen(open);
