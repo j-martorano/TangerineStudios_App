@@ -1251,7 +1251,7 @@ function CardView({
       className={`relative !rounded-[5px] !py-0 !gap-0 !bg-[#2c2c2c] transition-[filter,opacity] duration-200 ${
         dragging ? "rotate-2 shadow-lg ring-2 ring-primary/40" : ""
       } ${isBlurred ? "blur-[2px] opacity-35 pointer-events-none select-none" : ""} ${
-        editOpen ? "z-[51] outline outline-2 outline-white/20 shadow-2xl" : ""
+        editOpen ? "z-[51]" : ""
       }`}
     >
       {/* ── Drag handle + header ──────────────────────────────────────────── */}
