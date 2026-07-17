@@ -7,6 +7,7 @@ import {
   fetchProjects,
 } from "@/lib/projects/queries";
 import { fetchClientsForInvoice } from "@/lib/invoices/queries";
+import { fetchRetainerPayments } from "@/lib/finanzas/queries";
 import { isPack } from "@/lib/projects/types";
 
 export const dynamic = "force-dynamic";
@@ -22,11 +23,12 @@ export default async function KanbanPage({
   const query = params.q?.trim() || undefined;
   const focusId = params.focus?.trim() || undefined;
 
-  const [allProjects, editors, clients, clientsForInvoice] = await Promise.all([
+  const [allProjects, editors, clients, clientsForInvoice, retainerPayments] = await Promise.all([
     fetchProjects({ query }),
     fetchEditors(),
     fetchClients(),
     fetchClientsForInvoice(),
+    fetchRetainerPayments(),
   ]);
 
   // En el kanban mostramos packs (con lista de hijos adentro del card).
@@ -76,6 +78,7 @@ export default async function KanbanPage({
         clientsForInvoice={clientsForInvoice}
         availableParents={availableParents}
         highlightId={focusId}
+        retainerPayments={retainerPayments}
       />
     </main>
   );

@@ -10,6 +10,26 @@ export type FinanzasPayment = {
   clientColor: string | null;
 };
 
+/** Pago de retainer para el kanban (solo client_id, amount, paid_at). */
+export type RetainerPayment = {
+  client_id: string;
+  amount: number;
+  paid_at: string; // "YYYY-MM-DD"
+};
+
+export async function fetchRetainerPayments(): Promise<RetainerPayment[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("client_payments")
+    .select("client_id, amount, paid_at");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((p) => ({
+    client_id: p.client_id,
+    amount: Number(p.amount),
+    paid_at: p.paid_at,
+  }));
+}
+
 export async function fetchClientPayments(): Promise<FinanzasPayment[]> {
   const supabase = await createClient();
   const { data, error } = await supabase

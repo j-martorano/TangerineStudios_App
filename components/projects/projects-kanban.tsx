@@ -74,6 +74,7 @@ import {
   computePrice,
 } from "@/lib/projects/format";
 import { reorderProjects, type ReorderUpdate } from "@/lib/projects/actions";
+import type { RetainerPayment } from "@/lib/finanzas/queries";
 
 type Props = {
   projects: ProjectWithRelations[];
@@ -83,6 +84,7 @@ type Props = {
   availableParents?: ParentOption[];
   /** ID del proyecto a resaltar (viene del param ?focus=ID del link de Discord) */
   highlightId?: string;
+  retainerPayments?: RetainerPayment[];
 };
 
 type ColumnsMap = Record<ProjectPhase, ProjectWithRelations[]>;
@@ -208,6 +210,10 @@ const KanbanInvoiceCtx = createContext<{
   onFacturar: (project: ProjectWithRelations) => void;
 }>({ onFacturar: () => {} });
 
+// ─── Context para pagos de retainer (stats de columnas) ──────────────────────
+
+const KanbanRetainerPaymentsCtx = createContext<RetainerPayment[]>([]);
+
 // ─── Export ───────────────────────────────────────────────────────────────────
 
 export function ProjectsKanban(props: Props) {
@@ -263,6 +269,7 @@ export function ProjectsKanban(props: Props) {
   };
 
   return (
+    <KanbanRetainerPaymentsCtx.Provider value={props.retainerPayments ?? []}>
     <KanbanHighlightCtx.Provider value={props.highlightId ?? null}>
     <KanbanFocusCtx.Provider value={{ focusedId, setFocusedId }}>
     <KanbanInvoiceCtx.Provider value={{ onFacturar: setFacturarProject }}>
@@ -310,6 +317,7 @@ export function ProjectsKanban(props: Props) {
     </KanbanInvoiceCtx.Provider>
     </KanbanFocusCtx.Provider>
     </KanbanHighlightCtx.Provider>
+    </KanbanRetainerPaymentsCtx.Provider>
   );
 }
 
@@ -869,7 +877,29 @@ function StatCard({
 
 function TerminadoStats({ items }: { items: ProjectWithRelations[] }) {
   if (items.length === 0) return null;
-  const total = items.reduce((s, p) => s + (computePrice(p) ?? 0), 0);
+  const retainerPayments = useContext(KanbanRetainerPaymentsCtx);
+
+  // Mes de los items (todos comparten el mismo mes al venir agrupados).
+  const mk = items[0]?.finalized_at?.slice(0, 7) ?? null;
+
+  // Para clientes mensual: usar el pago registrado ese mes (una vez por cliente).
+  // Para los demás: sumar computePrice normal.
+  let total = 0;
+  const countedClients = new Set<string>();
+  for (const p of items) {
+    if (p.client?.payment_type === "mensual" && p.client_id && mk) {
+      if (!countedClients.has(p.client_id)) {
+        countedClients.add(p.client_id);
+        const payment = retainerPayments.find(
+          (pay) => pay.client_id === p.client_id && pay.paid_at.startsWith(mk)
+        );
+        if (payment) total += payment.amount;
+      }
+    } else {
+      total += computePrice(p) ?? 0;
+    }
+  }
+
   const cost = items.reduce((s, p) => s + (computeCost(p) ?? 0), 0);
   const ganancia = total - cost;
   return (
