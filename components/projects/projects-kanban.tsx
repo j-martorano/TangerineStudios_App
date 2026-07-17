@@ -1096,7 +1096,7 @@ function KanbanColumn({
             {items.length}
           </span>
         </div>
-        <TerminadoStats items={items} />
+        {phase === "terminado" && <TerminadoStats items={items} />}
         <SortableContext
           id={phase}
           items={itemIds}
