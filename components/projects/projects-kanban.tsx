@@ -498,13 +498,38 @@ function InteractiveKanban({
       const activeContainer = findContainer(prev, activeIdStr);
       const overContainer = findContainer(prev, overIdStr);
       if (!activeContainer || !overContainer) return prev;
-      if (activeContainer === overContainer) return prev;
+
+      // Cuando el destino es terminado, determinar el finalized_at temporal
+      // para que la card aparezca visualmente en el mes correcto durante el drag.
+      const tempFinalizedAt: string | null = (() => {
+        if (overContainer !== "terminado") return null;
+        if (overIdStr.startsWith("hist:")) return `${overIdStr.slice(5)}-01T12:00:00Z`;
+        const overProject = prev.terminado.find((p) => p.id === overIdStr);
+        return overProject?.finalized_at ?? null;
+      })();
+
+      if (activeContainer === overContainer) {
+        // Mismo container: solo actualizar finalized_at si cambia de mes histórico
+        if (overContainer !== "terminado") return prev;
+        const activeItem = prev.terminado.find((p) => p.id === activeIdStr);
+        if (!activeItem || activeItem.finalized_at === tempFinalizedAt) return prev;
+        return {
+          ...prev,
+          terminado: prev.terminado.map((p) =>
+            p.id === activeIdStr ? { ...p, finalized_at: tempFinalizedAt } : p
+          ),
+        };
+      }
 
       const activeItems = prev[activeContainer];
       const overItems = prev[overContainer];
       const activeIndex = activeItems.findIndex((p) => p.id === activeIdStr);
       if (activeIndex === -1) return prev;
-      const moving = { ...activeItems[activeIndex], phase: overContainer };
+      const moving = {
+        ...activeItems[activeIndex],
+        phase: overContainer,
+        finalized_at: overContainer === "terminado" ? tempFinalizedAt : activeItems[activeIndex].finalized_at,
+      };
 
       let overIndex = overItems.findIndex((p) => p.id === overIdStr);
       if (overIndex === -1) overIndex = overItems.length;
