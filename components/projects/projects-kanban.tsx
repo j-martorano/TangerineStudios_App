@@ -197,9 +197,17 @@ const PHASE_BLOB: Record<ProjectPhase, string | null> = {
 // Cuando una card abre su menú, las otras se blurean.
 
 const KanbanFocusCtx = createContext<{
-  focusedId: string | null;
-  setFocusedId: (id: string | null) => void;
-}>({ focusedId: null, setFocusedId: () => {} });
+  menuFocusId: string | null;
+  setMenuFocusId: (id: string | null) => void;
+  editFocusId: string | null;
+  setEditFocusId: (id: string | null) => void;
+  dndDisabled: boolean;
+  setDndDisabled: (v: boolean) => void;
+}>({
+  menuFocusId: null, setMenuFocusId: () => {},
+  editFocusId: null, setEditFocusId: () => {},
+  dndDisabled: false, setDndDisabled: () => {},
+});
 
 // ─── Context para highlight desde URL (?focus=ID) ─────────────────────────────
 // Cuando se llega desde el link del bot de Discord, se resalta la card.
@@ -219,14 +227,16 @@ const KanbanRetainerPaymentsCtx = createContext<RetainerPayment[]>([]);
 export function ProjectsKanban(props: Props) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [focusedId, setFocusedId] = useState<string | null>(props.highlightId ?? null);
+  const [menuFocusId, setMenuFocusId] = useState<string | null>(props.highlightId ?? null);
+  const [editFocusId, setEditFocusId] = useState<string | null>(null);
+  const [dndDisabled, setDndDisabled] = useState(false);
   const [facturarProject, setFacturarProject] = useState<ProjectWithRelations | null>(null);
   useEffect(() => setMounted(true), []);
 
   // Limpiar el focus del highlight después de 3.5s
   useEffect(() => {
     if (!props.highlightId) return;
-    const t = setTimeout(() => setFocusedId(null), 3500);
+    const t = setTimeout(() => setMenuFocusId(null), 3500);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -271,7 +281,7 @@ export function ProjectsKanban(props: Props) {
   return (
     <KanbanRetainerPaymentsCtx.Provider value={props.retainerPayments ?? []}>
     <KanbanHighlightCtx.Provider value={props.highlightId ?? null}>
-    <KanbanFocusCtx.Provider value={{ focusedId, setFocusedId }}>
+    <KanbanFocusCtx.Provider value={{ menuFocusId, setMenuFocusId, editFocusId, setEditFocusId, dndDisabled, setDndDisabled }}>
     <KanbanInvoiceCtx.Provider value={{ onFacturar: setFacturarProject }}>
       {/* Modal de nueva factura pre-cargado con el proyecto */}
       {facturarProject ? (
@@ -448,6 +458,8 @@ function InteractiveKanban({
   clients,
   availableParents = [],
 }: Props) {
+  const { dndDisabled } = useContext(KanbanFocusCtx);
+
   const [columns, setColumns] = useState<ColumnsMap>(() =>
     buildColumns(projects)
   );
@@ -478,7 +490,7 @@ function InteractiveKanban({
     setColumns(buildColumns(projects));
   }, [projectsKey, projects]);
 
-  const sensors = useSensors(
+  const allSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor)
   );
@@ -697,7 +709,7 @@ function InteractiveKanban({
   return (
     <>
       <DndContext
-        sensors={sensors}
+        sensors={dndDisabled ? [] : allSensors}
         collisionDetection={closestCorners}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
@@ -946,7 +958,12 @@ function DroppableHistoricalMonthColumn({
   const itemIds = useMemo(() => group.items.map((p) => p.id), [group.items]);
 
   return (
-    <div className="relative flex w-[280px] shrink-0 flex-col overflow-hidden rounded-[10px] border border-white/[0.08] bg-[#1a1a1a] min-h-[70vh]">
+    <div
+      ref={setNodeRef}
+      className={`relative flex w-[280px] shrink-0 flex-col overflow-hidden rounded-[10px] border bg-[#1a1a1a] min-h-[70vh] transition-colors ${
+        isOver ? "border-primary/60 ring-2 ring-inset ring-primary/40" : "border-white/[0.08]"
+      }`}
+    >
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-48"
         style={{ background: "radial-gradient(ellipse 100% 140px at 50% 0%, #37FF6210, transparent)" }}
@@ -958,12 +975,7 @@ function DroppableHistoricalMonthColumn({
         </div>
         <TerminadoStats items={group.items} />
         <SortableContext id={droppableId} items={itemIds} strategy={verticalListSortingStrategy}>
-          <div
-            ref={setNodeRef}
-            className={`flex flex-1 flex-col gap-2 overflow-y-auto transition-colors ${
-              isOver ? "bg-accent/40 ring-2 ring-primary/40 rounded-lg" : ""
-            }`}
-          >
+          <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
             {group.items.length === 0 ? (
               <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
                 Arrastrá una card acá
@@ -1053,7 +1065,12 @@ function KanbanColumn({
       : "Soltá una tarjeta acá";
 
   return (
-    <div className="relative flex w-[280px] shrink-0 flex-col overflow-hidden rounded-[10px] border border-white/[0.08] bg-[#1a1a1a] min-h-[70vh]">
+    <div
+      ref={setNodeRef}
+      className={`relative flex w-[280px] shrink-0 flex-col overflow-hidden rounded-[10px] border bg-[#1a1a1a] min-h-[70vh] transition-colors ${
+        isOver ? "border-primary/60 ring-2 ring-inset ring-primary/40" : "border-white/[0.08]"
+      }`}
+    >
       {PHASE_BLOB[phase] ? (
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-48"
@@ -1075,12 +1092,7 @@ function KanbanColumn({
           items={itemIds}
           strategy={verticalListSortingStrategy}
         >
-          <div
-            ref={setNodeRef}
-            className={`flex flex-1 flex-col gap-2 overflow-y-auto transition-colors ${
-              isOver ? "bg-accent/40 ring-2 ring-primary/40" : ""
-            }`}
-          >
+          <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
           {items.length === 0 ? (
             <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
               {emptyLabel}
@@ -1187,15 +1199,15 @@ function CardView({
   dragging?: boolean;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
-  const { focusedId, setFocusedId } = useContext(KanbanFocusCtx);
+  const { menuFocusId, setMenuFocusId, editFocusId, setEditFocusId, setDndDisabled } = useContext(KanbanFocusCtx);
   const highlightedId = useContext(KanbanHighlightCtx);
 
   const [editOpen, setEditOpen] = useState(false);
-  // Ref síncrono para que onMenuOpenChange no limpie focusedId cuando
-  // el dropdown cierra porque se clickeó "Editar".
-  const editOpenRef = useRef(false);
 
-  const isBlurred = focusedId !== null && focusedId !== project.id && !editOpen;
+  // Cualquiera de los dos focos activos mantiene el blur en otras cards.
+  const effectiveFocusedId = menuFocusId ?? editFocusId;
+  const isBlurred = effectiveFocusedId !== null && effectiveFocusedId !== project.id && !editOpen;
+
   // ── Scroll desde link de Discord (?focus=ID) ─────────────────────────────
   const isHighlighted = highlightedId === project.id;
   const cardRef = useRef<HTMLDivElement>(null);
@@ -1208,16 +1220,12 @@ function CardView({
 
   function handleEditOpenChange(open: boolean) {
     setEditOpen(open);
-    editOpenRef.current = open;
-    setFocusedId(open ? project.id : null);
+    setEditFocusId(open ? project.id : null);
+    setDndDisabled(open);
   }
 
   function handleMenuOpenChange(open: boolean) {
-    if (open) {
-      setFocusedId(project.id);
-    } else if (!editOpenRef.current) {
-      setFocusedId(null);
-    }
+    setMenuFocusId(open ? project.id : null);
   }
 
   const [expanded, setExpanded] = useState(false);
