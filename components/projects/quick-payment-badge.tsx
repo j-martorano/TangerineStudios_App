@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import {
-  changeCobrado,
+  applyCobradoToggle,
   changeInvoiced,
   changePagado,
 } from "@/lib/projects/actions";
@@ -26,7 +26,6 @@ import {
   PAGADO_LABEL,
 } from "@/lib/projects/format";
 import {
-  COBRADO_STATUSES,
   INVOICED_STATUSES,
   PAGADO_STATUSES,
 } from "@/lib/projects/types";
@@ -56,10 +55,10 @@ type Config = {
 
 const CONFIG: Record<Props["kind"], Config> = {
   cobrado: {
-    options: COBRADO_STATUSES,
+    options: ["no", "si"],
     labels: COBRADO_LABEL,
     classes: COBRADO_CLASS,
-    action: changeCobrado as Config["action"],
+    action: applyCobradoToggle as Config["action"],
     ariaLabel: "Cambiar estado de cobro",
     successMessage: "Cobrado actualizado",
   },

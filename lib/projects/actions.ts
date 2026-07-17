@@ -467,6 +467,58 @@ export async function changeCobrado(
   return { ok: true };
 }
 
+/**
+ * Cambia cobrado a SI o NO desde el spreadsheet y sincroniza project_cobros:
+ *  - SI → elimina cobros previos, crea uno por el precio completo (si computable)
+ *  - NO → elimina todos los cobros del proyecto
+ */
+export async function applyCobradoToggle(
+  id: string,
+  cobrado: string
+): Promise<ActionResult> {
+  if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
+  if (cobrado !== "si" && cobrado !== "no")
+    return { ok: false, error: "Estado de cobro inválido" };
+
+  const supabase = await createClient();
+
+  const { error: delErr } = await supabase
+    .from("project_cobros")
+    .delete()
+    .eq("project_id", id);
+  if (delErr) return { ok: false, error: delErr.message };
+
+  if (cobrado === "si") {
+    const { data } = await supabase
+      .from("projects")
+      .select(PROJECT_SELECT)
+      .eq("id", id)
+      .single();
+    if (data) {
+      const proj = data as unknown as ProjectWithRelations;
+      const total = computePrice(proj);
+      if (total != null && total > 0) {
+        const today = new Date().toISOString().slice(0, 10);
+        await supabase.from("project_cobros").insert({
+          project_id: id,
+          amount: total,
+          paid_at: today,
+          note: null,
+        });
+      }
+    }
+  }
+
+  const { error } = await supabase
+    .from("projects")
+    .update({ cobrado })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidateAll();
+  return { ok: true };
+}
+
 export async function changePagado(
   id: string,
   pagado: PagadoStatus

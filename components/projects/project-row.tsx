@@ -29,9 +29,7 @@ import {
 } from "@/components/ui/select";
 import { TableCell, TableRow } from "@/components/ui/table";
 
-import { CobroManager } from "./cobro-manager";
 import { KanbanCardActions } from "./kanban-card-actions";
-import { PagoManager } from "./pago-manager";
 import { QuickPhaseBadge } from "./quick-phase-badge";
 import { QuickPaymentBadge } from "./quick-payment-badge";
 import type { ParentOption } from "./project-form";
@@ -224,7 +222,12 @@ export function ProjectRow({
         <TableCell className="w-32 p-2 align-middle">
           <span className="flex items-center gap-1.5">
             <span className="text-[11px] text-muted-foreground/45">Cobrado</span>
-            <CobroManager project={project} disabled={locked} />
+            <QuickPaymentBadge
+              kind="cobrado"
+              id={project.id}
+              value={project.cobrado}
+              disabled={locked}
+            />
           </span>
         </TableCell>
 
@@ -232,11 +235,16 @@ export function ProjectRow({
         <TableCell className="w-32 p-2 align-middle">
           <span className="flex items-center gap-1.5">
             <span className="text-[11px] text-muted-foreground/45">Pagado</span>
-            <PagoManager project={project} disabled={locked} />
+            <QuickPaymentBadge
+              kind="pagado"
+              id={project.id}
+              value={project.pagado}
+              disabled={locked}
+            />
           </span>
         </TableCell>
 
-        {/* ── Col 9: Facturado — read-only (se actualiza desde Finanzas) ── */}
+        {/* ── Col 9: Facturado ── */}
         <TableCell className="w-36 p-2 align-middle">
           <span className={`flex items-center gap-1.5 ${locked ? "opacity-50" : ""}`}>
             <span className="text-[11px] text-muted-foreground/45">Facturado</span>
@@ -244,7 +252,7 @@ export function ProjectRow({
               kind="invoiced"
               id={project.id}
               value={project.invoiced}
-              disabled={true}
+              disabled={locked}
             />
           </span>
         </TableCell>
