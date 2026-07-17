@@ -888,8 +888,8 @@ function StatCard({
 }
 
 function TerminadoStats({ items }: { items: ProjectWithRelations[] }) {
-  if (items.length === 0) return null;
   const retainerPayments = useContext(KanbanRetainerPaymentsCtx);
+  if (items.length === 0) return null;
 
   // Mes de los items (todos comparten el mismo mes al venir agrupados).
   const mk = items[0]?.finalized_at?.slice(0, 7) ?? null;
