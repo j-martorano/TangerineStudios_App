@@ -9,9 +9,11 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCorners,
+  pointerWithin,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -185,6 +187,14 @@ function getHistMonthFromDrop(
   const projectMK = monthKey(overProject.finalized_at);
   return projectMK !== currentMK && projectMK !== "0000-00" ? projectMK : null;
 }
+
+// Detecta droppables usando primero la posición del puntero (fiable para
+// columnas vacías) y cae a closestCorners como fallback.
+const kanbanCollision: CollisionDetection = (args) => {
+  const pointer = pointerWithin(args);
+  if (pointer.length > 0) return pointer;
+  return closestCorners(args);
+};
 
 const PHASE_BLOB: Record<ProjectPhase, string | null> = {
   por_asignar: null,
@@ -710,7 +720,7 @@ function InteractiveKanban({
     <>
       <DndContext
         sensors={dndDisabled ? [] : allSensors}
-        collisionDetection={closestCorners}
+        collisionDetection={kanbanCollision}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
