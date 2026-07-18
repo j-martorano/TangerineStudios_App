@@ -475,6 +475,7 @@ function InteractiveKanban({
   );
   const columnsRef = useRef<ColumnsMap>(columns);
   columnsRef.current = columns;
+  const preDragColsRef = useRef<ColumnsMap>(columns);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeSourcePhase, setActiveSourcePhase] =
@@ -513,6 +514,7 @@ function InteractiveKanban({
 
   function handleDragStart(e: DragStartEvent) {
     const id = String(e.active.id);
+    preDragColsRef.current = columnsRef.current;
     setActiveId(id);
     setActiveSourcePhase(findContainer(columnsRef.current, id));
   }
@@ -657,7 +659,7 @@ function InteractiveKanban({
         setPendingFinalize({
           projectId: activeIdStr,
           existingFinalizedAt: original!.finalized_at!,
-          rollbackCols: prevCols,
+          rollbackCols: preDragColsRef.current,
           baseUpdates,
         });
         return;
@@ -688,7 +690,9 @@ function InteractiveKanban({
     const { projectId, baseUpdates } = pendingFinalize;
     const today = todayUTC();
     const finalUpdates = baseUpdates.map((u) =>
-      u.id === projectId ? { ...u, finalized_at: `${today}T12:00:00Z` } : u
+      u.id === projectId
+        ? { ...u, phase: "terminado" as ProjectPhase, finalized: true, finalized_at: `${today}T12:00:00Z` }
+        : u
     );
     startTransition(async () => {
       const result = await reorderProjects(finalUpdates);
@@ -701,7 +705,9 @@ function InteractiveKanban({
     if (!pendingFinalize) return;
     const { projectId, existingFinalizedAt, baseUpdates } = pendingFinalize;
     const finalUpdates = baseUpdates.map((u) =>
-      u.id === projectId ? { ...u, finalized_at: existingFinalizedAt } : u
+      u.id === projectId
+        ? { ...u, phase: "terminado" as ProjectPhase, finalized: true, finalized_at: existingFinalizedAt }
+        : u
     );
     startTransition(async () => {
       const result = await reorderProjects(finalUpdates);
