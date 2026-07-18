@@ -535,7 +535,7 @@ function InteractiveKanban({
         if (overContainer !== "terminado") return null;
         if (overIdStr.startsWith("hist:")) return `${overIdStr.slice(5)}-01T12:00:00Z`;
         const overProject = prev.terminado.find((p) => p.id === overIdStr);
-        return overProject?.finalized_at ?? null;
+        return overProject?.finalized_at ?? `${todayUTC()}T12:00:00Z`;
       })();
 
       if (activeContainer === overContainer) {
