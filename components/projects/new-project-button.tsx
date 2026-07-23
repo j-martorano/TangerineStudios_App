@@ -62,7 +62,7 @@ export function NewProjectButton({
         <PlusIcon className="size-4" />
         Nuevo Proyecto
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Nuevo proyecto</DialogTitle>
           <DialogDescription>
@@ -107,7 +107,7 @@ export function NewHistoricProjectButton({
         <ClockIcon className="size-4" />
         Nuevo Proyecto Histórico
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Nuevo proyecto histórico</DialogTitle>
           <DialogDescription>

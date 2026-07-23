@@ -332,7 +332,7 @@ export function ProjectForm({
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <div className="flex max-h-[60vh] flex-col gap-5 overflow-y-auto pr-1">
+      <div className="flex max-h-[60vh] flex-col gap-5 overflow-y-auto pr-1 lg:max-h-[80vh]">
         {mode === "create" ? (
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">
@@ -344,6 +344,7 @@ export function ProjectForm({
             />
           </div>
         ) : null}
+
         <div className="flex flex-col gap-2">
           <Label htmlFor="title">
             Título <span className="text-destructive">*</span>
@@ -359,294 +360,292 @@ export function ProjectForm({
           />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="project_type">Tipo</Label>
-          <Select
-            value={projectType}
-            onValueChange={(v) => {
-              if (!v) return;
-              const next = v as ProjectType;
-              // Al salir del tipo PACK, limpiamos los shorts para no enviar
-              // hijos a un proyecto que ya no es pack.
-              if (projectType === "pack" && next !== "pack") {
-                setShorts([]);
-                setNewShortDraft("");
-              }
-              setProjectType(next);
-            }}
-          >
-            <SelectTrigger id="project_type" className="w-full">
-              <SelectValue>
-                {(v: string | null) =>
-                  v ? PROJECT_TYPE_LABEL[v as ProjectType] : ""
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {PROJECT_TYPES
-                // Los proyectos hijo no pueden ser packs (sin anidación de varios niveles)
-                .filter((t) => !isChildOfPack || t !== "pack")
-                .map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {PROJECT_TYPE_LABEL[t]}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-          {isChildOfPack && (
-            <p className="text-xs text-muted-foreground">
-              Los proyectos hijo de un pack no pueden ser pack a su vez.
-            </p>
-          )}
-        </div>
+        {/* Desktop: 2 columnas — izquierda: tipo/fase/duración; derecha: cliente/financiero */}
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
 
-        {/* Proyectos del pack — visible automáticamente cuando el tipo es PACK
-            y el proyecto no es hijo de otro pack. */}
-        {!isChildOfPack && projectType === "pack" ? (
-          <div className="flex flex-col gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-3">
-            <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
-              Proyectos del pack
-            </p>
+          {/* Columna izquierda */}
+          <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
-              {shorts.map((s, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="shrink-0 text-muted-foreground/60">↳</span>
-                  <select
-                    value={s.project_type}
-                    onChange={(e) =>
-                      changeChildType(i, e.target.value as ChildType)
-                    }
-                    className="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
-                    aria-label="Tipo del proyecto hijo"
-                  >
-                    {PROJECT_TYPES.filter((t) => t !== "pack").map((t) => (
-                      <option key={t} value={t}>
-                        {PROJECT_TYPE_LABEL[t]}
-                      </option>
-                    ))}
-                  </select>
-                  <Input
-                    value={s.title}
-                    onChange={(e) => renameShort(i, e.target.value)}
-                    placeholder={`Proyecto #${i + 1}`}
-                    className="flex-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeShort(i)}
-                    aria-label="Quitar proyecto"
-                    className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground/60">+</span>
-                <Input
-                  value={newShortDraft}
-                  onChange={(e) => setNewShortDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addShort();
-                    }
-                  }}
-                  placeholder="Nombre del proyecto (Enter para agregar)"
-                  className="flex-1"
-                />
-                <button
-                  type="button"
-                  onClick={addShort}
-                  disabled={newShortDraft.trim().length === 0}
-                  className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Agregar
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Cada proyecto se crea con el mismo cliente. Para asignarle
-                editor o duración, abrilo desde la tabla después de guardar.
-              </p>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="flex flex-col gap-2">
-          <Label>Cliente</Label>
-          <ClientCombobox
-            clients={clients}
-            value={clientId}
-            onChange={(id) => {
-              setClientId(id);
-              if (mode === "create" && id) {
-                const client = clients.find((c) => c.id === id);
-                if (client && client.editors.length > 0) {
-                  setEditorEntries(
-                    client.editors.map((e) => ({ id: e.id, costDraft: "" }))
-                  );
-                }
-              }
-            }}
-          />
-          {isChildOfPack ? (
-            <p className="text-xs text-muted-foreground">
-              Este proyecto pertenece a un pack — el cliente lo hereda del pack
-              padre.
-            </p>
-          ) : null}
-        </div>
-
-        {/* Saldo de minutos del cliente mensual. */}
-        {selectedClient?.payment_type === "mensual" ? (
-          <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-xs">
-            {selectedClient.minute_balance != null ? (
-              <>
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">
-                    Saldo de minutos del cliente
-                  </span>
-                  <span
-                    className={`font-medium tabular-nums ${
-                      selectedClient.minute_balance < 0
-                        ? "text-destructive"
-                        : ""
-                    }`}
-                  >
-                    {fmtMin(selectedClient.minute_balance)}
-                  </span>
-                </div>
-                {mode === "create" && validDur != null ? (
-                  <div className="mt-1 flex justify-between gap-3">
-                    <span className="text-muted-foreground">
-                      Quedaría tras este video ({fmtMin(validDur)})
-                    </span>
-                    <span
-                      className={`font-medium tabular-nums ${
-                        selectedClient.minute_balance - validDur < 0
-                          ? "text-destructive"
-                          : ""
-                      }`}
-                    >
-                      {fmtMin(selectedClient.minute_balance - validDur)}
-                    </span>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <span className="text-muted-foreground">
-                Sin saldo cargado. Registrá pagos del cliente para acreditar
-                minutos.
-              </span>
-            )}
-          </div>
-        ) : null}
-
-        <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="phase">Fase</Label>
+              <Label htmlFor="project_type">Tipo</Label>
               <Select
-                value={phase}
+                value={projectType}
                 onValueChange={(v) => {
                   if (!v) return;
-                  const next = v as ProjectPhase;
-                  setPhase(next);
-                  // Auto-completar fecha si se pone en terminado y no hay fecha
-                  if (next === "terminado" && !finalizedAt) {
-                    setFinalizedAt(new Date().toISOString().slice(0, 10));
+                  const next = v as ProjectType;
+                  if (projectType === "pack" && next !== "pack") {
+                    setShorts([]);
+                    setNewShortDraft("");
                   }
+                  setProjectType(next);
                 }}
               >
-                <SelectTrigger id="phase" className="w-full">
+                <SelectTrigger id="project_type" className="w-full">
                   <SelectValue>
                     {(v: string | null) =>
-                      v ? PHASE_LABEL[v as ProjectPhase] : ""
+                      v ? PROJECT_TYPE_LABEL[v as ProjectType] : ""
                     }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {PROJECT_PHASES.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {PHASE_LABEL[p]}
-                    </SelectItem>
-                  ))}
+                  {PROJECT_TYPES
+                    .filter((t) => !isChildOfPack || t !== "pack")
+                    .map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {PROJECT_TYPE_LABEL[t]}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
+              {isChildOfPack && (
+                <p className="text-xs text-muted-foreground">
+                  Los proyectos hijo de un pack no pueden ser pack a su vez.
+                </p>
+              )}
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label>
-                Duración{" "}
-                <span className="text-xs text-muted-foreground">(min : seg)</span>
-              </Label>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={durMm}
-                  onChange={(e) => setDurMm(e.target.value)}
-                  placeholder="0"
-                  aria-label="Minutos"
-                  className="w-20 text-center tabular-nums"
-                />
-                <span className="text-muted-foreground select-none font-medium">:</span>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={59}
-                  value={durSs}
-                  onChange={(e) => setDurSs(e.target.value)}
-                  placeholder="00"
-                  aria-label="Segundos"
-                  className="w-20 text-center tabular-nums"
-                />
+            {!isChildOfPack && projectType === "pack" ? (
+              <div className="flex flex-col gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-3">
+                <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                  Proyectos del pack
+                </p>
+                <div className="flex flex-col gap-2">
+                  {shorts.map((s, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="shrink-0 text-muted-foreground/60">↳</span>
+                      <select
+                        value={s.project_type}
+                        onChange={(e) =>
+                          changeChildType(i, e.target.value as ChildType)
+                        }
+                        className="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                        aria-label="Tipo del proyecto hijo"
+                      >
+                        {PROJECT_TYPES.filter((t) => t !== "pack").map((t) => (
+                          <option key={t} value={t}>
+                            {PROJECT_TYPE_LABEL[t]}
+                          </option>
+                        ))}
+                      </select>
+                      <Input
+                        value={s.title}
+                        onChange={(e) => renameShort(i, e.target.value)}
+                        placeholder={`Proyecto #${i + 1}`}
+                        className="flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeShort(i)}
+                        aria-label="Quitar proyecto"
+                        className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground/60">+</span>
+                    <Input
+                      value={newShortDraft}
+                      onChange={(e) => setNewShortDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addShort();
+                        }
+                      }}
+                      placeholder="Nombre del proyecto (Enter para agregar)"
+                      className="flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={addShort}
+                      disabled={newShortDraft.trim().length === 0}
+                      className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Agregar
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Cada proyecto se crea con el mismo cliente. Para asignarle
+                    editor o duración, abrilo desde la tabla después de guardar.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="phase">Fase</Label>
+                <Select
+                  value={phase}
+                  onValueChange={(v) => {
+                    if (!v) return;
+                    const next = v as ProjectPhase;
+                    setPhase(next);
+                    if (next === "terminado" && !finalizedAt) {
+                      setFinalizedAt(new Date().toISOString().slice(0, 10));
+                    }
+                  }}
+                >
+                  <SelectTrigger id="phase" className="w-full">
+                    <SelectValue>
+                      {(v: string | null) =>
+                        v ? PHASE_LABEL[v as ProjectPhase] : ""
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROJECT_PHASES.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {PHASE_LABEL[p]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label>
+                  Duración{" "}
+                  <span className="text-xs text-muted-foreground">(min : seg)</span>
+                </Label>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    value={durMm}
+                    onChange={(e) => setDurMm(e.target.value)}
+                    placeholder="0"
+                    aria-label="Minutos"
+                    className="w-20 text-center tabular-nums"
+                  />
+                  <span className="text-muted-foreground select-none font-medium">:</span>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={59}
+                    value={durSs}
+                    onChange={(e) => setDurSs(e.target.value)}
+                    placeholder="00"
+                    aria-label="Segundos"
+                    className="w-20 text-center tabular-nums"
+                  />
+                </div>
               </div>
             </div>
+
+            {phase === "terminado" ? (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="finalized_at">Fecha de terminado</Label>
+                <Input
+                  id="finalized_at"
+                  type="date"
+                  value={finalizedAt}
+                  onChange={(e) => setFinalizedAt(e.target.value)}
+                  max={new Date().toISOString().slice(0, 10)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Determina en qué mes aparece en el log del kanban. Se
+                  autocompleta con la fecha de hoy si la dejás vacía.
+                </p>
+              </div>
+            ) : null}
           </div>
 
-          {/* Fecha de terminado — sólo cuando la fase es "terminado" */}
-          {phase === "terminado" ? (
+          {/* Columna derecha */}
+          <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="finalized_at">
-                Fecha de terminado
-              </Label>
-              <Input
-                id="finalized_at"
-                type="date"
-                value={finalizedAt}
-                onChange={(e) => setFinalizedAt(e.target.value)}
-                max={new Date().toISOString().slice(0, 10)}
+              <Label>Cliente</Label>
+              <ClientCombobox
+                clients={clients}
+                value={clientId}
+                onChange={(id) => {
+                  setClientId(id);
+                  if (mode === "create" && id) {
+                    const client = clients.find((c) => c.id === id);
+                    if (client && client.editors.length > 0) {
+                      setEditorEntries(
+                        client.editors.map((e) => ({ id: e.id, costDraft: "" }))
+                      );
+                    }
+                  }
+                }}
               />
-              <p className="text-xs text-muted-foreground">
-                Determina en qué mes aparece en el log del kanban. Se
-                autocompleta con la fecha de hoy si la dejás vacía.
-              </p>
+              {isChildOfPack ? (
+                <p className="text-xs text-muted-foreground">
+                  Este proyecto pertenece a un pack — el cliente lo hereda del pack
+                  padre.
+                </p>
+              ) : null}
             </div>
-          ) : null}
 
-          {selectedClient?.payment_type === "por_proyecto" ? (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="price">
-                Precio{" "}
-                <span className="text-xs text-muted-foreground">
-                  (manual, USD)
-                </span>
-              </Label>
-              <Input
-                id="price"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                value={manualPrice}
-                onChange={(e) => setManualPrice(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-          ) : null}
+            {selectedClient?.payment_type === "mensual" ? (
+              <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-xs">
+                {selectedClient.minute_balance != null ? (
+                  <>
+                    <div className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">
+                        Saldo de minutos del cliente
+                      </span>
+                      <span
+                        className={`font-medium tabular-nums ${
+                          selectedClient.minute_balance < 0
+                            ? "text-destructive"
+                            : ""
+                        }`}
+                      >
+                        {fmtMin(selectedClient.minute_balance)}
+                      </span>
+                    </div>
+                    {mode === "create" && validDur != null ? (
+                      <div className="mt-1 flex justify-between gap-3">
+                        <span className="text-muted-foreground">
+                          Quedaría tras este video ({fmtMin(validDur)})
+                        </span>
+                        <span
+                          className={`font-medium tabular-nums ${
+                            selectedClient.minute_balance - validDur < 0
+                              ? "text-destructive"
+                              : ""
+                          }`}
+                        >
+                          {fmtMin(selectedClient.minute_balance - validDur)}
+                        </span>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">
+                    Sin saldo cargado. Registrá pagos del cliente para acreditar
+                    minutos.
+                  </span>
+                )}
+              </div>
+            ) : null}
+
+            {selectedClient?.payment_type === "por_proyecto" ? (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="price">
+                  Precio{" "}
+                  <span className="text-xs text-muted-foreground">
+                    (manual, USD)
+                  </span>
+                </Label>
+                <Input
+                  id="price"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={manualPrice}
+                  onChange={(e) => setManualPrice(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {/* Editores — sin límite de cantidad. */}
@@ -733,110 +732,110 @@ export function ProjectForm({
           </Button>
         </div>
 
-        {/* Cost total del proyecto — override opcional que sobrescribe la
-            suma calculada de los editores. */}
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="manual_cost">
-            Cost total del proyecto{" "}
-            <span className="text-xs text-muted-foreground">
-              (override opcional, USD)
-            </span>
-          </Label>
-          <Input
-            id="manual_cost"
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step="0.01"
-            value={manualCost}
-            onChange={(e) => setManualCost(e.target.value)}
-            placeholder="Vacío = se calcula desde los editores"
-          />
-          <p className="text-xs text-muted-foreground">
-            Si cargás un monto, sobrescribe la suma calculada de los costos
-            por editor. Útil para casos especiales que no encajan en ningún
-            modelo.
-          </p>
-        </div>
+        {/* Desktop: cost total y preview de ganancias lado a lado */}
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="manual_cost">
+              Cost total del proyecto{" "}
+              <span className="text-xs text-muted-foreground">
+                (override opcional, USD)
+              </span>
+            </Label>
+            <Input
+              id="manual_cost"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.01"
+              value={manualCost}
+              onChange={(e) => setManualCost(e.target.value)}
+              placeholder="Vacío = se calcula desde los editores"
+            />
+            <p className="text-xs text-muted-foreground">
+              Si cargás un monto, sobrescribe la suma calculada de los costos
+              por editor. Útil para casos especiales que no encajan en ningún
+              modelo.
+            </p>
+          </div>
 
-        {/* Preview de precio / costo / ganancia. */}
-        {(() => {
-          const parsedPrice =
-            manualPrice === "" ? null : Number(manualPrice);
-          const parsedManualCost =
-            manualCost === "" ? null : Number(manualCost);
-          const previewEditors = editorEntries
-            .map((entry) => {
-              const editor = editors.find((ed) => ed.id === entry.id) ?? null;
-              if (!editor) return null;
-              const costStr = entry.costDraft.trim();
-              const cost =
-                costStr === ""
-                  ? null
-                  : Number.isNaN(Number(costStr))
+          {(() => {
+            const parsedPrice =
+              manualPrice === "" ? null : Number(manualPrice);
+            const parsedManualCost =
+              manualCost === "" ? null : Number(manualCost);
+            const previewEditors = editorEntries
+              .map((entry) => {
+                const editor = editors.find((ed) => ed.id === entry.id) ?? null;
+                if (!editor) return null;
+                const costStr = entry.costDraft.trim();
+                const cost =
+                  costStr === ""
                     ? null
-                    : Number(costStr);
-              return { cost, editor };
-            })
-            .filter((e): e is { cost: number | null; editor: EditorMini } =>
-              e != null
+                    : Number.isNaN(Number(costStr))
+                      ? null
+                      : Number(costStr);
+                return { cost, editor };
+              })
+              .filter((e): e is { cost: number | null; editor: EditorMini } =>
+                e != null
+              );
+            const preview = {
+              cost:
+                parsedManualCost != null && !Number.isNaN(parsedManualCost)
+                  ? parsedManualCost
+                  : null,
+              duration_minutes: validDur,
+              price:
+                selectedClient?.payment_type === "por_proyecto" &&
+                parsedPrice != null &&
+                !Number.isNaN(parsedPrice)
+                  ? parsedPrice
+                  : null,
+              client: selectedClient,
+              editors: previewEditors,
+            };
+            const computedPrice = computePrice(preview);
+            const computedCost = computeCost(preview);
+            const computedProfit = computeProfit(preview);
+            const isMensual = selectedClient?.payment_type === "mensual";
+            return (
+              <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-xs">
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Precio (calc.)</span>
+                  <span className="font-medium tabular-nums">
+                    {isMensual
+                      ? "RETAINER"
+                      : computedPrice != null
+                        ? formatPrice(computedPrice)
+                        : "—"}
+                  </span>
+                </div>
+                <div className="mt-1 flex justify-between gap-3">
+                  <span className="text-muted-foreground">Costo (calc.)</span>
+                  <span className="font-medium tabular-nums">
+                    {computedCost != null ? formatPrice(computedCost) : "—"}
+                  </span>
+                </div>
+                <div className="mt-1 flex justify-between gap-3">
+                  <span className="text-muted-foreground">Ganancia (calc.)</span>
+                  <span
+                    className={`font-medium tabular-nums ${
+                      computedProfit != null && computedProfit < 0
+                        ? "text-destructive"
+                        : ""
+                    }`}
+                  >
+                    {isMensual
+                      ? "—"
+                      : computedProfit != null
+                        ? formatPrice(computedProfit)
+                        : "—"}
+                  </span>
+                </div>
+              </div>
             );
-          const preview = {
-            cost:
-              parsedManualCost != null && !Number.isNaN(parsedManualCost)
-                ? parsedManualCost
-                : null,
-            duration_minutes: validDur,
-            price:
-              selectedClient?.payment_type === "por_proyecto" &&
-              parsedPrice != null &&
-              !Number.isNaN(parsedPrice)
-                ? parsedPrice
-                : null,
-            client: selectedClient,
-            editors: previewEditors,
-          };
-          const computedPrice = computePrice(preview);
-          const computedCost = computeCost(preview);
-          const computedProfit = computeProfit(preview);
-          const isMensual = selectedClient?.payment_type === "mensual";
-          return (
-            <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-xs">
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Precio (calc.)</span>
-                <span className="font-medium tabular-nums">
-                  {isMensual
-                    ? "RETAINER"
-                    : computedPrice != null
-                      ? formatPrice(computedPrice)
-                      : "—"}
-                </span>
-              </div>
-              <div className="mt-1 flex justify-between gap-3">
-                <span className="text-muted-foreground">Costo (calc.)</span>
-                <span className="font-medium tabular-nums">
-                  {computedCost != null ? formatPrice(computedCost) : "—"}
-                </span>
-              </div>
-              <div className="mt-1 flex justify-between gap-3">
-                <span className="text-muted-foreground">Ganancia (calc.)</span>
-                <span
-                  className={`font-medium tabular-nums ${
-                    computedProfit != null && computedProfit < 0
-                      ? "text-destructive"
-                      : ""
-                  }`}
-                >
-                  {isMensual
-                    ? "—"
-                    : computedProfit != null
-                      ? formatPrice(computedProfit)
-                      : "—"}
-                </span>
-              </div>
-            </div>
-          );
-        })()}
+          })()}
+        </div>
 
         <div className="border-t pt-4">
           <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">

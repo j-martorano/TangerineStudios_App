@@ -63,7 +63,7 @@ export function EditProjectButton({
       >
         <PencilIcon className="size-4" />
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Editar proyecto</DialogTitle>
         </DialogHeader>

@@ -167,7 +167,7 @@ export function KanbanCardActions({
       </DropdownMenu>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="z-[52]">
+        <DialogContent size="xl" className="z-[52]">
           <DialogHeader>
             <DialogTitle>Editar proyecto</DialogTitle>
           </DialogHeader>
