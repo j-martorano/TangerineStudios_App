@@ -72,6 +72,7 @@ type Props = {
   childIndex?: number;
   isLastChild?: boolean;
   forceBg?: string;
+  parentClientColor?: string;
 };
 
 export function ProjectRow({
@@ -84,6 +85,7 @@ export function ProjectRow({
   childIndex,
   isLastChild = false,
   forceBg,
+  parentClientColor,
 }: Props) {
   const isHighlighted = project.id === highlightId;
   const rowRef = useRef<HTMLTableRowElement>(null);
@@ -160,7 +162,7 @@ export function ProjectRow({
           )}
         </TableCell>
 
-        {/* ── Col 2: Client chip ── */}
+        {/* ── Col 2: Client chip / sub-client tag ── */}
         <TableCell className="w-32 p-2 align-middle">
           {!isChild && project.client ? (
             <span
@@ -171,6 +173,16 @@ export function ProjectRow({
               }}
             >
               <span className="truncate">{project.client.name}</span>
+            </span>
+          ) : isChild && project.sub_client && parentClientColor ? (
+            <span
+              className="inline-flex max-w-[116px] items-center overflow-hidden truncate rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider opacity-80"
+              style={{
+                backgroundColor: parentClientColor,
+                color: contrastColor(parentClientColor),
+              }}
+            >
+              <span className="truncate">{project.sub_client}</span>
             </span>
           ) : null}
         </TableCell>
@@ -302,6 +314,7 @@ export function ProjectRow({
               highlightId={highlightId}
               childIndex={idx + 1}
               isLastChild={idx === project.children!.length - 1}
+              parentClientColor={project.client?.color ?? undefined}
             />
           ))
         : null}

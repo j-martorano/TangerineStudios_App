@@ -125,6 +125,7 @@ const projectInputSchema = z
           project_type: projectTypeEnum
             .exclude(["pack"])
             .default("long_form"),
+          sub_client: z.string().max(80).nullable().default(null),
         })
       )
       .default([]),
@@ -207,6 +208,7 @@ export async function createProject(
       client_name: clientName,
       project_type: c.project_type,
       parent_id: created.id,
+      sub_client: c.sub_client ?? null,
       phase: "por_asignar" as const,
       cobrado: "no" as const,
       pagado: "sin_pagar" as const,
@@ -298,7 +300,7 @@ export async function updateProject(
   //    pagado, duración, etc.) se respetan — cada hijo puede editarse aparte.
   const { data: existingChildren, error: fetchChildErr } = await supabase
     .from("projects")
-    .select("id, title, project_type")
+    .select("id, title, project_type, sub_client")
     .eq("parent_id", id);
   if (fetchChildErr) return { ok: false, error: fetchChildErr.message };
 
@@ -306,6 +308,7 @@ export async function updateProject(
     id: string;
     title: string;
     project_type: string;
+    sub_client: string | null;
   }[];
 
   // — 1a. Borrar hijos que el form ya no incluye —
@@ -322,14 +325,20 @@ export async function updateProject(
     if (delErr) return { ok: false, error: delErr.message };
   }
 
-  // — 1b. Actualizar título y tipo de los existentes —
+  // — 1b. Actualizar título, tipo y subcliente de los existentes —
   for (const c of children) {
     if (!c.id) continue;
     const old = existing.find((e) => e.id === c.id);
-    if (old && (old.title !== c.title || old.project_type !== c.project_type)) {
+    const subClientNew = c.sub_client ?? null;
+    if (
+      old &&
+      (old.title !== c.title ||
+        old.project_type !== c.project_type ||
+        old.sub_client !== subClientNew)
+    ) {
       const { error: updErr } = await supabase
         .from("projects")
-        .update({ title: c.title, project_type: c.project_type })
+        .update({ title: c.title, project_type: c.project_type, sub_client: subClientNew })
         .eq("id", c.id);
       if (updErr) return { ok: false, error: updErr.message };
     }
@@ -344,6 +353,7 @@ export async function updateProject(
       client_name: clientName,
       project_type: c.project_type,
       parent_id: id,
+      sub_client: c.sub_client ?? null,
       phase: "por_asignar" as const,
       cobrado: "no" as const,
       pagado: "sin_pagar" as const,

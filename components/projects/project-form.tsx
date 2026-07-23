@@ -93,11 +93,12 @@ export function ProjectForm({
   // Los hijos del pack: pre-cargados desde los hijos existentes al editar.
   // "pack" queda excluido — los hijos no pueden ser packs a su vez.
   type ChildType = Exclude<ProjectType, "pack">;
-  type Child = { id?: string; title: string; project_type: ChildType };
+  type Child = { id?: string; title: string; project_type: ChildType; sub_client: string };
   const initialChildren: Child[] = (project?.children ?? []).map((c) => ({
     id: c.id,
     title: c.title,
     project_type: (c.project_type === "pack" ? "long_form" : c.project_type) as ChildType,
+    sub_client: c.sub_client ?? "",
   }));
   const [shorts, setShorts] = useState<Child[]>(initialChildren);
   const lastChildType = useRef<ChildType>("short_form");
@@ -175,8 +176,12 @@ export function ProjectForm({
   function addShort() {
     const t = newShortDraft.trim();
     if (t.length === 0) return;
-    setShorts([...shorts, { title: t, project_type: lastChildType.current }]);
+    setShorts([...shorts, { title: t, project_type: lastChildType.current, sub_client: "" }]);
     setNewShortDraft("");
+  }
+
+  function changeChildSubClient(index: number, value: string) {
+    setShorts(shorts.map((s, i) => (i === index ? { ...s, sub_client: value } : s)));
   }
 
   function removeShort(index: number) {
@@ -279,6 +284,7 @@ export function ProjectForm({
               id: s.id,
               title: s.title.trim(),
               project_type: s.project_type,
+              sub_client: s.sub_client.trim() || null,
             }))
             .filter((s) => s.title.length > 0)
         : [];
@@ -408,6 +414,14 @@ export function ProjectForm({
                 <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
                   Proyectos del pack
                 </p>
+                {/* datalist para autocompletar subclientas ya usados en este pack */}
+                <datalist id="subclients-list">
+                  {Array.from(new Set(shorts.map((s) => s.sub_client).filter(Boolean))).map(
+                    (sc) => (
+                      <option key={sc} value={sc} />
+                    )
+                  )}
+                </datalist>
                 <div className="flex flex-col gap-2">
                   {shorts.map((s, i) => (
                     <div key={i} className="flex items-center gap-2">
@@ -431,6 +445,13 @@ export function ProjectForm({
                         onChange={(e) => renameShort(i, e.target.value)}
                         placeholder={`Proyecto #${i + 1}`}
                         className="flex-1"
+                      />
+                      <Input
+                        value={s.sub_client}
+                        onChange={(e) => changeChildSubClient(i, e.target.value)}
+                        placeholder="Subcliente"
+                        list="subclients-list"
+                        className="w-28 shrink-0 text-xs"
                       />
                       <button
                         type="button"
@@ -465,10 +486,6 @@ export function ProjectForm({
                       Agregar
                     </button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Cada proyecto se crea con el mismo cliente. Para asignarle
-                    editor o duración, abrilo desde la tabla después de guardar.
-                  </p>
                 </div>
               </div>
             ) : null}

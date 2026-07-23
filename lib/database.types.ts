@@ -758,6 +758,7 @@ export type Database = {
           project_code: string
           project_type: Database["public"]["Enums"]["project_type"]
           status: Database["public"]["Enums"]["project_status"] | null
+          sub_client: string | null
           title: string
           updated_at: string
         }
@@ -782,6 +783,7 @@ export type Database = {
           project_code: string
           project_type?: Database["public"]["Enums"]["project_type"]
           status?: Database["public"]["Enums"]["project_status"] | null
+          sub_client?: string | null
           title: string
           updated_at?: string
         }
@@ -806,6 +808,7 @@ export type Database = {
           project_code?: string
           project_type?: Database["public"]["Enums"]["project_type"]
           status?: Database["public"]["Enums"]["project_status"] | null
+          sub_client?: string | null
           title?: string
           updated_at?: string
         }

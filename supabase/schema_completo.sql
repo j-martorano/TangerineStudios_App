@@ -1330,6 +1330,14 @@ CREATE POLICY "service role full access" ON public.project_revisions
 
 
 -- ========================================
+-- 20260723000000_add_sub_client_to_projects.sql
+-- ========================================
+-- Etiqueta de subcliente para proyectos hijos de un pack.
+ALTER TABLE public.projects
+  ADD COLUMN IF NOT EXISTS sub_client text DEFAULT NULL;
+
+
+-- ========================================
 -- 20260528020000_clients_discord_and_parent.sql
 -- ========================================
 -- Canal de Discord por cliente (para notificaciones de estado al cliente)
