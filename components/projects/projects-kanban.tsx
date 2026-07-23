@@ -231,6 +231,7 @@ const KanbanInvoiceCtx = createContext<{
 // ─── Context para pagos de retainer (stats de columnas) ──────────────────────
 
 const KanbanRetainerPaymentsCtx = createContext<RetainerPayment[]>([]);
+const KanbanAllProjectsCtx = createContext<ProjectWithRelations[]>([]);
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
@@ -289,6 +290,7 @@ export function ProjectsKanban(props: Props) {
   };
 
   return (
+    <KanbanAllProjectsCtx.Provider value={props.projects}>
     <KanbanRetainerPaymentsCtx.Provider value={props.retainerPayments ?? []}>
     <KanbanHighlightCtx.Provider value={props.highlightId ?? null}>
     <KanbanFocusCtx.Provider value={{ menuFocusId, setMenuFocusId, editFocusId, setEditFocusId, dndDisabled, setDndDisabled }}>
@@ -338,6 +340,7 @@ export function ProjectsKanban(props: Props) {
     </KanbanFocusCtx.Provider>
     </KanbanHighlightCtx.Provider>
     </KanbanRetainerPaymentsCtx.Provider>
+    </KanbanAllProjectsCtx.Provider>
   );
 }
 
@@ -905,17 +908,24 @@ function StatCard({
 
 function TerminadoStats({ items }: { items: ProjectWithRelations[] }) {
   const retainerPayments = useContext(KanbanRetainerPaymentsCtx);
-  if (items.length === 0) return null;
+  const allProjects = useContext(KanbanAllProjectsCtx);
 
-  // Mes de los items (todos comparten el mismo mes al venir agrupados).
+  // Mes del grupo (todos los items de terminado comparten el mismo mes).
   const mk = items[0]?.finalized_at?.slice(0, 7) ?? null;
+  if (!mk) return null;
 
-  // Para clientes mensual: usar el pago registrado ese mes (una vez por cliente).
-  // Para los demás: sumar computePrice normal.
+  // Stats desde TODOS los proyectos del mes, no solo los de la columna terminado.
+  // Así cobrado/pagado se refleja aunque el proyecto aún no esté en terminado.
+  const monthProjects = allProjects.filter((p) => {
+    if (p.parent_id) return false;
+    const date = p.finalized_at ?? p.created_at;
+    return date?.startsWith(mk) ?? false;
+  });
+
   let total = 0;
   const countedClients = new Set<string>();
-  for (const p of items) {
-    if (p.client?.payment_type === "mensual" && p.client_id && mk) {
+  for (const p of monthProjects) {
+    if (p.client?.payment_type === "mensual" && p.client_id) {
       if (!countedClients.has(p.client_id)) {
         countedClients.add(p.client_id);
         const payment = retainerPayments.find(
@@ -928,10 +938,11 @@ function TerminadoStats({ items }: { items: ProjectWithRelations[] }) {
     }
   }
 
-  const cost = items
+  const cost = monthProjects
     .filter((p) => p.pagado === "pago_total")
     .reduce((s, p) => s + (computeCost(p) ?? 0), 0);
   const ganancia = total - cost;
+  if (total === 0 && cost === 0) return null;
   return (
     <div className="flex flex-col gap-1">
       <StatCard label="Total" value={total} colorClass="text-foreground" />

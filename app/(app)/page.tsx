@@ -8,7 +8,11 @@ import {
   fetchProjects,
   fetchEditors,
 } from "@/lib/projects/queries";
-import { fetchClientPayments } from "@/lib/finanzas/queries";
+import {
+  fetchClientPayments,
+  fetchFixedServices,
+  fetchServiceMonthEntries,
+} from "@/lib/finanzas/queries";
 import type { ProjectWithRelations } from "@/lib/projects/types";
 import {
   computeCost,
@@ -57,11 +61,13 @@ export default async function DashboardPage({
     : currentMonthKey();
   const previousMonth = shiftMonth(selectedMonth, -1);
 
-  const [allProjects, clients, payments, editors] = await Promise.all([
+  const [allProjects, clients, payments, editors, fixedServices, serviceMonthEntries] = await Promise.all([
     fetchProjects(),
     fetchClients(),
     fetchClientPayments(),
     fetchEditors(),
+    fetchFixedServices(),
+    fetchServiceMonthEntries(),
   ]);
 
   const projects = allProjects.filter((p) => !p.parent_id);
@@ -75,12 +81,32 @@ export default async function DashboardPage({
         p.phase === "en_revision")
   );
 
-  const monthMetrics = computeMonthMetrics(projects, payments, selectedMonth);
-  const previousMetrics = computeMonthMetrics(
-    projects,
-    payments,
-    previousMonth
-  );
+  // Costo de servicios fijos para un mes dado (misma lógica que Finance page)
+  function servicesCostForMonth(mk: string): number {
+    const now = currentMonthKey();
+    if (mk === now) {
+      return fixedServices
+        .filter((s) => s.active)
+        .reduce((sum, s) => sum + s.monthly_cost, 0);
+    }
+    if (mk < now) {
+      const entries = serviceMonthEntries.filter((e) => e.year_month === mk);
+      return entries.reduce((sum, e) => sum + e.amount, 0);
+    }
+    return 0;
+  }
+
+  const rawMonthMetrics = computeMonthMetrics(projects, payments, selectedMonth);
+  const rawPreviousMetrics = computeMonthMetrics(projects, payments, previousMonth);
+
+  const monthMetrics = {
+    ...rawMonthMetrics,
+    profit: rawMonthMetrics.profit - servicesCostForMonth(selectedMonth),
+  };
+  const previousMetrics = {
+    ...rawPreviousMetrics,
+    profit: rawPreviousMetrics.profit - servicesCostForMonth(previousMonth),
+  };
 
   const availableParents = projects
     .filter((p) => p.project_type === "pack" && !p.archived)
