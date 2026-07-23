@@ -127,16 +127,17 @@ function applyPairOverrides(
       if (!entry.editor) continue;
       const key = pairKey(p.client_id, entry.editor.id);
       const pair = pairs.get(key);
-      if (!pair?.payment_type) continue;
+      if (!pair) continue;
+      const effectiveType = pair.payment_type ?? entry.editor.payment_type;
       const effectiveTiers =
-        pair.payment_type === "flat_variable"
+        effectiveType === "flat_variable"
           ? (tiers.get(key) ?? [])
           : [];
       entry.editor = {
         ...entry.editor,
-        payment_type: pair.payment_type,
-        rate: pair.rate,
-        flat_amount: pair.flat_amount,
+        payment_type: effectiveType,
+        rate: pair.rate !== null ? pair.rate : entry.editor.rate,
+        flat_amount: pair.flat_amount !== null ? pair.flat_amount : entry.editor.flat_amount,
         tiers: effectiveTiers,
       };
     }
@@ -446,7 +447,7 @@ export async function fetchClients(): Promise<ClientForProject[]> {
   const { data, error } = await supabase
     .from("clients")
     .select(
-      "id, name, color, payment_type, agreed_price, retainer_discount_pct, client_payments(minutes_credited), projects(duration_minutes, archived), client_editors(editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))"
+      "id, name, color, payment_type, agreed_price, retainer_discount_pct, client_payments(minutes_credited), projects(duration_minutes, archived), client_editors(payment_type, rate, flat_amount, editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))"
     )
     .order("name");
   if (error) throw new Error(error.message);
@@ -466,7 +467,16 @@ export async function fetchClients(): Promise<ClientForProject[]> {
       minute_balance:
         c.payment_type === "mensual" ? credited - consumed : null,
       editors: (c.client_editors ?? [])
-        .map((ce: { editor: EditorMini | null }) => ce.editor)
+        .map((ce: { payment_type: EditorPaymentType | null; rate: number | null; flat_amount: number | null; editor: EditorMini | null }) => {
+          if (!ce.editor) return null;
+          const effectiveType = ce.payment_type ?? ce.editor.payment_type;
+          return {
+            ...ce.editor,
+            payment_type: effectiveType,
+            rate: ce.rate !== null ? ce.rate : ce.editor.rate,
+            flat_amount: ce.flat_amount !== null ? ce.flat_amount : ce.editor.flat_amount,
+          };
+        })
         .filter((e): e is EditorMini => e != null),
     };
   });
