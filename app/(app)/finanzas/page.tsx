@@ -22,7 +22,6 @@ import {
 import {
   computeCost,
   computePrice,
-  computeProfit,
   formatPrice,
 } from "@/lib/projects/format";
 import { monthToneFromKey } from "@/lib/projects/month-colors";
@@ -192,15 +191,14 @@ function build(
     });
   }
 
-  // ====== Proyectos finalizados — entran en el mes en que se finalizaron ======
-  // Los shorts hijos de un pack no entran como entradas propias; el pack
-  // padre los engloba (su cost ya suma los costos de los hijos vía
-  // computeCost).
+  // ====== Proyectos — entran en el mes según finalized_at o created_at ======
+  // Los hijos de un pack no entran como entradas propias; el pack padre los
+  // engloba (su cost ya suma los costos de los hijos vía computeCost).
+  // Un proyecto se refleja en cobros/pagos SOLO cuando está marcado cobrado/pagado.
   for (const p of projects) {
-    if (!p.finalized) continue;
     if (p.parent_id) continue;
-    if (!p.finalized_at) continue;
-    const monthIso = p.finalized_at;
+    const monthIso = p.finalized_at ?? p.created_at;
+    if (!monthIso) continue;
     const key = monthKey(monthIso);
     const bucket = ensureBucket(key, monthIso);
     bucket.projects.push(p);
@@ -208,8 +206,8 @@ function build(
     const client = p.client;
     const isMensual = client?.payment_type === "mensual";
 
-    // Cobros por proyecto — sólo clientes NO mensuales (los mensuales cobran
-    // vía pagos). Incluye proyectos sin cliente linkeado.
+    // Cobros por proyecto — sólo clientes NO mensuales. Se reflejan SOLO cuando
+    // el proyecto está marcado cobrado === "si".
     if (!isMensual) {
       const price = computePrice(p);
       const cobrosSum = p.cobros.reduce(
@@ -217,17 +215,19 @@ function build(
         0
       );
       const cobradoFlag = p.cobrado === "si";
-      // Si está marcado «saldado» sin registrar cobros, tratamos el progreso
-      // como completo (modo legacy del badge antes de los parciales).
+
+      if (cobradoFlag && price != null) {
+        bucket.collected += price;
+      } else if (price != null) {
+        bucket.pendingCollect += Math.max(0, price - cobrosSum);
+      }
+
+      // Settle rows: muestran progreso parcial para tracking interno
       const progress =
         cobradoFlag && cobrosSum === 0 && price != null ? price : cobrosSum;
       const remaining =
         price != null ? Math.max(0, price - progress) : null;
-      const settled =
-        cobradoFlag || (remaining === 0 && progress > 0);
-
-      bucket.collected += progress;
-      if (remaining != null && !settled) bucket.pendingCollect += remaining;
+      const settled = cobradoFlag;
 
       if (price != null || progress > 0) {
         projectItems.push({
@@ -247,9 +247,7 @@ function build(
       }
     }
 
-    // Pagos por proyecto — todos los editores aportan al costo. Si hay
-    // pagos parciales registrados, sumamos los aportes; si no, fallback al
-    // flag pagado === 'pago_total'.
+    // Pagos por proyecto — se reflejan SOLO cuando está marcado pagado === "pago_total".
     const hasEditor = p.editors.some((e) => e.editor != null);
     if (hasEditor) {
       const cost = computeCost(p);
@@ -258,14 +256,18 @@ function build(
         0
       );
       const pagoFlag = p.pagado === "pago_total";
+
+      if (pagoFlag && cost != null) {
+        bucket.paid += cost;
+      } else if (cost != null) {
+        bucket.pendingPay += Math.max(0, cost - pagosSum);
+      }
+
       const progress =
         pagoFlag && pagosSum === 0 && cost != null ? cost : pagosSum;
       const remaining =
         cost != null ? Math.max(0, cost - progress) : null;
-      const settled = pagoFlag || (remaining === 0 && progress > 0);
-
-      bucket.paid += progress;
-      if (remaining != null && !settled) bucket.pendingPay += remaining;
+      const settled = pagoFlag;
 
       if (cost != null || progress > 0) {
         projectItems.push({
@@ -285,14 +287,14 @@ function build(
       }
     }
 
-    // Ganancia: para clientes no mensuales, precio − costo. Para mensuales,
-    // sólo resta el costo de edición (el ingreso son los pagos del retainer).
-    if (isMensual) {
+    // Ganancia: solo ingresos cobrados y costos pagados
+    if (!isMensual && p.cobrado === "si") {
+      const price = computePrice(p);
+      if (price != null) bucket.profit += price;
+    }
+    if (p.pagado === "pago_total") {
       const cost = computeCost(p);
       if (cost != null) bucket.profit -= cost;
-    } else {
-      const profit = computeProfit(p);
-      if (profit != null) bucket.profit += profit;
     }
   }
 
@@ -497,37 +499,23 @@ export default async function FinanzasPage({
     }
 
     for (const p of projects) {
-      if (!p.finalized || !p.finalized_at || p.parent_id) continue;
-      if (!p.finalized_at.startsWith(currentMonthKey)) continue;
-      const d = parseInt(p.finalized_at.slice(8, 10), 10);
+      if (p.parent_id) continue;
+      const projectDate = p.finalized_at ?? p.created_at;
+      if (!projectDate || !projectDate.startsWith(currentMonthKey)) continue;
+      const d = parseInt(projectDate.slice(8, 10), 10);
       const bucket = dailyMap.get(d);
       if (!bucket) continue;
 
       const isMensual = p.client?.payment_type === "mensual";
 
-      if (!isMensual) {
+      if (!isMensual && p.cobrado === "si") {
         const price = computePrice(p);
-        const cobrosSum = p.cobros.reduce((s, c) => s + Number(c.amount), 0);
-        const cobradoFlag = p.cobrado === "si";
-        const progress = cobradoFlag && cobrosSum === 0 && price != null ? price : cobrosSum;
-        bucket.cobrado += progress;
+        if (price != null) { bucket.cobrado += price; bucket.ganancia += price; }
       }
 
-      const hasEditor = p.editors.some((e) => e.editor != null);
-      if (hasEditor) {
+      if (p.pagado === "pago_total") {
         const cost = computeCost(p);
-        const pagosSum = p.editor_pagos.reduce((s, e) => s + Number(e.amount), 0);
-        const pagoFlag = p.pagado === "pago_total";
-        const progress = pagoFlag && pagosSum === 0 && cost != null ? cost : pagosSum;
-        bucket.pagado += progress;
-      }
-
-      if (isMensual) {
-        const cost = computeCost(p);
-        if (cost != null) bucket.ganancia -= cost;
-      } else {
-        const profit = computeProfit(p);
-        if (profit != null) bucket.ganancia += profit;
+        if (cost != null) { bucket.pagado += cost; bucket.ganancia -= cost; }
       }
     }
 
@@ -553,7 +541,6 @@ export default async function FinanzasPage({
       });
   }
   for (const p of projects) {
-    if (!p.finalized) continue;
     if (p.parent_id) continue;
     if (p.cobrado !== "si") continue;
     if (p.client?.payment_type === "mensual") continue;
@@ -580,11 +567,11 @@ export default async function FinanzasPage({
     });
   }
 
-  // ── Costos por cliente: costo de editores en proyectos finalizados ──
+  // ── Costos por cliente: costo de editores en proyectos pagados ──
   const costByClientMap = new Map<string, { color: string; total: number }>();
   for (const p of projects) {
-    if (!p.finalized) continue;
     if (p.parent_id) continue;
+    if (p.pagado !== "pago_total") continue;
     const cost = computeCost(p);
     if (cost == null || cost === 0) continue;
     const name = p.client?.name ?? p.client_name ?? "Sin cliente";

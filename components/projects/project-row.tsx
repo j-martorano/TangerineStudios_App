@@ -34,9 +34,8 @@ import { QuickPhaseBadge } from "./quick-phase-badge";
 import { QuickPaymentBadge } from "./quick-payment-badge";
 import type { ParentOption } from "./project-form";
 
-import {
-  updateProject,
-} from "@/lib/projects/actions";
+import { updateProject } from "@/lib/projects/actions";
+import { contrastColor } from "@/lib/clients/palette";
 import {
   computeCost,
   computePrice,
@@ -90,7 +89,7 @@ export function ProjectRow({
   const rowRef = useRef<HTMLTableRowElement>(null);
   const pack = isPack(project);
   const isChild = childIndex !== undefined;
-  const locked = isChild ? false : project.finalized;
+  const locked = false;
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -165,8 +164,11 @@ export function ProjectRow({
         <TableCell className="w-32 p-2 align-middle">
           {!isChild && project.client ? (
             <span
-              className="inline-flex max-w-[116px] items-center overflow-hidden truncate rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white"
-              style={{ backgroundColor: project.client.color ?? "#555" }}
+              className="inline-flex max-w-[116px] items-center overflow-hidden truncate rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider"
+              style={{
+                backgroundColor: project.client.color ?? "#555",
+                color: contrastColor(project.client.color ?? "#555"),
+              }}
             >
               <span className="truncate">{project.client.name}</span>
             </span>

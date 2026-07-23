@@ -923,12 +923,14 @@ function TerminadoStats({ items }: { items: ProjectWithRelations[] }) {
         );
         if (payment) total += payment.amount;
       }
-    } else {
+    } else if (p.cobrado === "si") {
       total += computePrice(p) ?? 0;
     }
   }
 
-  const cost = items.reduce((s, p) => s + (computeCost(p) ?? 0), 0);
+  const cost = items
+    .filter((p) => p.pagado === "pago_total")
+    .reduce((s, p) => s + (computeCost(p) ?? 0), 0);
   const ganancia = total - cost;
   return (
     <div className="flex flex-col gap-1">

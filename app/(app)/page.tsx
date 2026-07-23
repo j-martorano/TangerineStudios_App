@@ -15,6 +15,7 @@ import {
   computePrice,
   formatPrice,
 } from "@/lib/projects/format";
+import { contrastColor } from "@/lib/clients/palette";
 
 import {
   MonthNav,
@@ -94,14 +95,17 @@ export default async function DashboardPage({
     href: string;
   };
 
-  const activosItems: PanelItem[] = activeProjects.slice(0, 7).map((p) => ({
-    id: p.id,
-    chipLabel: p.client?.name ?? "—",
-    chipClassName: "text-white",
-    chipStyle: { backgroundColor: p.client?.color ?? "#666" },
-    title: p.title,
-    href: `/kanban?focus=${p.id}`,
-  }));
+  const activosItems: PanelItem[] = activeProjects.slice(0, 7).map((p) => {
+    const bg = p.client?.color ?? "#666";
+    return {
+      id: p.id,
+      chipLabel: p.client?.name ?? "—",
+      chipClassName: "",
+      chipStyle: { backgroundColor: bg, color: contrastColor(bg) },
+      title: p.title,
+      href: `/kanban?focus=${p.id}`,
+    };
+  });
 
   // Todas las tareas pendientes de TODOS los meses, agrupadas por mes
   const allFinalized = projects.filter(
@@ -391,27 +395,21 @@ function computeMonthMetrics(
   let profit = 0;
 
   for (const p of projects) {
-    if (!p.finalized || !p.finalized_at) continue;
-    if (monthKeyOf(new Date(p.finalized_at)) !== monthKey) continue;
+    const projectDate = p.finalized_at ?? p.created_at;
+    if (!projectDate) continue;
+    if (monthKeyOf(new Date(projectDate)) !== monthKey) continue;
 
     const isMensual = p.client?.payment_type === "mensual";
 
+    // Cobros: solo cuando está marcado cobrado
     if (!isMensual && p.cobrado === "si") {
       const price = computePrice(p);
-      if (price != null) cobrado += price;
+      if (price != null) { cobrado += price; profit += price; }
     }
+    // Pagos: solo cuando está marcado pago_total
     if (p.pagado === "pago_total") {
       const cost = computeCost(p);
-      if (cost != null) pagado += cost;
-    }
-    if (isMensual) {
-      const cost = computeCost(p);
-      if (cost != null) profit -= cost;
-    } else {
-      const price = computePrice(p);
-      const cost = computeCost(p);
-      if (price != null && cost != null) profit += price - cost;
-      else if (price != null) profit += price;
+      if (cost != null) { pagado += cost; profit -= cost; }
     }
   }
 
