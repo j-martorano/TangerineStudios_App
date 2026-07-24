@@ -1,6 +1,4 @@
-﻿import { unstable_cache } from "next/cache";
-import { createCacheClient } from "@/lib/supabase/server";
-import { CACHE_TAGS } from "@/lib/cache-tags";
+import { createClient } from "@/lib/supabase/server";
 
 /** Método del catálogo global (ej. Binance, DolarApp, cuenta de banco). */
 export type PaymentMethod = {
@@ -19,16 +17,12 @@ export type EditorPaymentMethod = {
   color: string;
 };
 
-export const fetchPaymentMethods = unstable_cache(
-  async (): Promise<PaymentMethod[]> => {
-    const supabase = createCacheClient();
-    const { data, error } = await supabase
-      .from("payment_methods")
-      .select("id, name, icon, color")
-      .order("name");
-    if (error) throw new Error(error.message);
-    return (data ?? []) as PaymentMethod[];
-  },
-  ["payment-methods"],
-  { tags: [CACHE_TAGS.editors] }
-);
+export async function fetchPaymentMethods(): Promise<PaymentMethod[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("payment_methods")
+    .select("id, name, icon, color")
+    .order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as PaymentMethod[];
+}

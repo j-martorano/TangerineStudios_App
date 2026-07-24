@@ -1,6 +1,4 @@
-﻿import { unstable_cache } from "next/cache";
-import { createClient, createCacheClient } from "@/lib/supabase/server";
-import { CACHE_TAGS } from "@/lib/cache-tags";
+import { createClient } from "@/lib/supabase/server";
 import type {
   ClientEditorPair,
   ClientForProject,
@@ -33,7 +31,7 @@ function pairKey(clientId: string, editorId: string): string {
 }
 
 async function fetchPairConfigMap(): Promise<Map<string, PairConfigRow>> {
-  const supabase = createCacheClient();
+  const supabase = await createClient();
   const { data } = await supabase
     .from("client_editors")
     .select("client_id, editor_id, payment_type, rate, flat_amount");
@@ -49,7 +47,7 @@ async function fetchPairConfigMap(): Promise<Map<string, PairConfigRow>> {
 }
 
 async function fetchPairTiersMap(): Promise<Map<string, PaymentTier[]>> {
-  const supabase = createCacheClient();
+  const supabase = await createClient();
   const { data } = await supabase
     .from("client_editor_payment_tiers")
     .select("client_id, editor_id, min_minutes, max_minutes, amount");
@@ -149,55 +147,49 @@ function applyPairOverrides(
 
 // ---- Proyectos ----
 
-const _fetchProjectsCached = unstable_cache(
-  async (
-    query: string,
-    includeArchived: boolean,
-    includeFinalized: boolean
-  ): Promise<ProjectWithRelations[]> => {
-    const supabase = createCacheClient();
-    let q = supabase.from("projects").select(PROJECT_SELECT);
-
-    if (!includeArchived) q = q.eq("archived", false);
-    if (!includeFinalized) q = q.eq("finalized", false);
-
-    if (query.length > 0) {
-      const safe = query.replace(/[(),]/g, " ").trim();
-      if (safe.length > 0) {
-        q = q.or(
-          `title.ilike.%${safe}%,client_name.ilike.%${safe}%,project_code.ilike.%${safe}%`
-        );
-      }
-    }
-
-    const [{ data, error }, pairs, tiers] = await Promise.all([
-      q
-        .order("phase")
-        .order("position")
-        .order("created_at", { ascending: true })
-        .order("id"),
-      fetchPairConfigMap(),
-      fetchPairTiersMap(),
-    ]);
-    if (error) throw new Error(error.message);
-    const all = (data ?? []) as unknown as ProjectWithRelations[];
-    applyPairOverrides(all, pairs, tiers);
-    attachParentChildLinks(all);
-    return includeFinalized ? all : all.filter((p) => !p.finalized);
-  },
-  ["projects"],
-  { tags: [CACHE_TAGS.projects, CACHE_TAGS.clients, CACHE_TAGS.editors] }
-);
-
 export async function fetchProjects(
   opts: {
     query?: string;
+    /** Incluir proyectos archivados (borrado lógico). Por defecto se ocultan. */
     includeArchived?: boolean;
+    /** Incluir proyectos finalizados. Por defecto sí (el kanban los excluye). */
     includeFinalized?: boolean;
   } = {}
 ): Promise<ProjectWithRelations[]> {
-  const { query = "", includeArchived = false, includeFinalized = true } = opts;
-  return _fetchProjectsCached(query, includeArchived, includeFinalized);
+  const { query, includeArchived = false, includeFinalized = true } = opts;
+  const supabase = await createClient();
+  let q = supabase.from("projects").select(PROJECT_SELECT);
+
+  if (!includeArchived) q = q.eq("archived", false);
+  if (!includeFinalized) q = q.eq("finalized", false);
+
+  if (query && query.length > 0) {
+    const safe = query.replace(/[(),]/g, " ").trim();
+    if (safe.length > 0) {
+      q = q.or(
+        `title.ilike.%${safe}%,client_name.ilike.%${safe}%,project_code.ilike.%${safe}%`
+      );
+    }
+  }
+
+  // Tiebreaker estable por created_at para que el orden no cambie entre
+  // refetches cuando varios proyectos comparten phase + position (típico del
+  // seed con position=0 en todos). Filtramos finalized en JS post-fetch para
+  // poder armar las relaciones padre/hijo aunque el padre esté finalized.
+  const [{ data, error }, pairs, tiers] = await Promise.all([
+    q
+      .order("phase")
+      .order("position")
+      .order("created_at", { ascending: true })
+      .order("id"),
+    fetchPairConfigMap(),
+    fetchPairTiersMap(),
+  ]);
+  if (error) throw new Error(error.message);
+  const all = (data ?? []) as unknown as ProjectWithRelations[];
+  applyPairOverrides(all, pairs, tiers);
+  attachParentChildLinks(all);
+  return includeFinalized ? all : all.filter((p) => !p.finalized);
 }
 
 export type ProjectsListOptions = {
@@ -211,61 +203,56 @@ export type ProjectsListResult = {
   total: number;
 };
 
-const _fetchProjectsListCached = unstable_cache(
-  async (query: string, page: number, perPage: number): Promise<ProjectsListResult> => {
-    const supabase = createCacheClient();
-    let q = supabase.from("projects").select(PROJECT_SELECT, { count: "exact" });
-
-    if (query.length > 0) {
-      const safe = query.replace(/[(),]/g, " ").trim();
-      if (safe.length > 0) {
-        q = q.or(
-          `title.ilike.%${safe}%,client_name.ilike.%${safe}%,project_code.ilike.%${safe}%`
-        );
-      }
-    }
-
-    const from = (page - 1) * perPage;
-    const to = from + perPage - 1;
-
-    const [{ data, error, count }, pairs, tiers] = await Promise.all([
-      q.order("updated_at", { ascending: false }).range(from, to),
-      fetchPairConfigMap(),
-      fetchPairTiersMap(),
-    ]);
-
-    if (error) throw new Error(error.message);
-    const projects = (data ?? []) as unknown as ProjectWithRelations[];
-    return { projects: applyPairOverrides(projects, pairs, tiers), total: count ?? 0 };
-  },
-  ["projects-list"],
-  { tags: [CACHE_TAGS.projects, CACHE_TAGS.clients, CACHE_TAGS.editors] }
-);
-
 export async function fetchProjectsList(
   opts: ProjectsListOptions = {}
 ): Promise<ProjectsListResult> {
-  const { query = "", page = 1, perPage = DEFAULT_PER_PAGE } = opts;
-  return _fetchProjectsListCached(query, page, perPage);
+  const { query, page = 1, perPage = DEFAULT_PER_PAGE } = opts;
+  const supabase = await createClient();
+
+  let q = supabase
+    .from("projects")
+    .select(PROJECT_SELECT, { count: "exact" });
+
+  if (query && query.length > 0) {
+    const safe = query.replace(/[(),]/g, " ").trim();
+    if (safe.length > 0) {
+      q = q.or(
+        `title.ilike.%${safe}%,client_name.ilike.%${safe}%,project_code.ilike.%${safe}%`
+      );
+    }
+  }
+
+  const from = (page - 1) * perPage;
+  const to = from + perPage - 1;
+
+  const [{ data, error, count }, pairs, tiers] = await Promise.all([
+    q.order("updated_at", { ascending: false }).range(from, to),
+    fetchPairConfigMap(),
+    fetchPairTiersMap(),
+  ]);
+
+  if (error) throw new Error(error.message);
+
+  const projects = (data ?? []) as unknown as ProjectWithRelations[];
+  return {
+    projects: applyPairOverrides(projects, pairs, tiers),
+    total: count ?? 0,
+  };
 }
 
 // ---- Editores ----
 
-export const fetchEditors = unstable_cache(
-  async (): Promise<EditorMini[]> => {
-    const supabase = createCacheClient();
-    const { data, error } = await supabase
-      .from("editors")
-      .select(
-        "id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)"
-      )
-      .order("name");
-    if (error) throw new Error(error.message);
-    return (data ?? []) as unknown as EditorMini[];
-  },
-  ["editors"],
-  { tags: [CACHE_TAGS.editors] }
-);
+export async function fetchEditors(): Promise<EditorMini[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("editors")
+    .select(
+      "id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)"
+    )
+    .order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as EditorMini[];
+}
 
 export type EditorWithCount = EditorRow & {
   project_count: number;
@@ -374,7 +361,7 @@ async function fetchPairTiersByEditor(
 ): Promise<Map<string, Map<string, PaymentTier[]>>> {
   const result = new Map<string, Map<string, PaymentTier[]>>();
   if (editorIds.length === 0) return result;
-  const supabase = createCacheClient();
+  const supabase = await createClient();
   const { data } = await supabase
     .from("client_editor_payment_tiers")
     .select("client_id, editor_id, min_minutes, max_minutes, amount")
@@ -412,34 +399,36 @@ export type EditorsListResult = {
   total: number;
 };
 
-const _fetchEditorsListCached = unstable_cache(
-  async (query: string, page: number, perPage: number): Promise<EditorsListResult> => {
-    const supabase = createCacheClient();
-    let q = supabase.from("editors").select(EDITOR_FULL_SELECT, { count: "exact" });
-
-    if (query.length > 0) {
-      const safe = query.replace(/[(),]/g, " ").trim();
-      if (safe.length > 0) q = q.ilike("name", `%${safe}%`);
-    }
-
-    const from = (page - 1) * perPage;
-    const to = from + perPage - 1;
-    const { data, error, count } = await q.order("name").range(from, to);
-    if (error) throw new Error(error.message);
-
-    const editorIds = (data ?? []).map((e) => e.id);
-    const pairTiers = await fetchPairTiersByEditor(editorIds);
-    return { editors: (data ?? []).map((e) => mapEditor(e, pairTiers)), total: count ?? 0 };
-  },
-  ["editors-list"],
-  { tags: [CACHE_TAGS.editors, CACHE_TAGS.clients] }
-);
-
 export async function fetchEditorsList(
   opts: EditorsListOptions = {}
 ): Promise<EditorsListResult> {
-  const { query = "", page = 1, perPage = DEFAULT_PER_PAGE } = opts;
-  return _fetchEditorsListCached(query, page, perPage);
+  const { query, page = 1, perPage = DEFAULT_PER_PAGE } = opts;
+  const supabase = await createClient();
+
+  let q = supabase
+    .from("editors")
+    .select(EDITOR_FULL_SELECT, { count: "exact" });
+
+  if (query && query.length > 0) {
+    const safe = query.replace(/[(),]/g, " ").trim();
+    if (safe.length > 0) {
+      q = q.ilike("name", `%${safe}%`);
+    }
+  }
+
+  const from = (page - 1) * perPage;
+  const to = from + perPage - 1;
+
+  const { data, error, count } = await q.order("name").range(from, to);
+  if (error) throw new Error(error.message);
+
+  const editorIds = (data ?? []).map((e) => e.id);
+  const pairTiers = await fetchPairTiersByEditor(editorIds);
+
+  return {
+    editors: (data ?? []).map((e) => mapEditor(e, pairTiers)),
+    total: count ?? 0,
+  };
 }
 
 // ---- Clientes ----
@@ -453,49 +442,45 @@ function consumedMinutes(
     .reduce((sum, p) => sum + Number(p.duration_minutes ?? 0), 0);
 }
 
-export const fetchClients = unstable_cache(
-  async (): Promise<ClientForProject[]> => {
-    const supabase = createCacheClient();
-    const { data, error } = await supabase
-      .from("clients")
-      .select(
-        "id, name, color, payment_type, agreed_price, retainer_discount_pct, client_payments(minutes_credited), projects(duration_minutes, archived), client_editors(payment_type, rate, flat_amount, editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))"
-      )
-      .order("name");
-    if (error) throw new Error(error.message);
-    return (data ?? []).map((c) => {
-      const credited = (c.client_payments ?? []).reduce(
-        (sum, p) => sum + Number(p.minutes_credited),
-        0
-      );
-      const consumed = consumedMinutes(c.projects ?? []);
-      return {
-        id: c.id,
-        name: c.name,
-        color: c.color,
-        payment_type: c.payment_type,
-        agreed_price: c.agreed_price,
-        retainer_discount_pct: c.retainer_discount_pct,
-        minute_balance:
-          c.payment_type === "mensual" ? credited - consumed : null,
-        editors: (c.client_editors ?? [])
-          .map((ce: { payment_type: EditorPaymentType | null; rate: number | null; flat_amount: number | null; editor: EditorMini | null }) => {
-            if (!ce.editor) return null;
-            const effectiveType = ce.payment_type ?? ce.editor.payment_type;
-            return {
-              ...ce.editor,
-              payment_type: effectiveType,
-              rate: ce.rate !== null ? ce.rate : ce.editor.rate,
-              flat_amount: ce.flat_amount !== null ? ce.flat_amount : ce.editor.flat_amount,
-            };
-          })
-          .filter((e): e is EditorMini => e != null),
-      };
-    });
-  },
-  ["clients"],
-  { tags: [CACHE_TAGS.clients, CACHE_TAGS.editors] }
-);
+export async function fetchClients(): Promise<ClientForProject[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("clients")
+    .select(
+      "id, name, color, payment_type, agreed_price, retainer_discount_pct, client_payments(minutes_credited), projects(duration_minutes, archived), client_editors(payment_type, rate, flat_amount, editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))"
+    )
+    .order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((c) => {
+    const credited = (c.client_payments ?? []).reduce(
+      (sum, p) => sum + Number(p.minutes_credited),
+      0
+    );
+    const consumed = consumedMinutes(c.projects ?? []);
+    return {
+      id: c.id,
+      name: c.name,
+      color: c.color,
+      payment_type: c.payment_type,
+      agreed_price: c.agreed_price,
+      retainer_discount_pct: c.retainer_discount_pct,
+      minute_balance:
+        c.payment_type === "mensual" ? credited - consumed : null,
+      editors: (c.client_editors ?? [])
+        .map((ce: { payment_type: EditorPaymentType | null; rate: number | null; flat_amount: number | null; editor: EditorMini | null }) => {
+          if (!ce.editor) return null;
+          const effectiveType = ce.payment_type ?? ce.editor.payment_type;
+          return {
+            ...ce.editor,
+            payment_type: effectiveType,
+            rate: ce.rate !== null ? ce.rate : ce.editor.rate,
+            flat_amount: ce.flat_amount !== null ? ce.flat_amount : ce.editor.flat_amount,
+          };
+        })
+        .filter((e): e is EditorMini => e != null),
+    };
+  });
+}
 
 import type { ClientRow } from "./types";
 
@@ -510,33 +495,28 @@ export type ClientWithCount = ClientRow & {
 const CLIENT_FULL_SELECT =
   "id, name, color, payment_type, agreed_price, retainer_discount_pct, billing_name, tax_id, address, city, state, country, contact_links, docs_url, created_at, discord_channel_id, parent_id, projects(duration_minutes, archived), client_editors(editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount))), client_payments(id, amount, minutes_credited, paid_at, note)";
 
-export const fetchClientsWithCount = unstable_cache(
-  async (): Promise<ClientWithCount[]> => {
-    const supabase = createCacheClient();
-    const { data, error } = await supabase
-      .from("clients")
-      .select(CLIENT_FULL_SELECT)
-      .order("name");
-    if (error) throw new Error(error.message);
-    return (data ?? []).map((c) => mapClient(c));
-  },
-  ["clients-with-count"],
-  { tags: [CACHE_TAGS.clients, CACHE_TAGS.editors, CACHE_TAGS.finanzas] }
-);
+export async function fetchClientsWithCount(): Promise<ClientWithCount[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("clients")
+    .select(CLIENT_FULL_SELECT)
+    .order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((c) => mapClient(c));
+}
 
-export const fetchClientsForParentSelect = unstable_cache(
-  async (): Promise<{ id: string; name: string }[]> => {
-    const supabase = createCacheClient();
-    const { data } = await supabase
-      .from("clients")
-      .select("id, name")
-      .is("parent_id", null)
-      .order("name");
-    return data ?? [];
-  },
-  ["clients-for-parent-select"],
-  { tags: [CACHE_TAGS.clients] }
-);
+/** Minimal fetch for parent-client selectors in forms. Only top-level clients (no parent). */
+export async function fetchClientsForParentSelect(): Promise<
+  { id: string; name: string }[]
+> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("clients")
+    .select("id, name")
+    .is("parent_id", null)
+    .order("name");
+  return data ?? [];
+}
 
 function mapClient(c: {
   id: string;
@@ -622,29 +602,31 @@ export type ClientsListResult = {
   total: number;
 };
 
-const _fetchClientsListCached = unstable_cache(
-  async (query: string, page: number, perPage: number): Promise<ClientsListResult> => {
-    const supabase = createCacheClient();
-    let q = supabase.from("clients").select(CLIENT_FULL_SELECT, { count: "exact" });
-
-    if (query.length > 0) {
-      const safe = query.replace(/[(),]/g, " ").trim();
-      if (safe.length > 0) q = q.ilike("name", `%${safe}%`);
-    }
-
-    const from = (page - 1) * perPage;
-    const to = from + perPage - 1;
-    const { data, error, count } = await q.order("name").range(from, to);
-    if (error) throw new Error(error.message);
-    return { clients: (data ?? []).map((c) => mapClient(c)), total: count ?? 0 };
-  },
-  ["clients-list"],
-  { tags: [CACHE_TAGS.clients, CACHE_TAGS.editors, CACHE_TAGS.finanzas] }
-);
-
 export async function fetchClientsList(
   opts: ClientsListOptions = {}
 ): Promise<ClientsListResult> {
-  const { query = "", page = 1, perPage = DEFAULT_PER_PAGE } = opts;
-  return _fetchClientsListCached(query, page, perPage);
+  const { query, page = 1, perPage = DEFAULT_PER_PAGE } = opts;
+  const supabase = await createClient();
+
+  let q = supabase
+    .from("clients")
+    .select(CLIENT_FULL_SELECT, { count: "exact" });
+
+  if (query && query.length > 0) {
+    const safe = query.replace(/[(),]/g, " ").trim();
+    if (safe.length > 0) {
+      q = q.ilike("name", `%${safe}%`);
+    }
+  }
+
+  const from = (page - 1) * perPage;
+  const to = from + perPage - 1;
+
+  const { data, error, count } = await q.order("name").range(from, to);
+  if (error) throw new Error(error.message);
+
+  return {
+    clients: (data ?? []).map((c) => mapClient(c)),
+    total: count ?? 0,
+  };
 }
