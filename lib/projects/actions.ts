@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { upsertSubClients } from "@/lib/sub-clients/actions";
 import {
   COBRADO_STATUSES,
   INVOICED_STATUSES,
@@ -218,6 +219,14 @@ export async function createProject(
       .from("projects")
       .insert(childRows as never);
     if (childErr) return { ok: false, error: childErr.message };
+
+    // Persistir subclientas nuevas en la tabla sub_clients
+    if (projectData.client_id) {
+      const subClientNames = children
+        .map((c) => c.sub_client)
+        .filter((n): n is string => Boolean(n));
+      await upsertSubClients(projectData.client_id, subClientNames);
+    }
   }
 
   revalidateAll();
@@ -409,6 +418,14 @@ export async function updateProject(
           .from("project_editors")
           .insert(childEditorRows);
         if (insEditorsErr) return { ok: false, error: insEditorsErr.message };
+      }
+
+      // Persistir subclientas nuevas en la tabla sub_clients
+      if (projectData.client_id) {
+        const subClientNames = children
+          .map((c) => c.sub_client)
+          .filter((n): n is string => Boolean(n));
+        await upsertSubClients(projectData.client_id, subClientNames);
       }
     }
   }

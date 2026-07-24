@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { PlusIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,6 +46,7 @@ import {
   formatPrice,
 } from "@/lib/projects/format";
 import { createProject, updateProject } from "@/lib/projects/actions";
+import { getSubClientsForClient } from "@/lib/sub-clients/actions";
 import { TemplatePicker } from "./template-picker";
 import type { ProjectTemplate } from "@/lib/projects/types";
 
@@ -93,16 +94,34 @@ export function ProjectForm({
   // Los hijos del pack: pre-cargados desde los hijos existentes al editar.
   // "pack" queda excluido — los hijos no pueden ser packs a su vez.
   type ChildType = Exclude<ProjectType, "pack">;
-  type Child = { id?: string; title: string; project_type: ChildType; sub_client: string };
-  const initialChildren: Child[] = (project?.children ?? []).map((c) => ({
-    id: c.id,
-    title: c.title,
-    project_type: (c.project_type === "pack" ? "long_form" : c.project_type) as ChildType,
-    sub_client: c.sub_client ?? "",
-  }));
-  const [shorts, setShorts] = useState<Child[]>(initialChildren);
+  type Child = { id?: string; title: string; project_type: ChildType };
+  // Cada sección agrupa los proyectos de un subcliente dentro del pack.
+  type PackSection = { subClient: string; newDraft: string; children: Child[] };
+
+  function buildInitialSections(): PackSection[] {
+    const raw = project?.children ?? [];
+    if (raw.length === 0) return [];
+    const map = new Map<string, Child[]>();
+    for (const c of raw) {
+      const key = c.sub_client ?? "";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({
+        id: c.id,
+        title: c.title,
+        project_type: (c.project_type === "pack" ? "long_form" : c.project_type) as ChildType,
+      });
+    }
+    return Array.from(map.entries()).map(([subClient, children]) => ({
+      subClient,
+      newDraft: "",
+      children,
+    }));
+  }
+
+  const [sections, setSections] = useState<PackSection[]>(buildInitialSections);
   const lastChildType = useRef<ChildType>("short_form");
-  const [newShortDraft, setNewShortDraft] = useState<string>("");
+  // Subclientas disponibles para el cliente seleccionado (cargadas desde DB)
+  const [subClientOptions, setSubClientOptions] = useState<{ id: string; name: string }[]>([]);
   const [clientId, setClientId] = useState<string | null>(
     project?.client?.id ?? null
   );
@@ -152,6 +171,12 @@ export function ProjectForm({
   // padre — un short hijo no puede tener a su vez hijos).
   const isChildOfPack = project?.parent_id != null;
 
+  // Cargar subclientas del cliente seleccionado
+  useEffect(() => {
+    if (!clientId) { setSubClientOptions([]); return; }
+    getSubClientsForClient(clientId).then(setSubClientOptions);
+  }, [clientId]);
+
   // ── Template picker ────────────────────────────────────────────────────────
 
   function applyTemplate(t: ProjectTemplate) {
@@ -173,28 +198,78 @@ export function ProjectForm({
   }
 
 
-  function addShort() {
-    const t = newShortDraft.trim();
-    if (t.length === 0) return;
-    setShorts([...shorts, { title: t, project_type: lastChildType.current, sub_client: "" }]);
-    setNewShortDraft("");
+  // ── Funciones de secciones del pack ───────────────────────────────────────
+
+  function addSection() {
+    setSections((prev) => [...prev, { subClient: "", newDraft: "", children: [] }]);
   }
 
-  function changeChildSubClient(index: number, value: string) {
-    setShorts(shorts.map((s, i) => (i === index ? { ...s, sub_client: value } : s)));
+  function removeSection(sIdx: number) {
+    setSections((prev) => prev.filter((_, i) => i !== sIdx));
   }
 
-  function removeShort(index: number) {
-    setShorts(shorts.filter((_, i) => i !== index));
+  function setSectionSubClient(sIdx: number, value: string) {
+    setSections((prev) =>
+      prev.map((s, i) => (i === sIdx ? { ...s, subClient: value } : s))
+    );
   }
 
-  function renameShort(index: number, value: string) {
-    setShorts(shorts.map((s, i) => (i === index ? { ...s, title: value } : s)));
+  function setSectionDraft(sIdx: number, value: string) {
+    setSections((prev) =>
+      prev.map((s, i) => (i === sIdx ? { ...s, newDraft: value } : s))
+    );
   }
 
-  function changeChildType(index: number, type: ChildType) {
+  function addChildToSection(sIdx: number) {
+    setSections((prev) =>
+      prev.map((s, i) => {
+        if (i !== sIdx) return s;
+        const t = s.newDraft.trim();
+        if (t.length === 0) return s;
+        return {
+          ...s,
+          newDraft: "",
+          children: [...s.children, { title: t, project_type: lastChildType.current }],
+        };
+      })
+    );
+  }
+
+  function removeChild(sIdx: number, cIdx: number) {
+    setSections((prev) =>
+      prev.map((s, i) =>
+        i !== sIdx ? s : { ...s, children: s.children.filter((_, j) => j !== cIdx) }
+      )
+    );
+  }
+
+  function renameChild(sIdx: number, cIdx: number, value: string) {
+    setSections((prev) =>
+      prev.map((s, i) =>
+        i !== sIdx
+          ? s
+          : {
+              ...s,
+              children: s.children.map((c, j) => (j === cIdx ? { ...c, title: value } : c)),
+            }
+      )
+    );
+  }
+
+  function changeChildType(sIdx: number, cIdx: number, type: ChildType) {
     lastChildType.current = type;
-    setShorts(shorts.map((s, i) => (i === index ? { ...s, project_type: type } : s)));
+    setSections((prev) =>
+      prev.map((s, i) =>
+        i !== sIdx
+          ? s
+          : {
+              ...s,
+              children: s.children.map((c, j) =>
+                j === cIdx ? { ...c, project_type: type } : c
+              ),
+            }
+      )
+    );
   }
 
   function addEditor() {
@@ -279,14 +354,16 @@ export function ProjectForm({
     // tipo a otro, el action interpreta la lista vacía como "borrar todos los hijos".
     const childrenPayload =
       projectType === "pack"
-        ? shorts
-            .map((s) => ({
-              id: s.id,
-              title: s.title.trim(),
-              project_type: s.project_type,
-              sub_client: s.sub_client.trim() || null,
-            }))
-            .filter((s) => s.title.length > 0)
+        ? sections.flatMap((sec) =>
+            sec.children
+              .map((c) => ({
+                id: c.id,
+                title: c.title.trim(),
+                project_type: c.project_type,
+                sub_client: sec.subClient.trim() || null,
+              }))
+              .filter((c) => c.title.length > 0)
+          )
         : [];
 
     const payload = {
@@ -379,8 +456,7 @@ export function ProjectForm({
                   if (!v) return;
                   const next = v as ProjectType;
                   if (projectType === "pack" && next !== "pack") {
-                    setShorts([]);
-                    setNewShortDraft("");
+                    setSections([]);
                   }
                   setProjectType(next);
                 }}
@@ -410,83 +486,120 @@ export function ProjectForm({
             </div>
 
             {!isChildOfPack && projectType === "pack" ? (
-              <div className="flex flex-col gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-3">
+              <div className="flex flex-col gap-3">
                 <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
                   Proyectos del pack
                 </p>
-                {/* datalist para autocompletar subclientas ya usados en este pack */}
-                <datalist id="subclients-list">
-                  {Array.from(new Set(shorts.map((s) => s.sub_client).filter(Boolean))).map(
-                    (sc) => (
-                      <option key={sc} value={sc} />
-                    )
-                  )}
+
+                {/* datalist compartido con opciones de la DB + nuevas escritas en otras secciones */}
+                <datalist id="subclients-datalist">
+                  {Array.from(
+                    new Set([
+                      ...subClientOptions.map((sc) => sc.name),
+                      ...sections.map((s) => s.subClient).filter(Boolean),
+                    ])
+                  ).map((name) => (
+                    <option key={name} value={name} />
+                  ))}
                 </datalist>
-                <div className="flex flex-col gap-2">
-                  {shorts.map((s, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="shrink-0 text-muted-foreground/60">↳</span>
-                      <select
-                        value={s.project_type}
-                        onChange={(e) =>
-                          changeChildType(i, e.target.value as ChildType)
-                        }
-                        className="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
-                        aria-label="Tipo del proyecto hijo"
-                      >
-                        {PROJECT_TYPES.filter((t) => t !== "pack").map((t) => (
-                          <option key={t} value={t}>
-                            {PROJECT_TYPE_LABEL[t]}
-                          </option>
-                        ))}
-                      </select>
+
+                {sections.map((sec, sIdx) => (
+                  <div
+                    key={sIdx}
+                    className="flex flex-col gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5"
+                  >
+                    {/* Header de la sección: subcliente + quitar sección */}
+                    <div className="flex items-center gap-2">
                       <Input
-                        value={s.title}
-                        onChange={(e) => renameShort(i, e.target.value)}
-                        placeholder={`Proyecto #${i + 1}`}
-                        className="flex-1"
-                      />
-                      <Input
-                        value={s.sub_client}
-                        onChange={(e) => changeChildSubClient(i, e.target.value)}
-                        placeholder="Subcliente"
-                        list="subclients-list"
-                        className="w-28 shrink-0 text-xs"
+                        value={sec.subClient}
+                        onChange={(e) => setSectionSubClient(sIdx, e.target.value)}
+                        placeholder="Subcliente (opcional)"
+                        list="subclients-datalist"
+                        className="flex-1 text-sm font-medium"
                       />
                       <button
                         type="button"
-                        onClick={() => removeShort(i)}
-                        aria-label="Quitar proyecto"
+                        onClick={() => removeSection(sIdx)}
+                        aria-label="Quitar sección"
                         className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
                       >
                         ×
                       </button>
                     </div>
-                  ))}
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground/60">+</span>
-                    <Input
-                      value={newShortDraft}
-                      onChange={(e) => setNewShortDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addShort();
-                        }
-                      }}
-                      placeholder="Nombre del proyecto (Enter para agregar)"
-                      className="flex-1"
-                    />
-                    <button
-                      type="button"
-                      onClick={addShort}
-                      disabled={newShortDraft.trim().length === 0}
-                      className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Agregar
-                    </button>
+
+                    {/* Proyectos de la sección */}
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      {sec.children.map((c, cIdx) => (
+                        <div key={cIdx} className="flex items-center gap-2">
+                          <span className="shrink-0 text-muted-foreground/60">↳</span>
+                          <select
+                            value={c.project_type}
+                            onChange={(e) =>
+                              changeChildType(sIdx, cIdx, e.target.value as ChildType)
+                            }
+                            className="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                            aria-label="Tipo del proyecto hijo"
+                          >
+                            {PROJECT_TYPES.filter((t) => t !== "pack").map((t) => (
+                              <option key={t} value={t}>
+                                {PROJECT_TYPE_LABEL[t]}
+                              </option>
+                            ))}
+                          </select>
+                          <Input
+                            value={c.title}
+                            onChange={(e) => renameChild(sIdx, cIdx, e.target.value)}
+                            placeholder={`Proyecto #${cIdx + 1}`}
+                            className="flex-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeChild(sIdx, cIdx)}
+                            aria-label="Quitar proyecto"
+                            className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+
+                      {/* Input para agregar proyecto a esta sección */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground/60">+</span>
+                        <Input
+                          value={sec.newDraft}
+                          onChange={(e) => setSectionDraft(sIdx, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addChildToSection(sIdx);
+                            }
+                          }}
+                          placeholder="Nombre del proyecto (Enter para agregar)"
+                          className="flex-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => addChildToSection(sIdx)}
+                          disabled={sec.newDraft.trim().length === 0}
+                          className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Agregar
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
+
+                {/* Botón para agregar una nueva sección */}
+                <button
+                  type="button"
+                  onClick={addSection}
+                  className="inline-flex items-center gap-1.5 self-start rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
+                >
+                  <PlusIcon className="size-3.5" />
+                  Agregar sección de proyectos
+                </button>
               </div>
             ) : null}
 

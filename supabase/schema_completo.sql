@@ -1338,6 +1338,24 @@ ALTER TABLE public.projects
 
 
 -- ========================================
+-- 20260723100000_add_sub_clients_table.sql
+-- ========================================
+-- Tabla de subclientas para agrupar proyectos dentro de un pack.
+CREATE TABLE public.sub_clients (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id   uuid        NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  name        text        NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(client_id, name)
+);
+
+ALTER TABLE public.sub_clients ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "sub_clients full access" ON public.sub_clients
+  USING (true) WITH CHECK (true);
+
+
+-- ========================================
 -- 20260528020000_clients_discord_and_parent.sql
 -- ========================================
 -- Canal de Discord por cliente (para notificaciones de estado al cliente)

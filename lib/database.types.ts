@@ -829,6 +829,35 @@ export type Database = {
           },
         ]
       }
+      sub_clients: {
+        Row: {
+          id: string
+          client_id: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          name?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_month_entries: {
         Row: {
           amount: number
