@@ -54,13 +54,14 @@ import { QuickDurationEditor } from "./quick-duration-editor";
 
 import {
   PROJECT_PHASES,
-  PROJECT_TYPE_LABEL,
   isPack,
 } from "@/lib/projects/types";
 import {
   CARD_CHIP_BASE,
   CARD_CLIENT_CHIP_BASE,
   CARD_TYPE_CHIP,
+  CARD_TYPE_CHIP_BASE,
+  CARD_TYPE_INITIAL,
 } from "./kanban-card-styles";
 import { QuickPaymentBadge } from "./quick-payment-badge";
 import { contrastColor } from "@/lib/clients/palette";
@@ -1292,13 +1293,13 @@ function CardView({
                 <span className="truncate">{project.client.name}</span>
               </span>
             ) : project.client_name ? (
-              <span className={`${CARD_CHIP_BASE} max-w-[110px] overflow-hidden bg-muted text-muted-foreground`}>
+              <span className={`${CARD_CHIP_BASE} max-w-[150px] overflow-hidden bg-muted text-muted-foreground`}>
                 <span className="truncate">{project.client_name}</span>
               </span>
             ) : null}
             {!isPack(project) ? (
-              <span className={`${CARD_CHIP_BASE} ${CARD_TYPE_CHIP[project.project_type]}`}>
-                {PROJECT_TYPE_LABEL[project.project_type]}
+              <span className={`${CARD_TYPE_CHIP_BASE} ${CARD_TYPE_CHIP[project.project_type]}`}>
+                {CARD_TYPE_INITIAL[project.project_type]}
               </span>
             ) : null}
             <div className="flex-1" />

@@ -17,12 +17,24 @@ export const CARD_TYPE_CHIP: Record<ProjectType, string> = {
   other: "bg-stone-500 text-white",
 };
 
+// Iniciales para mostrar el tipo de proyecto en la card (más compacto)
+export const CARD_TYPE_INITIAL: Record<ProjectType, string> = {
+  pack: "P",
+  long_form: "LF",
+  short_form: "SF",
+  other: "O",
+};
+
 // Base compartida de chips pequeños (tipo + cliente)
 export const CARD_CHIP_BASE =
   "shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider leading-none";
 
+// Chip de tipo: padding reducido ya que solo muestra 2 chars (LF / SF)
+export const CARD_TYPE_CHIP_BASE =
+  "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider leading-none";
+
 export const CARD_CLIENT_CHIP_BASE =
-  "inline-flex min-w-0 max-w-[110px] items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white leading-none overflow-hidden";
+  "inline-flex min-w-0 max-w-[150px] items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white leading-none overflow-hidden";
 
 // ── Badges de estado financiero (COBRADO / PAGADO / FACTURADO) ─────────────────
 export function financialBadgeClass(pct: number): string {
