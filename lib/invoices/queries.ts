@@ -1,5 +1,5 @@
-import { unstable_cache } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+﻿import { unstable_cache } from "next/cache";
+import { createCacheClient } from "@/lib/supabase/server";
 import type { ClientForInvoice, InvoiceSettings, InvoiceWithProjects } from "./types";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 
@@ -7,7 +7,7 @@ import { CACHE_TAGS } from "@/lib/cache-tags";
 
 export const fetchInvoices = unstable_cache(
   async (): Promise<InvoiceWithProjects[]> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     const { data, error } = await supabase
       .from("invoices")
       .select(
@@ -43,7 +43,7 @@ export const fetchInvoices = unstable_cache(
 
 export const fetchClientsForInvoice = unstable_cache(
   async (): Promise<ClientForInvoice[]> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     const { data, error } = await supabase
       .from("clients")
       .select("id, name, billing_name, tax_id, address, city, state, country, payment_type, agreed_price, retainer_discount_pct")
@@ -59,7 +59,7 @@ export const fetchClientsForInvoice = unstable_cache(
 
 export const fetchInvoiceSettings = unstable_cache(
   async (): Promise<InvoiceSettings> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     const { data, error } = await supabase
       .from("invoice_settings")
       .select(

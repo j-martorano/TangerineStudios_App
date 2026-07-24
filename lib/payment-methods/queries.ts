@@ -1,5 +1,5 @@
-import { unstable_cache } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+﻿import { unstable_cache } from "next/cache";
+import { createCacheClient } from "@/lib/supabase/server";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 
 /** Método del catálogo global (ej. Binance, DolarApp, cuenta de banco). */
@@ -21,7 +21,7 @@ export type EditorPaymentMethod = {
 
 export const fetchPaymentMethods = unstable_cache(
   async (): Promise<PaymentMethod[]> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     const { data, error } = await supabase
       .from("payment_methods")
       .select("id, name, icon, color")

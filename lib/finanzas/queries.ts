@@ -1,5 +1,5 @@
-import { unstable_cache } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+﻿import { unstable_cache } from "next/cache";
+import { createCacheClient } from "@/lib/supabase/server";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 
 export type FinanzasPayment = {
@@ -21,7 +21,7 @@ export type RetainerPayment = {
 
 export const fetchRetainerPayments = unstable_cache(
   async (): Promise<RetainerPayment[]> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     const { data, error } = await supabase
       .from("client_payments")
       .select("client_id, amount, paid_at");
@@ -38,7 +38,7 @@ export const fetchRetainerPayments = unstable_cache(
 
 export const fetchClientPayments = unstable_cache(
   async (): Promise<FinanzasPayment[]> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     const { data, error } = await supabase
       .from("client_payments")
       .select(
@@ -70,7 +70,7 @@ export type FixedService = {
 
 export const fetchFixedServices = unstable_cache(
   async (): Promise<FixedService[]> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     const { data, error } = await supabase
       .from("fixed_services")
       .select("id, name, monthly_cost, active, created_at")
@@ -101,7 +101,7 @@ export type ServiceMonthEntry = {
 export const fetchServiceMonthEntries = unstable_cache(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async (): Promise<ServiceMonthEntry[]> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any)
       .from("service_month_entries")

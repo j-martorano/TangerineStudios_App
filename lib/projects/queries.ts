@@ -1,5 +1,5 @@
-import { unstable_cache } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+﻿import { unstable_cache } from "next/cache";
+import { createClient, createCacheClient } from "@/lib/supabase/server";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import type {
   ClientEditorPair,
@@ -33,7 +33,7 @@ function pairKey(clientId: string, editorId: string): string {
 }
 
 async function fetchPairConfigMap(): Promise<Map<string, PairConfigRow>> {
-  const supabase = await createClient();
+  const supabase = createCacheClient();
   const { data } = await supabase
     .from("client_editors")
     .select("client_id, editor_id, payment_type, rate, flat_amount");
@@ -49,7 +49,7 @@ async function fetchPairConfigMap(): Promise<Map<string, PairConfigRow>> {
 }
 
 async function fetchPairTiersMap(): Promise<Map<string, PaymentTier[]>> {
-  const supabase = await createClient();
+  const supabase = createCacheClient();
   const { data } = await supabase
     .from("client_editor_payment_tiers")
     .select("client_id, editor_id, min_minutes, max_minutes, amount");
@@ -155,7 +155,7 @@ const _fetchProjectsCached = unstable_cache(
     includeArchived: boolean,
     includeFinalized: boolean
   ): Promise<ProjectWithRelations[]> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     let q = supabase.from("projects").select(PROJECT_SELECT);
 
     if (!includeArchived) q = q.eq("archived", false);
@@ -213,7 +213,7 @@ export type ProjectsListResult = {
 
 const _fetchProjectsListCached = unstable_cache(
   async (query: string, page: number, perPage: number): Promise<ProjectsListResult> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     let q = supabase.from("projects").select(PROJECT_SELECT, { count: "exact" });
 
     if (query.length > 0) {
@@ -253,7 +253,7 @@ export async function fetchProjectsList(
 
 export const fetchEditors = unstable_cache(
   async (): Promise<EditorMini[]> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     const { data, error } = await supabase
       .from("editors")
       .select(
@@ -374,7 +374,7 @@ async function fetchPairTiersByEditor(
 ): Promise<Map<string, Map<string, PaymentTier[]>>> {
   const result = new Map<string, Map<string, PaymentTier[]>>();
   if (editorIds.length === 0) return result;
-  const supabase = await createClient();
+  const supabase = createCacheClient();
   const { data } = await supabase
     .from("client_editor_payment_tiers")
     .select("client_id, editor_id, min_minutes, max_minutes, amount")
@@ -414,7 +414,7 @@ export type EditorsListResult = {
 
 const _fetchEditorsListCached = unstable_cache(
   async (query: string, page: number, perPage: number): Promise<EditorsListResult> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     let q = supabase.from("editors").select(EDITOR_FULL_SELECT, { count: "exact" });
 
     if (query.length > 0) {
@@ -455,7 +455,7 @@ function consumedMinutes(
 
 export const fetchClients = unstable_cache(
   async (): Promise<ClientForProject[]> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     const { data, error } = await supabase
       .from("clients")
       .select(
@@ -512,7 +512,7 @@ const CLIENT_FULL_SELECT =
 
 export const fetchClientsWithCount = unstable_cache(
   async (): Promise<ClientWithCount[]> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     const { data, error } = await supabase
       .from("clients")
       .select(CLIENT_FULL_SELECT)
@@ -526,7 +526,7 @@ export const fetchClientsWithCount = unstable_cache(
 
 export const fetchClientsForParentSelect = unstable_cache(
   async (): Promise<{ id: string; name: string }[]> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     const { data } = await supabase
       .from("clients")
       .select("id, name")
@@ -624,7 +624,7 @@ export type ClientsListResult = {
 
 const _fetchClientsListCached = unstable_cache(
   async (query: string, page: number, perPage: number): Promise<ClientsListResult> => {
-    const supabase = await createClient();
+    const supabase = createCacheClient();
     let q = supabase.from("clients").select(CLIENT_FULL_SELECT, { count: "exact" });
 
     if (query.length > 0) {
