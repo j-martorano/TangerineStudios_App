@@ -1,17 +1,24 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createBotClient } from "@/lib/supabase/bot";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { ProjectTemplate } from "./types";
 
-export async function fetchTemplates(): Promise<ProjectTemplate[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("project_templates")
-    .select("*")
-    .order("name");
-  return (data ?? []) as ProjectTemplate[];
-}
+export const fetchTemplates = unstable_cache(
+  async (): Promise<ProjectTemplate[]> => {
+    const supabase = createBotClient();
+    const { data } = await supabase
+      .from("project_templates")
+      .select("*")
+      .order("name");
+    return (data ?? []) as ProjectTemplate[];
+  },
+  ["templates"],
+  { tags: [CACHE_TAGS.templates] }
+);
 
 export async function createTemplate(
   input: Omit<ProjectTemplate, "id" | "created_at">
@@ -19,6 +26,7 @@ export async function createTemplate(
   const supabase = await createClient();
   const { error } = await supabase.from("project_templates").insert(input);
   if (error) return { ok: false, error: error.message };
+  revalidateTag(CACHE_TAGS.templates, {});
   revalidatePath("/", "layout");
   return { ok: true };
 }
@@ -32,6 +40,7 @@ export async function deleteTemplate(
     .delete()
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
+  revalidateTag(CACHE_TAGS.templates, {});
   revalidatePath("/", "layout");
   return { ok: true };
 }
