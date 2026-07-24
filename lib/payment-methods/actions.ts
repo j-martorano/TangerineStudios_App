@@ -1,7 +1,8 @@
-"use server";
+﻿"use server";
 
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { createClient } from "@/lib/supabase/server";
 import type { PaymentMethod } from "./queries";
 
@@ -50,6 +51,7 @@ export type PaymentMethodResult =
   | { ok: false; error: string };
 
 function revalidateEditors() {
+  revalidateTag(CACHE_TAGS.editors, {});
   revalidatePath("/editors");
   revalidatePath("/configuracion");
 }

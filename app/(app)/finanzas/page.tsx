@@ -35,7 +35,6 @@ function clientTint(hex: string | null | undefined): string | undefined {
   return `${hex}33`;
 }
 
-export const dynamic = "force-dynamic";
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat("es-AR", {
   month: "long",

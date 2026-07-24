@@ -10,7 +10,6 @@ import { fetchClientsForInvoice } from "@/lib/invoices/queries";
 import { fetchRetainerPayments } from "@/lib/finanzas/queries";
 import { isPack } from "@/lib/projects/types";
 
-export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<{ q?: string; focus?: string }>;
 

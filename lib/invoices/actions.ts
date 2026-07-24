@@ -1,6 +1,7 @@
-"use server";
+﻿"use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { renderToBuffer } from "@react-pdf/renderer";
@@ -178,6 +179,8 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
       .in("id", d.project_ids);
   }
 
+  revalidateTag(CACHE_TAGS.invoices, {});
+  revalidateTag(CACHE_TAGS.projects, {});
   revalidatePath("/facturas");
   revalidatePath("/kanban");
   revalidatePath("/projects");
@@ -204,6 +207,7 @@ export async function deleteInvoice(id: string): Promise<ActionResult> {
     await supabase.storage.from("invoices").remove([inv.pdf_storage_path]);
   }
 
+  revalidateTag(CACHE_TAGS.invoices, {});
   revalidatePath("/facturas");
   return { ok: true };
 }
@@ -251,6 +255,8 @@ export async function updateInvoiceSettings(
     .eq("id", 1);
 
   if (error) return { ok: false, error: error.message };
+  revalidateTag(CACHE_TAGS.invoices, {});
+  revalidateTag(CACHE_TAGS.settings, {});
   revalidatePath("/configuracion");
   revalidatePath("/facturas");
   return { ok: true };

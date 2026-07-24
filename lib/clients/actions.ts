@@ -1,7 +1,8 @@
-"use server";
+﻿"use server";
 
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { PAYMENT_TYPES } from "@/lib/projects/types";
 import type { ClientMini, PaymentType } from "@/lib/projects/types";
@@ -63,6 +64,9 @@ export type ClientCreateResult =
   | { ok: false; error: string };
 
 function revalidateAll() {
+  revalidateTag(CACHE_TAGS.clients, {});
+  revalidateTag(CACHE_TAGS.projects, {});
+  revalidateTag(CACHE_TAGS.finanzas, {});
   revalidatePath("/");
   revalidatePath("/clients");
   revalidatePath("/projects");

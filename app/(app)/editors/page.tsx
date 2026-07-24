@@ -6,7 +6,6 @@ import { fetchClients, fetchEditorsList } from "@/lib/projects/queries";
 import { fetchPaymentMethods } from "@/lib/payment-methods/queries";
 import { fetchUserPrefs } from "@/lib/settings/queries";
 
-export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<{ q?: string; page?: string }>;
 

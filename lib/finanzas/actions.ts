@@ -1,13 +1,15 @@
-"use server";
+﻿"use server";
 
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 
 const uuidRegex =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function revalidateFinanzas() {
+  revalidateTag(CACHE_TAGS.finanzas, {});
   revalidatePath("/finanzas");
   revalidatePath("/");
 }

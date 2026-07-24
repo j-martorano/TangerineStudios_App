@@ -1,7 +1,7 @@
-"use server";
+﻿"use server";
 
-import { revalidatePath } from "next/cache";
-
+import { revalidatePath, revalidateTag } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { createClient } from "@/lib/supabase/server";
 import { mergePrefs, type UserPrefs } from "./types";
 
@@ -62,6 +62,7 @@ export async function updateUserPrefs(
   if (error) return { ok: false, error: error.message };
 
   // Las prefs afectan a todas las páginas — revalidamos el layout.
+  revalidateTag(CACHE_TAGS.settings, {});
   revalidatePath("/", "layout");
   return { ok: true };
 }

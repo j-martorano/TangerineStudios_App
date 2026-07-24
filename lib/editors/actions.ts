@@ -1,7 +1,8 @@
-"use server";
+﻿"use server";
 
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { EDITOR_PAYMENT_TYPES } from "@/lib/projects/types";
 import type { EditorMini, EditorPaymentType } from "@/lib/projects/types";
@@ -104,6 +105,8 @@ export type EditorCreateResult =
   | { ok: false; error: string };
 
 function revalidateAll() {
+  revalidateTag(CACHE_TAGS.editors, {});
+  revalidateTag(CACHE_TAGS.projects, {});
   revalidatePath("/");
   revalidatePath("/clients");
   revalidatePath("/projects");

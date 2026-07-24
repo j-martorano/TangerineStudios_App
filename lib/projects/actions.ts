@@ -1,7 +1,8 @@
-"use server";
+﻿"use server";
 
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { createClient } from "@/lib/supabase/server";
 import { upsertSubClients } from "@/lib/sub-clients/actions";
 import {
@@ -137,6 +138,9 @@ export type ProjectInput = z.input<typeof projectInputSchema>;
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
 function revalidateAll() {
+  revalidateTag(CACHE_TAGS.projects, {});
+  revalidateTag(CACHE_TAGS.clients, {});
+  revalidateTag(CACHE_TAGS.finanzas, {});
   revalidatePath("/");
   revalidatePath("/kanban");
   revalidatePath("/projects");

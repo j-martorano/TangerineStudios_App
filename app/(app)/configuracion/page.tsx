@@ -10,7 +10,6 @@ import { SeedSection } from "@/components/configuracion/seed-section";
 import { FixedServicesSection } from "@/components/finanzas/fixed-services-section";
 import { InvoiceSettingsSection } from "@/components/invoices/invoice-settings-section";
 
-export const dynamic = "force-dynamic";
 
 export default async function ConfiguracionPage() {
   const [prefs, paymentMethods, fixedServices, seedActive, canSeed, invoiceSettings] =

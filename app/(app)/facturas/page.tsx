@@ -5,7 +5,6 @@ import { InvoiceList } from "@/components/invoices/invoice-list";
 import { NewInvoiceButton } from "@/components/invoices/new-invoice-button";
 import { PendingInvoicesPanel } from "@/components/invoices/pending-invoices-panel";
 
-export const dynamic = "force-dynamic";
 
 export default async function FacturasPage() {
   const [invoices, projects, clients] = await Promise.all([

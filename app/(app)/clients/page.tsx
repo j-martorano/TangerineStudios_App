@@ -5,7 +5,6 @@ import { DataSearch } from "@/components/data-search";
 import { fetchClientsList, fetchEditors, fetchClientsForParentSelect } from "@/lib/projects/queries";
 import { fetchUserPrefs } from "@/lib/settings/queries";
 
-export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<{ q?: string; page?: string }>;
 

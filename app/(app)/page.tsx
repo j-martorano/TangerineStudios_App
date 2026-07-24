@@ -32,7 +32,6 @@ import {
 import { NewProjectButton } from "@/components/projects/new-project-button";
 import { NewClientButton } from "@/components/clients/new-client-button";
 
-export const dynamic = "force-dynamic";
 
 type TaskType = "factura" | "cobro" | "pago";
 

@@ -10,8 +10,6 @@ import {
 } from "@/lib/projects/queries";
 import { fetchUserPrefs } from "@/lib/settings/queries";
 
-export const dynamic = "force-dynamic";
-
 type SearchParams = Promise<{ q?: string; year?: string; archived?: string; highlight?: string }>;
 
 function projectYear(iso: string | null | undefined): number {
