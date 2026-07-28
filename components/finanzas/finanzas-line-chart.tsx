@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ChevronDown } from "lucide-react";
 
 export type ChartPoint = {
   label: string;
@@ -27,6 +28,16 @@ const USD = new Intl.NumberFormat("en-US", {
   currencyDisplay: "narrowSymbol",
   maximumFractionDigits: 0,
 });
+
+const MONTH_NAMES_ES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+function formatMonthKey(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  return `${MONTH_NAMES_ES[m - 1]} ${y}`;
+}
 
 function fmtAxis(v: number): string {
   if (Math.abs(v) >= 1000) return `$${(v / 1000).toFixed(1)}k`;
@@ -66,16 +77,32 @@ function TooltipContent({
 
 export function FinanzasLineChart({
   monthly,
-  daily,
+  dailyByMonth,
 }: {
   monthly: ChartPoint[];
-  daily: ChartPoint[];
+  dailyByMonth: Record<string, ChartPoint[]>;
 }) {
   const [mode, setMode] = useState<ViewMode>("historico");
 
-  const data = mode === "historico" ? monthly : daily;
+  const monthKeys = Object.keys(dailyByMonth).sort();
+  const latestMonth = monthKeys[monthKeys.length - 1] ?? "";
+  const [selectedMonth, setSelectedMonth] = useState(latestMonth);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  if (monthly.length === 0 && daily.length === 0) {
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const data = mode === "historico" ? monthly : (dailyByMonth[selectedMonth] ?? []);
+
+  if (monthly.length === 0 && Object.keys(dailyByMonth).length === 0) {
     return (
       <p className="text-sm italic text-muted-foreground">
         Sin meses con actividad para graficar.
@@ -109,6 +136,43 @@ export function FinanzasLineChart({
         >
           Mensual
         </button>
+
+        {mode === "mensual" && monthKeys.length > 0 && (
+          <div ref={dropdownRef} className="relative ml-2">
+            <button
+              type="button"
+              onClick={() => setDropdownOpen((o) => !o)}
+              className="flex items-center gap-1 rounded-md border border-border/50 bg-muted/40 px-2.5 py-1 text-[11px] font-bold uppercase tracking-widest text-foreground transition-colors hover:bg-muted/70"
+            >
+              {formatMonthKey(selectedMonth)}
+              <ChevronDown
+                className={`size-3 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute left-0 top-full z-50 mt-1 max-h-52 min-w-[140px] overflow-y-auto rounded-md border border-border/50 bg-popover shadow-lg">
+                {[...monthKeys].reverse().map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedMonth(key);
+                      setDropdownOpen(false);
+                    }}
+                    className={`w-full px-3 py-1.5 text-left text-[11px] font-bold uppercase tracking-widest transition-colors hover:bg-muted/60 ${
+                      key === selectedMonth
+                        ? "text-foreground"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {formatMonthKey(key)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <ResponsiveContainer width="100%" height={260}>

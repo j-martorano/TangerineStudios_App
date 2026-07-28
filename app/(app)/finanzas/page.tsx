@@ -476,14 +476,14 @@ export default async function FinanzasPage({
     ganancia: Math.round(b.profit),
   }));
 
-  // Datos diarios del mes actual para el modo Mensual del gráfico.
-  const dailyChartData: ChartPoint[] = (() => {
-    const [y, m] = currentMonthKey.split("-").map(Number);
+  // Datos diarios por mes para el modo Mensual del gráfico.
+  function buildDailyForMonth(monthKey: string): ChartPoint[] {
+    const [y, m] = monthKey.split("-").map(Number);
     const daysInMonth = new Date(y, m, 0).getDate();
-    const today = new Date();
-    const todayDay = today.getUTCFullYear() === y && today.getUTCMonth() + 1 === m
-      ? today.getUTCDate()
-      : daysInMonth;
+    const todayDay =
+      now.getUTCFullYear() === y && now.getUTCMonth() + 1 === m
+        ? now.getUTCDate()
+        : daysInMonth;
 
     const dailyMap = new Map<number, { cobrado: number; pagado: number; ganancia: number }>();
     for (let d = 1; d <= todayDay; d++) {
@@ -491,7 +491,7 @@ export default async function FinanzasPage({
     }
 
     for (const pay of payments) {
-      if (!pay.paid_at.startsWith(currentMonthKey)) continue;
+      if (!pay.paid_at.startsWith(monthKey)) continue;
       const d = parseInt(pay.paid_at.slice(8, 10), 10);
       const bucket = dailyMap.get(d);
       if (bucket) { bucket.cobrado += pay.amount; bucket.ganancia += pay.amount; }
@@ -500,7 +500,7 @@ export default async function FinanzasPage({
     for (const p of projects) {
       if (p.parent_id) continue;
       const projectDate = p.finalized_at ?? p.created_at;
-      if (!projectDate || !projectDate.startsWith(currentMonthKey)) continue;
+      if (!projectDate || !projectDate.startsWith(monthKey)) continue;
       const d = parseInt(projectDate.slice(8, 10), 10);
       const bucket = dailyMap.get(d);
       if (!bucket) continue;
@@ -526,7 +526,11 @@ export default async function FinanzasPage({
         pagado: Math.round(vals.pagado),
         ganancia: Math.round(vals.ganancia),
       }));
-  })();
+  }
+
+  const dailyByMonth: Record<string, ChartPoint[]> = Object.fromEntries(
+    sortedBuckets.map((b) => [b.key, buildDailyForMonth(b.key)])
+  );
 
   // ── Ingresos por cliente: pagos retainer + proyectos finalizados cobrados ──
   const incomeByClient = new Map<string, { color: string; total: number }>();
@@ -653,7 +657,7 @@ export default async function FinanzasPage({
 
       {/* Fila 3: Line chart con toggle Histórico | Mensual */}
       <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
-        <FinanzasLineChart monthly={monthlyChartData} daily={dailyChartData} />
+        <FinanzasLineChart monthly={monthlyChartData} dailyByMonth={dailyByMonth} />
       </div>
 
       {/* Fila 4: Tres donuts por cliente */}
