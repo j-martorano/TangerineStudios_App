@@ -70,6 +70,27 @@ async function fetchPairTiersMap(): Promise<Map<string, PaymentTier[]>> {
   return map;
 }
 
+async function fetchGlobalEditorTiersMap(): Promise<Map<string, PaymentTier[]>> {
+  const supabase = createBotClient();
+  const { data } = await supabase
+    .from("editor_payment_tiers")
+    .select("editor_id, min_minutes, max_minutes, amount");
+  const map = new Map<string, PaymentTier[]>();
+  for (const r of data ?? []) {
+    const arr = map.get(r.editor_id) ?? [];
+    arr.push({
+      min_minutes: Number(r.min_minutes),
+      max_minutes: Number(r.max_minutes),
+      amount: Number(r.amount),
+    });
+    map.set(r.editor_id, arr);
+  }
+  for (const arr of map.values()) {
+    arr.sort((a, b) => a.min_minutes - b.min_minutes);
+  }
+  return map;
+}
+
 /**
  * Conecta cada proyecto con su pack padre (si lo tiene) y cada pack con sus
  * hijos. Trabaja sobre el array entero — los refs apuntan a objetos vivos,
@@ -116,11 +137,16 @@ function attachParentChildLinks(
  * Aplica la config del par cliente-editor (si existe) al editor embebido en
  * un proyecto. Si el par define payment_type, el editor "efectivo" usado
  * por computeCost adopta esa config en vez de la global del editor.
+ *
+ * Para tramos flat_variable: prioridad es par-específico > global del editor.
+ * El join profundo de Supabase puede devolver [] vacío incluso cuando el editor
+ * tiene tramos globales, por eso se usa el mapa global como fuente confiable.
  */
 function applyPairOverrides(
   projects: ProjectWithRelations[],
   pairs: Map<string, PairConfigRow>,
-  tiers: Map<string, PaymentTier[]>
+  pairTiers: Map<string, PaymentTier[]>,
+  globalTiers: Map<string, PaymentTier[]>
 ): ProjectWithRelations[] {
   for (const p of projects) {
     if (!p.client_id) continue;
@@ -148,7 +174,7 @@ function applyPairOverrides(
       }
       const effectiveTiers =
         effectiveType === "flat_variable"
-          ? (tiers.get(key) ?? entry.editor.tiers)
+          ? (pairTiers.get(key) ?? globalTiers.get(entry.editor.id) ?? [])
           : [];
       entry.editor = {
         ...entry.editor,
@@ -185,7 +211,7 @@ const _fetchProjectsCached = unstable_cache(
       }
     }
 
-    const [{ data, error }, pairs, tiers] = await Promise.all([
+    const [{ data, error }, pairs, pairTiers, globalTiers] = await Promise.all([
       q
         .order("phase")
         .order("position")
@@ -193,10 +219,11 @@ const _fetchProjectsCached = unstable_cache(
         .order("id"),
       fetchPairConfigMap(),
       fetchPairTiersMap(),
+      fetchGlobalEditorTiersMap(),
     ]);
     if (error) throw new Error(error.message);
     const all = (data ?? []) as unknown as ProjectWithRelations[];
-    applyPairOverrides(all, pairs, tiers);
+    applyPairOverrides(all, pairs, pairTiers, globalTiers);
     attachParentChildLinks(all);
     return includeFinalized ? all : all.filter((p) => !p.finalized);
   },
@@ -243,15 +270,16 @@ const _fetchProjectsListCached = unstable_cache(
     const from = (page - 1) * perPage;
     const to = from + perPage - 1;
 
-    const [{ data, error, count }, pairs, tiers] = await Promise.all([
+    const [{ data, error, count }, pairs, pairTiers, globalTiers] = await Promise.all([
       q.order("updated_at", { ascending: false }).range(from, to),
       fetchPairConfigMap(),
       fetchPairTiersMap(),
+      fetchGlobalEditorTiersMap(),
     ]);
 
     if (error) throw new Error(error.message);
     const projects = (data ?? []) as unknown as ProjectWithRelations[];
-    return { projects: applyPairOverrides(projects, pairs, tiers), total: count ?? 0 };
+    return { projects: applyPairOverrides(projects, pairs, pairTiers, globalTiers), total: count ?? 0 };
   },
   ["projects-list"],
   { tags: [CACHE_TAGS.projects, CACHE_TAGS.clients, CACHE_TAGS.editors] }
