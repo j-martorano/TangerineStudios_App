@@ -410,8 +410,8 @@ function StaticKanban({
                   </div>
                 ))
               )}
+              <KanbanAddButton phase={phase} editors={editors} clients={clients} availableParents={availableParents} />
             </div>
-            <KanbanAddButton phase={phase} editors={editors} clients={clients} availableParents={availableParents} />
           </div>
         </div>
       ))}
@@ -1118,54 +1118,54 @@ function KanbanColumn({
           </span>
         </div>
         {phase === "terminado" && <TerminadoStats items={items} />}
-        <SortableContext
-          id={phase}
-          items={itemIds}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
-          {items.length === 0 ? (
-            <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
-              {emptyLabel}
-            </p>
-          ) : phase === "terminado" ? (
-            groupTerminadoByMonth(items).map(({ key, label, items: monthItems }) => (
-              <Fragment key={key}>
-                <div className="px-1 pt-2 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
-                  {label}
-                </div>
-                {monthItems.map((p) => (
-                  <SortableCard
-                    key={p.id}
-                    project={p}
-                    editors={editors}
-                    clients={clients}
-                    availableParents={availableParents}
-                  />
-                ))}
-              </Fragment>
-            ))
-          ) : (
-            items.map((p) => (
-              <SortableCard
-                key={p.id}
-                project={p}
-                editors={editors}
-                clients={clients}
-                availableParents={availableParents}
-              />
-            ))
-          )}
+        <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
+          <SortableContext
+            id={phase}
+            items={itemIds}
+            strategy={verticalListSortingStrategy}
+          >
+            {items.length === 0 ? (
+              <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">
+                {emptyLabel}
+              </p>
+            ) : phase === "terminado" ? (
+              groupTerminadoByMonth(items).map(({ key, label, items: monthItems }) => (
+                <Fragment key={key}>
+                  <div className="px-1 pt-2 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
+                    {label}
+                  </div>
+                  {monthItems.map((p) => (
+                    <SortableCard
+                      key={p.id}
+                      project={p}
+                      editors={editors}
+                      clients={clients}
+                      availableParents={availableParents}
+                    />
+                  ))}
+                </Fragment>
+              ))
+            ) : (
+              items.map((p) => (
+                <SortableCard
+                  key={p.id}
+                  project={p}
+                  editors={editors}
+                  clients={clients}
+                  availableParents={availableParents}
+                />
+              ))
+            )}
+          </SortableContext>
+          {phase !== "terminado" ? (
+            <KanbanAddButton
+              phase={phase}
+              editors={editors}
+              clients={clients}
+              availableParents={availableParents}
+            />
+          ) : null}
         </div>
-      </SortableContext>
-        {phase !== "terminado" ? (
-          <KanbanAddButton
-            phase={phase}
-            editors={editors}
-            clients={clients}
-            availableParents={availableParents}
-          />
-        ) : null}
       </div>
     </div>
   );
