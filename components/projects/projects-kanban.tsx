@@ -627,6 +627,7 @@ function InteractiveKanban({
           sourcePhase === "terminado"
         ) {
           u.finalized = false;
+          u.finalized_at = null;
         }
         updates.push(u);
       });

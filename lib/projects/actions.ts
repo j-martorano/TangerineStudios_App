@@ -260,7 +260,7 @@ export async function updateProject(
         ? finalized_at
         : `${finalized_at}T12:00:00Z`
       : new Date().toISOString()
-    : undefined; // no tocar finalized_at si no es terminado
+    : null; // limpiar finalized_at al sacar de terminado (evita que finanzas lo bucketice en el mes viejo)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updatePayload: any = {

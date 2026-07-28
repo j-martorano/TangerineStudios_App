@@ -132,7 +132,7 @@ function applyPairOverrides(
       const effectiveType = pair.payment_type ?? entry.editor.payment_type;
       const effectiveTiers =
         effectiveType === "flat_variable"
-          ? (tiers.get(key) ?? [])
+          ? (tiers.get(key) ?? entry.editor.tiers)
           : [];
       entry.editor = {
         ...entry.editor,
