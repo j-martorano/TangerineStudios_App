@@ -129,7 +129,23 @@ function applyPairOverrides(
       const key = pairKey(p.client_id, entry.editor.id);
       const pair = pairs.get(key);
       if (!pair) continue;
-      const effectiveType = pair.payment_type ?? entry.editor.payment_type;
+      const effectiveRate =
+        pair.rate !== null ? pair.rate : entry.editor.rate;
+      const effectiveFlatAmount =
+        pair.flat_amount !== null ? pair.flat_amount : entry.editor.flat_amount;
+      // Only override payment_type when the required parameter for the new
+      // type is actually available (e.g. "por_minuto" needs a non-null rate).
+      // Without this guard, a pair that sets payment_type="por_minuto" but
+      // has no rate silently zeroes out cost for "flat_variable" editors.
+      let effectiveType = entry.editor.payment_type;
+      if (pair.payment_type) {
+        const t = pair.payment_type;
+        const usable =
+          (t === "por_minuto" && effectiveRate != null) ||
+          (t === "flat" && effectiveFlatAmount != null) ||
+          t === "flat_variable";
+        if (usable) effectiveType = t;
+      }
       const effectiveTiers =
         effectiveType === "flat_variable"
           ? (tiers.get(key) ?? entry.editor.tiers)
@@ -137,8 +153,8 @@ function applyPairOverrides(
       entry.editor = {
         ...entry.editor,
         payment_type: effectiveType,
-        rate: pair.rate !== null ? pair.rate : entry.editor.rate,
-        flat_amount: pair.flat_amount !== null ? pair.flat_amount : entry.editor.flat_amount,
+        rate: effectiveRate,
+        flat_amount: effectiveFlatAmount,
         tiers: effectiveTiers,
       };
     }
