@@ -430,11 +430,13 @@ function computeMonthMetrics(
     if (!isMensual && p.cobrado === "si") {
       const price = computePrice(p);
       if (price != null) { cobrado += price; profit += price; }
+      const cost = computeCost(p);
+      if (cost != null) profit -= cost;
     }
     // Pagos: solo cuando está marcado pago_total
     if (p.pagado === "pago_total") {
       const cost = computeCost(p);
-      if (cost != null) { pagado += cost; profit -= cost; }
+      if (cost != null) pagado += cost;
     }
   }
 

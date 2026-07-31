@@ -286,12 +286,10 @@ function build(
       }
     }
 
-    // Ganancia: solo ingresos cobrados y costos pagados
+    // Ganancia: ingreso cobrado menos costo del proyecto (independiente del pago al editor)
     if (!isMensual && p.cobrado === "si") {
       const price = computePrice(p);
       if (price != null) bucket.profit += price;
-    }
-    if (p.pagado === "pago_total") {
       const cost = computeCost(p);
       if (cost != null) bucket.profit -= cost;
     }
@@ -510,11 +508,12 @@ export default async function FinanzasPage({
       if (!isMensual && p.cobrado === "si") {
         const price = computePrice(p);
         if (price != null) { bucket.cobrado += price; bucket.ganancia += price; }
+        const cost = computeCost(p);
+        if (cost != null) bucket.ganancia -= cost;
       }
-
       if (p.pagado === "pago_total") {
         const cost = computeCost(p);
-        if (cost != null) { bucket.pagado += cost; bucket.ganancia -= cost; }
+        if (cost != null) bucket.pagado += cost;
       }
     }
 

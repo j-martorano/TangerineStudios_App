@@ -941,7 +941,7 @@ function TerminadoStats({ items }: { items: ProjectWithRelations[] }) {
   }
 
   const cost = monthProjects
-    .filter((p) => p.pagado === "pago_total")
+    .filter((p) => p.cobrado === "si" && p.client?.payment_type !== "mensual")
     .reduce((s, p) => s + (computeCost(p) ?? 0), 0);
   const ganancia = total - cost;
   if (total === 0 && cost === 0) return null;
