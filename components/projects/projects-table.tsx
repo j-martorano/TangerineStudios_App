@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { currentMonthKeyAR } from "@/lib/argentina-date";
 
 import { PlusIcon } from "lucide-react";
 
@@ -85,15 +86,14 @@ export function ProjectsTable({
   availableParents = [],
   highlightId,
 }: Props) {
-  if (projects.length === 0) {
-    return (
-      <p className="px-4 py-8 text-sm italic text-muted-foreground">
-        No hay proyectos cargados todavía.
-      </p>
-    );
-  }
+  const currentMK = currentMonthKeyAR();
+  const baseGroups = groupByMonth(projects);
 
-  const groups = groupByMonth(projects);
+  // Siempre incluir el mes actual como primer grupo aunque esté vacío
+  const groups: [string, ProjectWithRelations[]][] =
+    baseGroups.length > 0 && baseGroups[0][0] === currentMK
+      ? baseGroups
+      : [[currentMK, []], ...baseGroups];
 
   return (
     <Table>
@@ -109,7 +109,7 @@ export function ProjectsTable({
               availableParents={availableParents}
               highlightId={highlightId}
             />
-            {/* Fila "nuevo proyecto" debajo del mes más reciente */}
+            {/* Fila "nuevo proyecto" debajo del mes actual */}
             {idx === 0 && (
               <AddProjectRow
                 editors={editors}
