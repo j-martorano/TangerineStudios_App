@@ -379,8 +379,9 @@ function StaticKanban({
 }: Props) {
   const columns = buildColumns(projects);
   const terminadoGroups = groupTerminadoByMonth(columns.terminado);
-  const currentGroup = terminadoGroups[0];
-  const historicalGroups = terminadoGroups.slice(1);
+  const currentMKStatic = currentMonthKeyAR();
+  const currentGroup = terminadoGroups.find((g) => g.key === currentMKStatic) ?? null;
+  const historicalGroups = terminadoGroups.filter((g) => g.key !== currentMKStatic);
   const activePhases = (["por_asignar", "editando", "en_revision"] as ProjectPhase[]);
 
   return (
@@ -742,8 +743,9 @@ function InteractiveKanban({
       >
         {(() => {
           const terminadoGroups = groupTerminadoByMonth(columns.terminado);
-          const currentGroup = terminadoGroups[0];
-          const historicalGroups = terminadoGroups.slice(1);
+          const currentMK = currentMonthKeyAR();
+          const currentGroup = terminadoGroups.find((g) => g.key === currentMK) ?? null;
+          const historicalGroups = terminadoGroups.filter((g) => g.key !== currentMK);
           const activePhases = (["por_asignar", "editando", "en_revision"] as ProjectPhase[]);
           return (
             <div className="flex gap-3 overflow-x-auto pb-3">
