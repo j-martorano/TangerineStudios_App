@@ -1,4 +1,5 @@
 ﻿import Link from "next/link";
+import { todayAR } from "@/lib/argentina-date";
 
 import { NewHistoricProjectButton, NewProjectButton } from "@/components/projects/new-project-button";
 import { ProjectsTable } from "@/components/projects/projects-table";
@@ -54,7 +55,7 @@ export default async function ProjectsPage({
     )
   ).sort((a, b) => b - a);
 
-  const currentYear = new Date().getUTCFullYear();
+  const currentYear = parseInt(todayAR().slice(0, 4), 10);
   const requestedYear = Number(params.year);
   const highlightProject = highlightId ? projects.find((p) => p.id === highlightId) : undefined;
   const highlightYear = highlightProject ? projectYear(effectiveIso(highlightProject)) : undefined;

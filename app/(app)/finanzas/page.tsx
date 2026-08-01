@@ -28,6 +28,7 @@ import { monthToneFromKey } from "@/lib/projects/month-colors";
 import type { ProjectWithRelations } from "@/lib/projects/types";
 import type { FinanzasPayment } from "@/lib/finanzas/queries";
 import { ProjectSettleButton } from "@/components/finanzas/project-settle-button";
+import { currentMonthKeyAR, todayAR } from "@/lib/argentina-date";
 
 // Tinte de fondo basado en el color del cliente (hex de 8 dígitos = RRGGBB + alpha 0x33).
 function clientTint(hex: string | null | undefined): string | undefined {
@@ -107,9 +108,7 @@ function fillMonthGaps(buckets: MonthBucket[]): MonthBucket[] {
 
   const byKey = new Map(buckets.map((b) => [b.key, b]));
 
-  const now = new Date();
-  const cy = now.getUTCFullYear();
-  const cm = now.getUTCMonth() + 1;
+  const [cy, cm] = currentMonthKeyAR().split("-").map(Number);
 
   // Mes de inicio: el más antiguo con actividad
   const firstKey = [...byKey.keys()].sort()[0];
@@ -377,8 +376,7 @@ export default async function FinanzasPage({
     }));
   // Mes actual — definido aquí para usarlo tanto en los cálculos de servicios
   // como en la UI (por_mes defaultOpen, Servicios tab, etc.).
-  const now = new Date();
-  const currentMonthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const currentMonthKey = currentMonthKeyAR();
 
   const { buckets: rawBuckets, paymentItems, projectItems } = build(projects, payments);
 
@@ -478,9 +476,10 @@ export default async function FinanzasPage({
   function buildDailyForMonth(monthKey: string): ChartPoint[] {
     const [y, m] = monthKey.split("-").map(Number);
     const daysInMonth = new Date(y, m, 0).getDate();
+    const todayStr = todayAR();
     const todayDay =
-      now.getUTCFullYear() === y && now.getUTCMonth() + 1 === m
-        ? now.getUTCDate()
+      todayStr.slice(0, 7) === monthKey
+        ? parseInt(todayStr.slice(8, 10), 10)
         : daysInMonth;
 
     const dailyMap = new Map<number, { cobrado: number; pagado: number; ganancia: number }>();

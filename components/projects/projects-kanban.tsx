@@ -78,6 +78,7 @@ import {
 } from "@/lib/projects/format";
 import { reorderProjects, type ReorderUpdate } from "@/lib/projects/actions";
 import type { RetainerPayment } from "@/lib/finanzas/queries";
+import { todayAR, currentMonthKeyAR } from "@/lib/argentina-date";
 
 type Props = {
   projects: ProjectWithRelations[];
@@ -147,7 +148,7 @@ function groupTerminadoByMonth(
 }
 
 function todayUTC(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayAR();
 }
 
 function formatShortDate(iso: string): string {
@@ -183,8 +184,7 @@ function getHistMonthFromDrop(
   if (overId.startsWith("hist:")) return overId.slice(5);
   const overProject = terminadoItems.find((p) => p.id === overId);
   if (!overProject?.finalized_at) return null;
-  const now = new Date();
-  const currentMK = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const currentMK = currentMonthKeyAR();
   const projectMK = monthKey(overProject.finalized_at);
   return projectMK !== currentMK && projectMK !== "0000-00" ? projectMK : null;
 }

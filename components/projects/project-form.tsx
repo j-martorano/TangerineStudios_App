@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { todayAR } from "@/lib/argentina-date";
 import { PlusIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -613,7 +614,7 @@ export function ProjectForm({
                     const next = v as ProjectPhase;
                     setPhase(next);
                     if (next === "terminado" && !finalizedAt) {
-                      setFinalizedAt(new Date().toISOString().slice(0, 10));
+                      setFinalizedAt(todayAR());
                     }
                   }}
                 >
@@ -674,7 +675,7 @@ export function ProjectForm({
                   type="date"
                   value={finalizedAt}
                   onChange={(e) => setFinalizedAt(e.target.value)}
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={todayAR()}
                 />
                 <p className="text-xs text-muted-foreground">
                   Determina en qué mes aparece en el log del kanban. Se

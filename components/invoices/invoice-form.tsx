@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
+import { todayAR } from "@/lib/argentina-date";
 import { PlusIcon, XIcon, CheckIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,7 +26,7 @@ import { computePrice } from "@/lib/projects/format";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayAR();
 }
 
 function fmt(symbol: string, amount: number): string {

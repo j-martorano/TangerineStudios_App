@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { currentMonthKeyAR, todayAR } from "@/lib/argentina-date";
 
 const MONTH_NAMES = [
   "Enero",
@@ -32,7 +33,7 @@ export function monthKeyOf(date: Date): string {
 }
 
 export function currentMonthKey(): string {
-  return monthKeyOf(new Date());
+  return currentMonthKeyAR();
 }
 
 export function shiftMonth(key: string, delta: number): string {
@@ -47,11 +48,12 @@ export function monthLabelUpper(key: string): string {
   return `${MONTH_NAMES[idx]?.toUpperCase() ?? "—"} ${y}`;
 }
 
-/** "Sábado 13" — día de hoy en español. */
+/** "Sábado 13" — día de hoy en español, en horario argentino. */
 export function todayLabel(): string {
-  const now = new Date();
-  const day = DAY_NAMES[now.getDay()] ?? "";
-  return `${day} ${now.getDate()}`;
+  const today = todayAR();
+  const d = new Date(today + "T12:00:00Z");
+  const day = DAY_NAMES[d.getUTCDay()] ?? "";
+  return `${day} ${parseInt(today.slice(8), 10)}`;
 }
 
 /** Flechas de navegación de mes — sin caja, solo iconos. */

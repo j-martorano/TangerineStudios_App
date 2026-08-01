@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { currentMonthKeyAR } from "@/lib/argentina-date";
 import { BanknoteIcon, ClockIcon, PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -33,8 +34,7 @@ const btnBase =
 const btnStyle = { borderRadius: "6px", padding: "6px 12px" };
 
 function currentYearMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return currentMonthKeyAR();
 }
 
 export function NewProjectButton({

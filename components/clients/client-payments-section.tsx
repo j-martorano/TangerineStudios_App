@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { todayAR } from "@/lib/argentina-date";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,7 +29,7 @@ function fmtMin(n: number): string {
 }
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayAR();
 }
 
 /**

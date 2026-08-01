@@ -15,6 +15,7 @@ import { getUser, getOption, getFocusedOption } from "../types";
 import { reply, replyError, autocomplete } from "../respond";
 import { PHASE_EMOJI, PHASE_LABEL, notifyProjectMoved } from "../notify";
 import { createBotClient } from "@/lib/supabase/bot";
+import { nowISOArgentina } from "@/lib/argentina-date";
 
 // Phases editors can move TO (excludes por_asignar — that's Joaco's job)
 const MOVEABLE_PHASES = ["editando", "en_revision", "terminado"] as const;
@@ -169,7 +170,7 @@ export async function handleMover(
     .update({
       phase: newPhase,
       ...(isMovingToTerminado
-        ? { finalized: true, finalized_at: new Date().toISOString() }
+        ? { finalized: true, finalized_at: nowISOArgentina() }
         : isMovingFromTerminado
         ? { finalized: false, finalized_at: null }
         : {}),

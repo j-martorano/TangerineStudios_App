@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { todayAR } from "@/lib/argentina-date";
 import { Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -39,7 +40,7 @@ type Props = {
 };
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayAR();
 }
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("es-AR", {

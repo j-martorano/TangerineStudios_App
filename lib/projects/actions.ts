@@ -26,6 +26,7 @@ import {
 } from "./format";
 import { PROJECT_SELECT } from "./queries";
 import { notifyClientPhaseChange } from "@/lib/discord/notify";
+import { nowISOArgentina, todayAR } from "@/lib/argentina-date";
 
 async function getClientName(clientId: string | null): Promise<string | null> {
   if (!clientId) return null;
@@ -259,7 +260,7 @@ export async function updateProject(
       ? finalized_at.includes("T")
         ? finalized_at
         : `${finalized_at}T12:00:00Z`
-      : new Date().toISOString()
+      : nowISOArgentina()
     : null; // limpiar finalized_at al sacar de terminado (evita que finanzas lo bucketice en el mes viejo)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -529,11 +530,10 @@ export async function applyCobradoToggle(
       const proj = data as unknown as ProjectWithRelations;
       const total = computePrice(proj);
       if (total != null && total > 0) {
-        const today = new Date().toISOString().slice(0, 10);
         await supabase.from("project_cobros").insert({
           project_id: id,
           amount: total,
-          paid_at: today,
+          paid_at: todayAR(),
           note: null,
         });
       }
@@ -952,10 +952,9 @@ export async function setProjectFinalized(
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
 
   const supabase = await createClient();
-  const now = new Date().toISOString();
   const payload = {
     finalized,
-    finalized_at: finalized ? now : null,
+    finalized_at: finalized ? nowISOArgentina() : null,
   };
 
   // 1. Actualizar el proyecto principal
