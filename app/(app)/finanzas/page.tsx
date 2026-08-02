@@ -204,6 +204,24 @@ function build(
     const client = p.client;
     const isMensual = client?.payment_type === "mensual";
 
+    // Buckets financieros: se usan fechas reales de cobro/pago si existen,
+    // para que la transacción aparezca en el mes en que ocurrió.
+    const latestCobroIso = p.cobros.length > 0
+      ? p.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a)).paid_at
+      : null;
+    const cobradoBucket = ensureBucket(
+      monthKey(latestCobroIso ?? monthIso),
+      latestCobroIso ?? monthIso
+    );
+
+    const latestPagoIso = p.editor_pagos.length > 0
+      ? p.editor_pagos.reduce((a, b) => (b.paid_at > a.paid_at ? b : a)).paid_at
+      : null;
+    const pagadoBucket = ensureBucket(
+      monthKey(latestPagoIso ?? monthIso),
+      latestPagoIso ?? monthIso
+    );
+
     // Cobros por proyecto — sólo clientes NO mensuales. Se reflejan SOLO cuando
     // el proyecto está marcado cobrado === "si".
     if (!isMensual) {
@@ -215,12 +233,12 @@ function build(
       const cobradoFlag = p.cobrado === "si";
 
       if (cobradoFlag && price != null) {
-        bucket.collected += price;
+        cobradoBucket.collected += price;
       } else if (price != null) {
         bucket.pendingCollect += Math.max(0, price - cobrosSum);
       }
 
-      // Settle rows: muestran progreso parcial para tracking interno
+      // Settle rows: muestran progreso parcial para tracking interno (mes natural del proyecto)
       const progress =
         cobradoFlag && cobrosSum === 0 && price != null ? price : cobrosSum;
       const remaining =
@@ -256,7 +274,7 @@ function build(
       const pagoFlag = p.pagado === "pago_total";
 
       if (pagoFlag && cost != null) {
-        bucket.paid += cost;
+        pagadoBucket.paid += cost;
       } else if (cost != null) {
         bucket.pendingPay += Math.max(0, cost - pagosSum);
       }
@@ -285,12 +303,12 @@ function build(
       }
     }
 
-    // Ganancia: ingreso cobrado menos costo del proyecto (independiente del pago al editor)
+    // Ganancia: en el bucket del cobro (fecha real de transacción)
     if (!isMensual && p.cobrado === "si") {
       const price = computePrice(p);
-      if (price != null) bucket.profit += price;
+      if (price != null) cobradoBucket.profit += price;
       const cost = computeCost(p);
-      if (cost != null) bucket.profit -= cost;
+      if (cost != null) cobradoBucket.profit -= cost;
     }
   }
 
@@ -496,23 +514,60 @@ export default async function FinanzasPage({
 
     for (const p of projects) {
       if (p.parent_id) continue;
-      const projectDate = p.finalized_at ?? p.created_at;
-      if (!projectDate || !projectDate.startsWith(monthKey)) continue;
-      const d = parseInt(projectDate.slice(8, 10), 10);
-      const bucket = dailyMap.get(d);
-      if (!bucket) continue;
-
       const isMensual = p.client?.payment_type === "mensual";
 
+      // Cobrados: usar registros de cobros individuales si existen, si no fecha del proyecto
       if (!isMensual && p.cobrado === "si") {
         const price = computePrice(p);
-        if (price != null) { bucket.cobrado += price; bucket.ganancia += price; }
         const cost = computeCost(p);
-        if (cost != null) bucket.ganancia -= cost;
+        if (p.cobros.length > 0) {
+          for (const cobro of p.cobros) {
+            if (!cobro.paid_at.startsWith(monthKey)) continue;
+            const d = parseInt(cobro.paid_at.slice(8, 10), 10);
+            const b = dailyMap.get(d);
+            if (b) { b.cobrado += Number(cobro.amount); b.ganancia += Number(cobro.amount); }
+          }
+          // Restar costo en el día del cobro más reciente de este mes
+          const cobrosAqui = p.cobros.filter((c) => c.paid_at.startsWith(monthKey));
+          if (cobrosAqui.length > 0 && cost != null) {
+            const lastPaidAt = cobrosAqui.reduce((a, b) => (b.paid_at > a.paid_at ? b : a)).paid_at;
+            const d = parseInt(lastPaidAt.slice(8, 10), 10);
+            const b = dailyMap.get(d);
+            if (b) b.ganancia -= cost;
+          }
+        } else {
+          const projectDate = p.finalized_at ?? p.created_at;
+          if (projectDate?.startsWith(monthKey)) {
+            const d = parseInt(projectDate.slice(8, 10), 10);
+            const b = dailyMap.get(d);
+            if (b) {
+              if (price != null) { b.cobrado += price; b.ganancia += price; }
+              if (cost != null) b.ganancia -= cost;
+            }
+          }
+        }
       }
+
+      // Pagados: usar registros de editor_pagos si existen, si no fecha del proyecto
       if (p.pagado === "pago_total") {
-        const cost = computeCost(p);
-        if (cost != null) bucket.pagado += cost;
+        if (p.editor_pagos.length > 0) {
+          for (const pago of p.editor_pagos) {
+            if (!pago.paid_at.startsWith(monthKey)) continue;
+            const d = parseInt(pago.paid_at.slice(8, 10), 10);
+            const b = dailyMap.get(d);
+            if (b) b.pagado += Number(pago.amount);
+          }
+        } else {
+          const projectDate = p.finalized_at ?? p.created_at;
+          if (projectDate?.startsWith(monthKey)) {
+            const d = parseInt(projectDate.slice(8, 10), 10);
+            const b = dailyMap.get(d);
+            if (b) {
+              const cost = computeCost(p);
+              if (cost != null) b.pagado += cost;
+            }
+          }
+        }
       }
     }
 
