@@ -5,7 +5,7 @@ import { CheckIcon, UndoIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { changeCobrado, changePagado } from "@/lib/projects/actions";
+import { applyCobradoToggle, applyPagadoToggle } from "@/lib/projects/actions";
 
 type Props = {
   projectId: string;
@@ -31,8 +31,8 @@ export function ProjectSettleButton({
     startTransition(async () => {
       const result =
         field === "cobrado"
-          ? await changeCobrado(projectId, next ? "si" : "no")
-          : await changePagado(
+          ? await applyCobradoToggle(projectId, next ? "si" : "no")
+          : await applyPagadoToggle(
               projectId,
               next ? "pago_total" : "sin_pagar"
             );

@@ -550,6 +550,61 @@ export async function applyCobradoToggle(
   return { ok: true };
 }
 
+/**
+ * Cambia pagado a pago_total o sin_pagar y sincroniza project_editor_pagos:
+ *  - pago_total → elimina pagos previos, crea uno por editor con su costo y paid_at = hoy
+ *  - sin_pagar  → elimina todos los pagos del proyecto
+ */
+export async function applyPagadoToggle(
+  id: string,
+  pagado: string
+): Promise<ActionResult> {
+  if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
+  if (pagado !== "pago_total" && pagado !== "sin_pagar")
+    return { ok: false, error: "Estado de pago inválido" };
+
+  const supabase = await createClient();
+
+  const { error: delErr } = await supabase
+    .from("project_editor_pagos")
+    .delete()
+    .eq("project_id", id);
+  if (delErr) return { ok: false, error: delErr.message };
+
+  if (pagado === "pago_total") {
+    const { data } = await supabase
+      .from("projects")
+      .select(PROJECT_SELECT)
+      .eq("id", id)
+      .single();
+    if (data) {
+      const proj = data as unknown as ProjectWithRelations;
+      const today = todayAR();
+      for (const assignment of proj.editors) {
+        if (!assignment.editor) continue;
+        const cost = editorCostInProject(proj, assignment.editor.id);
+        if (cost == null || cost === 0) continue;
+        await supabase.from("project_editor_pagos").insert({
+          project_id: id,
+          editor_id: assignment.editor.id,
+          amount: cost,
+          paid_at: today,
+          note: null,
+        });
+      }
+    }
+  }
+
+  const { error } = await supabase
+    .from("projects")
+    .update({ pagado })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidateAll();
+  return { ok: true };
+}
+
 export async function changePagado(
   id: string,
   pagado: PagadoStatus
