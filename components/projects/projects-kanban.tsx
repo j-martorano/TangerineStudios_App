@@ -634,15 +634,16 @@ function InteractiveKanban({
       });
     }
 
-    // Movido HACIA terminado
-    if (overContainer === "terminado" && sourcePhase !== "terminado") {
+    // Drop en terminado: historial o mes actual
+    if (overContainer === "terminado") {
       const histMonth = getHistMonthFromDrop(overIdStr, next.terminado);
 
       if (histMonth) {
-        // Drop directo a mes histórico — sin dialog, fecha = primer día del mes
+        // Mes histórico: actualizar finalized_at sin dialog (funciona también al
+        // reubicar un proyecto ya terminado entre meses históricos).
         const finalUpdates = updates.map((u) =>
           u.id === activeIdStr
-            ? { ...u, finalized: true, finalized_at: `${histMonth}-01T12:00:00Z` }
+            ? { ...u, phase: "terminado" as ProjectPhase, finalized: true, finalized_at: `${histMonth}-01T12:00:00Z` }
             : u
         );
         startTransition(async () => {
@@ -652,35 +653,38 @@ function InteractiveKanban({
         return;
       }
 
-      const original = projects.find((p) => p.id === activeIdStr);
-      const existingDate = original?.finalized_at
-        ? original.finalized_at.slice(0, 10)
-        : null;
-      const today = todayUTC();
+      // Drag desde fase activa hacia terminado del mes actual
+      if (sourcePhase !== "terminado") {
+        const original = projects.find((p) => p.id === activeIdStr);
+        const existingDate = original?.finalized_at
+          ? original.finalized_at.slice(0, 10)
+          : null;
+        const today = todayUTC();
 
-      if (existingDate && existingDate !== today) {
-        const baseUpdates = updates.map((u) =>
-          u.id === activeIdStr ? { ...u, finalized: true } : u
+        if (existingDate && existingDate !== today) {
+          const baseUpdates = updates.map((u) =>
+            u.id === activeIdStr ? { ...u, finalized: true } : u
+          );
+          setPendingFinalize({
+            projectId: activeIdStr,
+            existingFinalizedAt: original!.finalized_at!,
+            rollbackCols: preDragColsRef.current,
+            baseUpdates,
+          });
+          return;
+        }
+
+        const finalUpdates = updates.map((u) =>
+          u.id === activeIdStr
+            ? { ...u, finalized: true, finalized_at: `${today}T12:00:00Z` }
+            : u
         );
-        setPendingFinalize({
-          projectId: activeIdStr,
-          existingFinalizedAt: original!.finalized_at!,
-          rollbackCols: preDragColsRef.current,
-          baseUpdates,
+        startTransition(async () => {
+          const result = await reorderProjects(finalUpdates);
+          if (!result.ok) toast.error(result.error);
         });
         return;
       }
-
-      const finalUpdates = updates.map((u) =>
-        u.id === activeIdStr
-          ? { ...u, finalized: true, finalized_at: `${today}T12:00:00Z` }
-          : u
-      );
-      startTransition(async () => {
-        const result = await reorderProjects(finalUpdates);
-        if (!result.ok) toast.error(result.error);
-      });
-      return;
     }
 
     if (updates.length > 0) {
