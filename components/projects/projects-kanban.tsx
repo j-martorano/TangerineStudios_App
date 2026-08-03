@@ -430,7 +430,7 @@ function StaticKanban({
               {currentGroup?.items.length ?? 0}
             </span>
           </div>
-          {currentGroup && <TerminadoStats items={currentGroup.items} />}
+          <TerminadoStats items={currentGroup?.items ?? []} mk={currentMKStatic} />
           <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
             {!currentGroup || currentGroup.items.length === 0 ? (
               <p className="px-1 py-4 text-center text-xs italic text-muted-foreground">Sin proyectos</p>
@@ -763,6 +763,7 @@ function InteractiveKanban({
                 phase="terminado"
                 items={currentGroup?.items ?? []}
                 monthLabel={currentGroup?.label}
+                mk={currentMK}
                 editors={editors}
                 clients={clients}
                 availableParents={availableParents}
@@ -910,41 +911,47 @@ function StatCard({
   );
 }
 
-function TerminadoStats({ items }: { items: ProjectWithRelations[] }) {
+function TerminadoStats({ items, mk: mkProp }: { items: ProjectWithRelations[]; mk?: string }) {
   const retainerPayments = useContext(KanbanRetainerPaymentsCtx);
   const allProjects = useContext(KanbanAllProjectsCtx);
 
-  // Mes del grupo (todos los items de terminado comparten el mismo mes).
-  const mk = items[0]?.finalized_at?.slice(0, 7) ?? null;
+  // mkProp se pasa explícitamente para el mes actual (aunque no haya terminados).
+  // Fallback: derivar del primer item del grupo histórico.
+  const mk = mkProp ?? items[0]?.finalized_at?.slice(0, 7) ?? null;
   if (!mk) return null;
 
-  // Stats desde TODOS los proyectos del mes, no solo los de la columna terminado.
-  // Así cobrado/pagado se refleja aunque el proyecto aún no esté en terminado.
-  const monthProjects = allProjects.filter((p) => {
-    if (p.parent_id) return false;
-    const date = p.finalized_at ?? p.created_at;
-    return date?.startsWith(mk) ?? false;
-  });
-
+  // Bucket por paid_at del cobro, no por la fecha natural del proyecto.
+  // Así un proyecto de julio cobrado en agosto aparece en agosto.
   let total = 0;
+  let cost = 0;
   const countedClients = new Set<string>();
-  for (const p of monthProjects) {
+
+  for (const p of allProjects) {
+    if (p.parent_id) continue;
+
     if (p.client?.payment_type === "mensual" && p.client_id) {
       if (!countedClients.has(p.client_id)) {
-        countedClients.add(p.client_id);
         const payment = retainerPayments.find(
           (pay) => pay.client_id === p.client_id && pay.paid_at.startsWith(mk)
         );
-        if (payment) total += payment.amount;
+        if (payment) {
+          countedClients.add(p.client_id);
+          total += payment.amount;
+        }
       }
     } else if (p.cobrado === "si") {
-      total += computePrice(p) ?? 0;
+      const latestCobro = p.cobros.length > 0
+        ? p.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a))
+        : null;
+      const cobradoMk = latestCobro?.paid_at.slice(0, 7)
+        ?? (p.finalized_at ?? p.created_at)?.slice(0, 7);
+      if (cobradoMk === mk) {
+        total += computePrice(p) ?? 0;
+        cost += computeCost(p) ?? 0;
+      }
     }
   }
 
-  const cost = monthProjects
-    .filter((p) => p.cobrado === "si" && p.client?.payment_type !== "mensual")
-    .reduce((s, p) => s + (computeCost(p) ?? 0), 0);
   const ganancia = total - cost;
   if (total === 0 && cost === 0) return null;
   return (
@@ -1081,6 +1088,7 @@ function KanbanColumn({
   clients,
   availableParents = [],
   monthLabel,
+  mk,
 }: {
   phase: ProjectPhase;
   items: ProjectWithRelations[];
@@ -1088,6 +1096,7 @@ function KanbanColumn({
   clients: ClientForProject[];
   availableParents?: ParentOption[];
   monthLabel?: string;
+  mk?: string;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: phase });
   const itemIds = useMemo(() => items.map((p) => p.id), [items]);
@@ -1119,7 +1128,7 @@ function KanbanColumn({
             {items.length}
           </span>
         </div>
-        {phase === "terminado" && <TerminadoStats items={items} />}
+        {phase === "terminado" && <TerminadoStats items={items} mk={mk} />}
         <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
           <SortableContext
             id={phase}
