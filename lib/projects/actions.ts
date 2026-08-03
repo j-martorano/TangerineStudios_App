@@ -509,8 +509,17 @@ export async function applyCobradoToggle(
   cobrado: string
 ): Promise<ActionResult> {
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
-  if (cobrado !== "si" && cobrado !== "no")
+  if (cobrado !== "si" && cobrado !== "no" && cobrado !== "parcial")
     return { ok: false, error: "Estado de cobro inválido" };
+
+  // "parcial" es solo un marcador visual — actualiza el flag sin tocar los registros de cobro
+  if (cobrado === "parcial") {
+    const supabase = await createClient();
+    const { error } = await supabase.from("projects").update({ cobrado }).eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidateAll();
+    return { ok: true };
+  }
 
   const supabase = await createClient();
 
