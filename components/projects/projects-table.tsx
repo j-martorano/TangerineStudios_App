@@ -51,6 +51,28 @@ function monthLabel(key: string): string {
   return year === "0000" ? "Sin fecha" : `${name} ${year}`;
 }
 
+function projectEffectiveMK(p: ProjectWithRelations, currentMK: string): string {
+  // Retainer: solo el terminado determina el mes histórico
+  if (p.client?.payment_type === "mensual") {
+    if (p.phase === "terminado" && p.finalized_at) return monthKey(p.finalized_at);
+    return currentMK;
+  }
+  // No-retainer: cobrado tiene prioridad (mes del cobro más reciente)
+  if (p.cobrado === "si") {
+    const latestCobro = p.cobros.length > 0
+      ? p.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a))
+      : null;
+    if (latestCobro) return latestCobro.paid_at.slice(0, 7);
+    if (p.finalized_at) return monthKey(p.finalized_at);
+    if (p.created_at) return monthKey(p.created_at);
+    return currentMK;
+  }
+  // Terminado pero no cobrado
+  if (p.phase === "terminado" && p.finalized_at) return monthKey(p.finalized_at);
+  // Activo (no cobrado, no terminado) → mes actual siempre
+  return currentMK;
+}
+
 function groupByMonth(
   projects: ProjectWithRelations[]
 ): [string, ProjectWithRelations[]][] {
@@ -58,10 +80,7 @@ function groupByMonth(
   const currentMK = currentMonthKeyAR();
   const map = new Map<string, ProjectWithRelations[]>();
   for (const p of topLevel) {
-    // Los proyectos activos siempre van al mes actual aunque hayan sido creados antes.
-    const key = p.phase === "terminado" && p.finalized_at
-      ? monthKey(p.finalized_at)
-      : currentMK;
+    const key = projectEffectiveMK(p, currentMK);
     const arr = map.get(key);
     if (arr) arr.push(p);
     else map.set(key, [p]);

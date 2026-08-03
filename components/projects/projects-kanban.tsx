@@ -117,6 +117,18 @@ function monthLabel(key: string): string {
   return year === "0000" ? "Sin fecha" : `${name} ${year}`;
 }
 
+/** Para proyectos no-retainer cobrados: devuelve el mes del cobro más reciente.
+ *  Para los demás (retainer o no cobrado) devuelve null. */
+function getCobradoMK(p: ProjectWithRelations): string | null {
+  if (p.cobrado !== "si" || p.client?.payment_type === "mensual") return null;
+  const latestCobro = p.cobros.length > 0
+    ? p.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a))
+    : null;
+  if (latestCobro) return latestCobro.paid_at.slice(0, 7);
+  // fallback: usar mes natural del proyecto
+  return monthKey(p.finalized_at ?? p.created_at);
+}
+
 const statCurrencyFmt = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -133,7 +145,8 @@ function groupTerminadoByMonth(
 ): { key: string; label: string; items: ProjectWithRelations[] }[] {
   const map = new Map<string, ProjectWithRelations[]>();
   for (const p of items) {
-    const key = monthKey(p.finalized_at);
+    // Prioridad: mes de cobro (no-retainer cobrado) > mes de terminado
+    const key = getCobradoMK(p) ?? monthKey(p.finalized_at);
     const arr = map.get(key);
     if (arr) arr.push(p);
     else map.set(key, [p]);
@@ -156,10 +169,20 @@ function formatShortDate(iso: string): string {
   return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
 }
 
-function buildColumns(projects: ProjectWithRelations[]): ColumnsMap {
+function buildColumns(projects: ProjectWithRelations[], currentMK: string): ColumnsMap {
   const map = {} as ColumnsMap;
   for (const phase of PROJECT_PHASES) map[phase] = [];
-  for (const p of projects) map[p.phase].push(p);
+  for (const p of projects) {
+    // Proyecto no-retainer cobrado en un mes pasado → columna histórica (terminado)
+    if (p.phase !== "terminado") {
+      const cobradoMK = getCobradoMK(p);
+      if (cobradoMK && cobradoMK !== currentMK) {
+        map["terminado"].push(p);
+        continue;
+      }
+    }
+    map[p.phase].push(p);
+  }
   for (const phase of PROJECT_PHASES) {
     map[phase].sort((a, b) => a.position - b.position);
   }
@@ -183,9 +206,10 @@ function getHistMonthFromDrop(
 ): string | null {
   if (overId.startsWith("hist:")) return overId.slice(5);
   const overProject = terminadoItems.find((p) => p.id === overId);
-  if (!overProject?.finalized_at) return null;
+  if (!overProject) return null;
   const currentMK = currentMonthKeyAR();
-  const projectMK = monthKey(overProject.finalized_at);
+  // Para proyectos cobrados (no-retainer), usar el mes del cobro como referencia
+  const projectMK = getCobradoMK(overProject) ?? monthKey(overProject.finalized_at);
   return projectMK !== currentMK && projectMK !== "0000-00" ? projectMK : null;
 }
 
@@ -377,9 +401,9 @@ function StaticKanban({
   clients,
   availableParents = [],
 }: Props) {
-  const columns = buildColumns(projects);
-  const terminadoGroups = groupTerminadoByMonth(columns.terminado);
   const currentMKStatic = currentMonthKeyAR();
+  const columns = buildColumns(projects, currentMKStatic);
+  const terminadoGroups = groupTerminadoByMonth(columns.terminado);
   const currentGroup = terminadoGroups.find((g) => g.key === currentMKStatic) ?? null;
   const historicalGroups = terminadoGroups.filter((g) => g.key !== currentMKStatic);
   const activePhases = (["por_asignar", "editando", "en_revision"] as ProjectPhase[]);
@@ -476,7 +500,7 @@ function InteractiveKanban({
   const { dndDisabled } = useContext(KanbanFocusCtx);
 
   const [columns, setColumns] = useState<ColumnsMap>(() =>
-    buildColumns(projects)
+    buildColumns(projects, currentMonthKeyAR())
   );
   const columnsRef = useRef<ColumnsMap>(columns);
   columnsRef.current = columns;
@@ -503,7 +527,7 @@ function InteractiveKanban({
   useEffect(() => {
     if (lastKeyRef.current === projectsKey) return;
     lastKeyRef.current = projectsKey;
-    setColumns(buildColumns(projects));
+    setColumns(buildColumns(projects, currentMonthKeyAR()));
   }, [projectsKey, projects]);
 
   const allSensors = useSensors(
