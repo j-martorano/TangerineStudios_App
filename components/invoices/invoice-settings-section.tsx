@@ -72,7 +72,7 @@ export function InvoiceSettingsSection({ settings }: Props) {
               Próximo número de factura
             </Label>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">INV-</span>
+              <span className="text-sm text-muted-foreground">{"{CLIENTE}-INV"}</span>
               <Input
                 id="inv-next-number"
                 type="number"

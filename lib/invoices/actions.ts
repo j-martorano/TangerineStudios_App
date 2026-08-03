@@ -63,7 +63,11 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     return { ok: false, error: numErr?.message ?? "No se pudo reservar número de factura" };
   }
   const invoiceNumber: number = numData;
-  const invoiceCode = `INV-${String(invoiceNumber).padStart(5, "0")}`;
+  const clientCode = (d.client_name.split(/\s+/)[0] ?? "CLIENT")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 8) || "CLIENT";
+  const invoiceCode = `${clientCode}-INV${String(invoiceNumber).padStart(5, "0")}`;
 
   // 2. Calcular totales
   const subtotal = d.items.reduce((s, it) => s + it.quantity * it.rate, 0);
