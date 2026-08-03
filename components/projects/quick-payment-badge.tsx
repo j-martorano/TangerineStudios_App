@@ -55,7 +55,7 @@ type Config = {
 
 const CONFIG: Record<Props["kind"], Config> = {
   cobrado: {
-    options: ["no", "si"],
+    options: ["no", "parcial", "si"],
     labels: COBRADO_LABEL,
     classes: COBRADO_CLASS,
     action: applyCobradoToggle as Config["action"],
