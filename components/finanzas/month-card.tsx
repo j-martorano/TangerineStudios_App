@@ -94,8 +94,8 @@ export function MonthCard({
             <CardTitle className="uppercase tracking-wide">{label}</CardTitle>
           </div>
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
-            <Inline label="Cobrado" value={formatPrice(collected)} />
-            <Inline label="Pagado" value={formatPrice(paid)} />
+            <Inline label="Cobrado" value={formatPrice(collected)} valueClass="text-sky-400" />
+            <Inline label="Pagado" value={formatPrice(paid)} valueClass="text-red-400" />
             <Inline
               label="Ganancia"
               value={formatPrice(profit)}
@@ -117,12 +117,14 @@ export function MonthCard({
               primary={formatPrice(collected)}
               secondaryLabel="Por cobrar"
               secondary={formatPrice(pendingCollect)}
+              tone="cobrado"
             />
             <MonthRow
               label="Pagado"
               primary={formatPrice(paid)}
               secondaryLabel="Por pagar"
               secondary={formatPrice(pendingPay)}
+              tone="pagado"
             />
             {servicesCost > 0 ? (
               <MonthRow
@@ -133,7 +135,7 @@ export function MonthCard({
             <MonthRow
               label="Ganancia"
               primary={formatPrice(profit)}
-              tone={profit < 0 ? undefined : "positive"}
+              tone={profit < 0 ? "negative" : "positive"}
             />
           </div>
 
@@ -247,10 +249,14 @@ function MonthRow({
   primary: string;
   secondaryLabel?: string;
   secondary?: string;
-  tone?: "positive";
+  tone?: "positive" | "negative" | "cobrado" | "pagado";
 }) {
   const primaryClass =
-    tone === "positive" ? "text-emerald-500" : "text-foreground";
+    tone === "positive" ? "text-emerald-500"
+    : tone === "negative" ? "text-destructive"
+    : tone === "cobrado" ? "text-sky-400"
+    : tone === "pagado" ? "text-red-400"
+    : "text-foreground";
   return (
     <div className="flex flex-col gap-1">
       <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
