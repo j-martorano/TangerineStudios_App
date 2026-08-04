@@ -189,20 +189,37 @@ function build(
     });
   }
 
-  // ====== Proyectos — entran en el mes según finalized_at o created_at ======
+  const currentMK = currentMonthKeyAR();
+
+  // ====== Proyectos — se muestran en el mes efectivo (misma lógica que kanban/spreadsheet) ======
   // Los hijos de un pack no entran como entradas propias; el pack padre los
   // engloba (su cost ya suma los costos de los hijos vía computeCost).
   // Un proyecto se refleja en cobros/pagos SOLO cuando está marcado cobrado/pagado.
   for (const p of projects) {
     if (p.parent_id) continue;
-    const monthIso = p.finalized_at ?? p.created_at;
-    if (!monthIso) continue;
-    const key = monthKey(monthIso);
-    const bucket = ensureBucket(key, monthIso);
+    const naturalIso = p.finalized_at ?? p.created_at;
+    if (!naturalIso) continue;
+
+    // Determinar el mes de display: mismo criterio que kanban y spreadsheet.
+    const isMensualClient = p.client?.payment_type === "mensual";
+    let displayKey: string;
+    if (!isMensualClient && p.cobrado === "si") {
+      const latestCobroIso = p.cobros.length > 0
+        ? p.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a)).paid_at
+        : null;
+      displayKey = monthKey(latestCobroIso ?? naturalIso);
+    } else if (p.phase === "terminado" && p.finalized_at) {
+      displayKey = monthKey(p.finalized_at);
+    } else {
+      displayKey = currentMK;
+    }
+    const displayIso = displayKey === currentMK ? `${currentMK}-01T00:00:00Z` : naturalIso;
+    const bucket = ensureBucket(displayKey, displayIso);
+    const monthIso = naturalIso; // usado más abajo para cobradoBucket/pagadoBucket
     bucket.projects.push(p);
 
     const client = p.client;
-    const isMensual = client?.payment_type === "mensual";
+    const isMensual = isMensualClient;
 
     // Buckets financieros: se usan fechas reales de cobro/pago si existen,
     // para que la transacción aparezca en el mes en que ocurrió.
@@ -247,7 +264,7 @@ function build(
 
       if (price != null || progress > 0) {
         projectItems.push({
-          yearMonth: key,
+          yearMonth: displayKey,
           monthLabel: bucket.label,
           projectId: p.id,
           projectCode: p.project_code,
@@ -287,7 +304,7 @@ function build(
 
       if (cost != null || progress > 0) {
         projectItems.push({
-          yearMonth: key,
+          yearMonth: displayKey,
           monthLabel: bucket.label,
           projectId: p.id,
           projectCode: p.project_code,
