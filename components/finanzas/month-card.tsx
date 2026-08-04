@@ -147,9 +147,9 @@ export function MonthCard({
               <div className="flex flex-col divide-y divide-border/40">
                 <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   <span>Proyecto / cliente</span>
-                  <span className="text-right">Cobrado</span>
-                  <span className="text-right">Pagado</span>
-                  <span className="text-right">Ganancia</span>
+                  <span className="text-right text-sky-400">Cobrado</span>
+                  <span className="text-right text-red-400">Pagado</span>
+                  <span className="text-right text-emerald-500">Ganancia</span>
                 </div>
                 {projects.map((p) => {
                   const isMensual = p.client?.payment_type === "mensual";
@@ -178,14 +178,10 @@ export function MonthCard({
                           {p.client?.name ?? p.client_name ?? "Sin cliente"}
                         </span>
                       </div>
-                      <span
-                        className={`text-right tabular-nums ${cobradoColor(p.cobrado)}`}
-                      >
+                      <span className="text-right tabular-nums text-sky-400">
                         {cobradoStr}
                       </span>
-                      <span
-                        className={`text-right tabular-nums ${pagadoColor(p.pagado)}`}
-                      >
+                      <span className="text-right tabular-nums text-red-400">
                         {pagadoStr}
                       </span>
                       <span
