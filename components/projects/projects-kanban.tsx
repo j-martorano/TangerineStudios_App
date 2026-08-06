@@ -653,6 +653,7 @@ function InteractiveKanban({
         ) {
           u.finalized = false;
           u.finalized_at = null;
+          u.movePaidAtTo = todayUTC();
         }
         updates.push(u);
       });
