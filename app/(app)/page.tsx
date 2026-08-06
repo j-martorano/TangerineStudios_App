@@ -444,19 +444,19 @@ function computeMonthMetrics(
     if (!isMensual && p.cobrado === "si") {
       const price = computePrice(p);
       if (price != null) { cobrado += price; profit += price; }
-      const cost = computeCost(p);
-      if (cost != null) profit -= cost;
     }
-    // Pagos: solo cuando está marcado pago_total
+    // Pagos: solo cuando está marcado pago_total, bucket por paid_at del editor_pago
     if (p.pagado === "pago_total") {
       const cost = computeCost(p);
       if (cost != null) {
-        // Bucket por paid_at del pago más reciente
         const latestPago = p.editor_pagos.length > 0
           ? p.editor_pagos.reduce((a, b) => (b.paid_at > a.paid_at ? b : a))
           : null;
         const pagoMK = latestPago ? latestPago.paid_at.slice(0, 7) : effectiveMK;
-        if (pagoMK === mk) pagado += cost;
+        if (pagoMK === mk) {
+          pagado += cost;
+          profit -= cost;
+        }
       }
     }
   }
