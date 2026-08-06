@@ -14,8 +14,8 @@ import {
 
 import {
   applyCobradoToggle,
+  applyPagadoToggle,
   changeInvoiced,
-  changePagado,
 } from "@/lib/projects/actions";
 import {
   COBRADO_CLASS,
@@ -66,7 +66,7 @@ const CONFIG: Record<Props["kind"], Config> = {
     options: PAGADO_STATUSES,
     labels: PAGADO_LABEL,
     classes: PAGADO_CLASS,
-    action: changePagado as Config["action"],
+    action: applyPagadoToggle as Config["action"],
     ariaLabel: "Cambiar estado de pago al editor",
     successMessage: "Pago al editor actualizado",
   },

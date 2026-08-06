@@ -975,6 +975,17 @@ function TerminadoStats({ items, mk: mkProp }: { items: ProjectWithRelations[]; 
         ?? (p.finalized_at ?? p.created_at)?.slice(0, 7);
       if (cobradoMk === mk) {
         total += computePrice(p) ?? 0;
+      }
+    }
+
+    // Costo: independiente del cobrado, se bucketa por la fecha del pago al editor
+    if (p.pagado === "pago_total" && p.client?.payment_type !== "mensual") {
+      const latestPago = p.editor_pagos.length > 0
+        ? p.editor_pagos.reduce((a, b) => (b.paid_at > a.paid_at ? b : a))
+        : null;
+      const pagadoMk = latestPago?.paid_at.slice(0, 7)
+        ?? (p.finalized_at ?? p.created_at)?.slice(0, 7);
+      if (pagadoMk === mk) {
         cost += computeCost(p) ?? 0;
       }
     }

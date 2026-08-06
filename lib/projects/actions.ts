@@ -569,8 +569,17 @@ export async function applyPagadoToggle(
   pagado: string
 ): Promise<ActionResult> {
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
-  if (pagado !== "pago_total" && pagado !== "sin_pagar")
+  if (pagado !== "pago_total" && pagado !== "sin_pagar" && pagado !== "parcial")
     return { ok: false, error: "Estado de pago inválido" };
+
+  // "parcial" es solo un marcador visual — actualiza el flag sin tocar los registros de pago
+  if (pagado === "parcial") {
+    const supabase = await createClient();
+    const { error } = await supabase.from("projects").update({ pagado }).eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidateAll();
+    return { ok: true };
+  }
 
   const supabase = await createClient();
 
