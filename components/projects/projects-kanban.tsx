@@ -667,7 +667,7 @@ function InteractiveKanban({
         // reubicar un proyecto ya terminado entre meses históricos).
         const finalUpdates = updates.map((u) =>
           u.id === activeIdStr
-            ? { ...u, phase: "terminado" as ProjectPhase, finalized: true, finalized_at: `${histMonth}-01T12:00:00Z` }
+            ? { ...u, phase: "terminado" as ProjectPhase, finalized: true, finalized_at: `${histMonth}-01T12:00:00Z`, movePaidAtTo: `${histMonth}-15` }
             : u
         );
         startTransition(async () => {

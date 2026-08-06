@@ -1082,6 +1082,8 @@ export type ReorderUpdate = {
   finalized?: boolean;
   /** ISO string de la fecha de terminado. Solo relevante si finalized=true. */
   finalized_at?: string | null;
+  /** Si se pasa, reasigna el paid_at de cobros y editor_pagos del proyecto a esta fecha (YYYY-MM-DD). */
+  movePaidAtTo?: string;
 };
 
 const reorderSchema = z.array(
@@ -1091,6 +1093,7 @@ const reorderSchema = z.array(
     position: z.number().int().nonnegative(),
     finalized: z.boolean().optional(),
     finalized_at: z.string().nullable().optional(),
+    movePaidAtTo: z.string().optional(),
   })
 );
 
@@ -1126,6 +1129,17 @@ export async function reorderProjects(
 
   const failure = results.find((r) => r.error);
   if (failure?.error) return { ok: false, error: failure.error.message };
+
+  // Reasignar paid_at en cobros y editor_pagos si se movió a un mes histórico
+  const paidAtMoves = parsed.data.filter((u) => u.movePaidAtTo);
+  if (paidAtMoves.length > 0) {
+    await Promise.all(
+      paidAtMoves.flatMap((u) => [
+        supabase.from("project_cobros").update({ paid_at: u.movePaidAtTo }).eq("project_id", u.id),
+        supabase.from("project_editor_pagos").update({ paid_at: u.movePaidAtTo }).eq("project_id", u.id),
+      ])
+    );
+  }
 
   revalidateAll();
 
