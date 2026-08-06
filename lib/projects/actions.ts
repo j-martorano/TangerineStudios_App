@@ -539,10 +539,15 @@ export async function applyCobradoToggle(
       const proj = data as unknown as ProjectWithRelations;
       const total = computePrice(proj);
       if (total != null && total > 0) {
+        // Usar la fecha efectiva del bucket del proyecto, no la fecha de hoy
+        const effectiveDate =
+          proj.phase === "terminado" && proj.finalized_at
+            ? proj.finalized_at.slice(0, 10)
+            : todayAR();
         await supabase.from("project_cobros").insert({
           project_id: id,
           amount: total,
-          paid_at: todayAR(),
+          paid_at: effectiveDate,
           note: null,
         });
       }
@@ -597,7 +602,16 @@ export async function applyPagadoToggle(
       .single();
     if (data) {
       const proj = data as unknown as ProjectWithRelations;
-      const today = todayAR();
+      // Usar la fecha efectiva del bucket del proyecto, no la fecha de hoy
+      const effectiveDate = (() => {
+        if (proj.cobrado === "si" && proj.cobros.length > 0) {
+          return proj.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a)).paid_at;
+        }
+        if (proj.phase === "terminado" && proj.finalized_at) {
+          return proj.finalized_at.slice(0, 10);
+        }
+        return todayAR();
+      })();
       for (const assignment of proj.editors) {
         if (!assignment.editor) continue;
         const cost = editorCostInProject(proj, assignment.editor.id);
@@ -606,7 +620,7 @@ export async function applyPagadoToggle(
           project_id: id,
           editor_id: assignment.editor.id,
           amount: cost,
-          paid_at: today,
+          paid_at: effectiveDate,
           note: null,
         });
       }
