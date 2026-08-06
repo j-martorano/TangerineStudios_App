@@ -199,12 +199,19 @@ function findContainer(cols: ColumnsMap, id: string): ProjectPhase | null {
 }
 
 /** Devuelve el mes histórico (YYYY-MM) si el drop target es una columna o
- *  card de un mes pasado. Devuelve null si es el mes actual o no es terminado. */
+ *  card de un mes pasado. Devuelve null si es el mes actual o no es terminado.
+ *
+ *  allowCardDetection: true solo cuando el origen ya está en terminado
+ *  (reordenar entre meses históricos). Cuando se viene de una fase activa,
+ *  solo confiamos en droppables "hist:YYYY-MM" para evitar que el cursor
+ *  termine sobre una card histórica y mande el proyecto al mes equivocado. */
 function getHistMonthFromDrop(
   overId: string,
-  terminadoItems: ProjectWithRelations[]
+  terminadoItems: ProjectWithRelations[],
+  allowCardDetection: boolean,
 ): string | null {
   if (overId.startsWith("hist:")) return overId.slice(5);
+  if (!allowCardDetection) return null;
   const overProject = terminadoItems.find((p) => p.id === overId);
   if (!overProject) return null;
   const currentMK = currentMonthKeyAR();
@@ -660,7 +667,7 @@ function InteractiveKanban({
 
     // Drop en terminado: historial o mes actual
     if (overContainer === "terminado") {
-      const histMonth = getHistMonthFromDrop(overIdStr, next.terminado);
+      const histMonth = getHistMonthFromDrop(overIdStr, next.terminado, sourcePhase === "terminado");
 
       if (histMonth) {
         // Mes histórico: actualizar finalized_at sin dialog (funciona también al
