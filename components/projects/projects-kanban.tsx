@@ -716,6 +716,21 @@ function InteractiveKanban({
         });
         return;
       }
+
+      // Drag desde terminado histórico → terminado mes actual
+      if (sourcePhase === "terminado") {
+        const today = todayUTC();
+        const finalUpdates = updates.map((u) =>
+          u.id === activeIdStr
+            ? { ...u, finalized: true, finalized_at: `${today}T12:00:00Z`, movePaidAtTo: today }
+            : u
+        );
+        startTransition(async () => {
+          const result = await reorderProjects(finalUpdates);
+          if (!result.ok) toast.error(result.error);
+        });
+        return;
+      }
     }
 
     if (updates.length > 0) {
