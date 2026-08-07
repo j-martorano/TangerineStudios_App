@@ -438,10 +438,13 @@ function computeMonthMetrics(
       }
     }
 
-    // Pagado: bucket por editor_pagos.paid_at (independiente del cobrado)
-    if (!isMensual && p.pagado === "pago_total" && p.editor_pagos.length > 0) {
-      const latestPago = p.editor_pagos.reduce((a, b) => (b.paid_at > a.paid_at ? b : a));
-      const pagoMK = latestPago.paid_at.slice(0, 7);
+    // Pagado: bucket por editor_pagos.paid_at; fallback a finalized_at/created_at (igual que kanban)
+    if (!isMensual && p.pagado === "pago_total") {
+      const latestPago = p.editor_pagos.length > 0
+        ? p.editor_pagos.reduce((a, b) => (b.paid_at > a.paid_at ? b : a))
+        : null;
+      const pagoMK = latestPago?.paid_at.slice(0, 7)
+        ?? (p.finalized_at ?? p.created_at)?.slice(0, 7);
       if (pagoMK === mk) {
         const cost = computeCost(p);
         if (cost != null) { pagado += cost; profit -= cost; }
