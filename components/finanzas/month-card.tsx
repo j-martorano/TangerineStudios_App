@@ -95,7 +95,12 @@ export function MonthCard({
           </div>
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
             <Inline label="Cobrado" value={formatPrice(collected)} valueClass="text-sky-400" />
-            <Inline label="Pagado" value={formatPrice(paid)} valueClass="text-red-400" />
+            <Inline
+              label="Pagado"
+              value={formatPrice(paid)}
+              valueClass="text-red-400"
+              note={servicesCost > 0 ? `(+${formatPrice(servicesCost)} serv.)` : undefined}
+            />
             <Inline
               label="Ganancia"
               value={formatPrice(profit)}
@@ -212,11 +217,13 @@ function Inline({
   value,
   valueClass,
   bold,
+  note,
 }: {
   label: string;
   value: string;
   valueClass?: string;
   bold?: boolean;
+  note?: string;
 }) {
   return (
     <span className="inline-flex items-baseline gap-1">
@@ -230,6 +237,9 @@ function Inline({
       >
         {value}
       </span>
+      {note ? (
+        <span className="text-[10px] text-muted-foreground">{note}</span>
+      ) : null}
     </span>
   );
 }

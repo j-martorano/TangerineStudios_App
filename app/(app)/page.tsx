@@ -8,7 +8,11 @@ import {
   fetchProjects,
   fetchEditors,
 } from "@/lib/projects/queries";
-import { fetchClientPayments } from "@/lib/finanzas/queries";
+import {
+  fetchClientPayments,
+  fetchFixedServices,
+  fetchServiceMonthEntries,
+} from "@/lib/finanzas/queries";
 import type { ProjectWithRelations } from "@/lib/projects/types";
 import {
   computeCost,
@@ -56,11 +60,13 @@ export default async function DashboardPage({
     : currentMonthKey();
   const previousMonth = shiftMonth(selectedMonth, -1);
 
-  const [allProjects, clients, payments, editors] = await Promise.all([
+  const [allProjects, clients, payments, editors, fixedServices, serviceMonthEntries] = await Promise.all([
     fetchProjects(),
     fetchClients(),
     fetchClientPayments(),
     fetchEditors(),
+    fetchFixedServices(),
+    fetchServiceMonthEntries(),
   ]);
 
   const projects = allProjects.filter((p) => !p.parent_id);
@@ -75,6 +81,19 @@ export default async function DashboardPage({
   );
 
   const currentMK = currentMonthKey();
+
+  function servicesCostForMonth(mk: string): number {
+    if (mk === currentMK) {
+      return fixedServices.filter((s) => s.active).reduce((s, sv) => s + sv.monthly_cost, 0);
+    }
+    if (mk < currentMK) {
+      return serviceMonthEntries.filter((e) => e.year_month === mk).reduce((s, e) => s + e.amount, 0);
+    }
+    return 0;
+  }
+
+  const selectedServicesCost = servicesCostForMonth(selectedMonth);
+
   const monthMetrics = computeMonthMetrics(projects, payments, selectedMonth, currentMK);
   const previousMetrics = computeMonthMetrics(projects, payments, previousMonth, currentMK);
 
@@ -171,6 +190,7 @@ export default async function DashboardPage({
             value={formatPrice(monthMetrics.pagado)}
             delta={moneyDelta(monthMetrics.pagado, previousMetrics.pagado)}
             blobColor="#FF373780"
+            note={selectedServicesCost > 0 ? `(+${formatPrice(selectedServicesCost)} serv.)` : undefined}
           />
           <GradientStatCard
             label="Ganancias"
@@ -226,11 +246,13 @@ function GradientStatCard({
   value,
   delta,
   blobColor,
+  note,
 }: {
   label: string;
   value: string;
   delta?: { raw: number; text: string };
   blobColor: string;
+  note?: string;
 }) {
   const deltaColor =
     !delta
@@ -261,6 +283,9 @@ function GradientStatCard({
           {label}
         </span>
         <span className="text-4xl font-bold tabular-nums">{value}</span>
+        {note ? (
+          <span className="text-xs text-muted-foreground">{note}</span>
+        ) : null}
         {delta ? (
           <span className={`text-xs font-semibold tabular-nums ${deltaColor}`}>
             {delta.text}
