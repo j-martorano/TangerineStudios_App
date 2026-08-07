@@ -1068,7 +1068,7 @@ function DroppableHistoricalMonthColumn({
           <span className="text-xl font-[200] uppercase tracking-tight">{group.label}</span>
           <span className="text-xl font-semibold tabular-nums text-white">{group.items.length}</span>
         </div>
-        <TerminadoStats items={group.items} />
+        <TerminadoStats items={group.items} mk={group.key} />
         <SortableContext id={droppableId} items={itemIds} strategy={verticalListSortingStrategy}>
           <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
             {group.items.length === 0 ? (
@@ -1117,7 +1117,7 @@ function HistoricalMonthColumn({
           <span className="text-xl font-[200] uppercase tracking-tight">{group.label}</span>
           <span className="text-xl font-semibold tabular-nums text-white">{group.items.length}</span>
         </div>
-        <TerminadoStats items={group.items} />
+        <TerminadoStats items={group.items} mk={group.key} />
         {group.items.map((p) => (
           <div key={p.id} className="flex flex-col">
             <PackBadge project={p} />
