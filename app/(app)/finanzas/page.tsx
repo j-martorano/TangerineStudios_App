@@ -320,12 +320,14 @@ function build(
       }
     }
 
-    // Ganancia: en el bucket del cobro (fecha real de transacción)
+    // Ganancia: cobrado en su bucket, pagado en su bucket (independientes)
     if (!isMensual && p.cobrado === "si") {
       const price = computePrice(p);
       if (price != null) cobradoBucket.profit += price;
+    }
+    if (!isMensual && p.pagado === "pago_total") {
       const cost = computeCost(p);
-      if (cost != null) cobradoBucket.profit -= cost;
+      if (cost != null) pagadoBucket.profit -= cost;
     }
   }
 
@@ -437,19 +439,15 @@ export default async function FinanzasPage({
   const buckets = fillMonthGaps(rawBuckets);
   for (const b of buckets) {
     if (b.key === currentMonthKey) {
-      // Mes actual: activos
       if (servicesMonthlyTotal > 0) {
         b.servicesCost = servicesMonthlyTotal;
-        b.profit -= servicesMonthlyTotal;
       }
     } else if (b.key < currentMonthKey) {
-      // Mes pasado: entradas guardadas en DB
       const monthMap = entriesByMonth.get(b.key);
       if (monthMap && monthMap.size > 0) {
         const total = [...monthMap.values()].reduce((s, a) => s + a, 0);
         if (total > 0) {
           b.servicesCost = total;
-          b.profit -= total;
         }
       }
     }
