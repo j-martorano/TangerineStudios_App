@@ -411,20 +411,6 @@ type MonthMetrics = {
   profit: number;
 };
 
-function projectEffectiveMK(p: ProjectWithRelations, currentMK: string): string {
-  const isMensual = p.client?.payment_type === "mensual";
-  if (!isMensual && p.cobrado === "si") {
-    const latestCobro = p.cobros.length > 0
-      ? p.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a))
-      : null;
-    if (latestCobro) return latestCobro.paid_at.slice(0, 7);
-    const naturalIso = p.finalized_at ?? p.created_at;
-    return naturalIso ? monthKeyOf(new Date(naturalIso)) : currentMK;
-  }
-  if (p.phase === "terminado" && p.finalized_at) return monthKeyOf(new Date(p.finalized_at));
-  return currentMK;
-}
-
 function computeMonthMetrics(
   projects: ProjectWithRelations[],
   payments: { amount: number; paid_at: string }[],
@@ -437,24 +423,28 @@ function computeMonthMetrics(
 
   for (const p of projects) {
     const isMensual = p.client?.payment_type === "mensual";
-    const effectiveMK = projectEffectiveMK(p, currentMK);
-    if (effectiveMK !== mk) continue;
 
-    // Cobros: solo cuando está marcado cobrado
+    // Cobrado: bucket por cobros.paid_at (independiente del pagado)
     if (!isMensual && p.cobrado === "si") {
-      const price = computePrice(p);
-      if (price != null) { cobrado += price; profit += price; }
+      const latestCobro = p.cobros.length > 0
+        ? p.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a))
+        : null;
+      const cobroMK = latestCobro
+        ? latestCobro.paid_at.slice(0, 7)
+        : (() => { const iso = p.finalized_at ?? p.created_at; return iso ? monthKeyOf(new Date(iso)) : currentMK; })();
+      if (cobroMK === mk) {
+        const price = computePrice(p);
+        if (price != null) { cobrado += price; profit += price; }
+      }
     }
-    // Pagos: solo cuando está marcado pago_total y hay registro con paid_at
-    if (p.pagado === "pago_total" && p.editor_pagos.length > 0) {
-      const cost = computeCost(p);
-      if (cost != null) {
-        const latestPago = p.editor_pagos.reduce((a, b) => (b.paid_at > a.paid_at ? b : a));
-        const pagoMK = latestPago.paid_at.slice(0, 7);
-        if (pagoMK === mk) {
-          pagado += cost;
-          profit -= cost;
-        }
+
+    // Pagado: bucket por editor_pagos.paid_at (independiente del cobrado)
+    if (!isMensual && p.pagado === "pago_total" && p.editor_pagos.length > 0) {
+      const latestPago = p.editor_pagos.reduce((a, b) => (b.paid_at > a.paid_at ? b : a));
+      const pagoMK = latestPago.paid_at.slice(0, 7);
+      if (pagoMK === mk) {
+        const cost = computeCost(p);
+        if (cost != null) { pagado += cost; profit -= cost; }
       }
     }
   }
