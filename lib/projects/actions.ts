@@ -499,10 +499,34 @@ export async function changeCobrado(
   return { ok: true };
 }
 
+type SB = Awaited<ReturnType<typeof createClient>>;
+
+async function _cobradoOne(sb: SB, projectId: string, cobrado: "si" | "no" | "parcial"): Promise<void> {
+  if (cobrado === "parcial") {
+    await sb.from("projects").update({ cobrado }).eq("id", projectId);
+    return;
+  }
+  await sb.from("project_cobros").delete().eq("project_id", projectId);
+  if (cobrado === "si") {
+    const { data } = await sb.from("projects").select(PROJECT_SELECT).eq("id", projectId).single();
+    if (data) {
+      const proj = data as unknown as ProjectWithRelations;
+      const total = computePrice(proj);
+      if (total != null && total > 0) {
+        const effectiveDate =
+          proj.phase === "terminado" && proj.finalized_at
+            ? proj.finalized_at.slice(0, 10)
+            : todayAR();
+        await sb.from("project_cobros").insert({ project_id: projectId, amount: total, paid_at: effectiveDate, note: null });
+      }
+    }
+  }
+  await sb.from("projects").update({ cobrado }).eq("id", projectId);
+}
+
 /**
- * Cambia cobrado a SI o NO desde el spreadsheet y sincroniza project_cobros:
- *  - SI → elimina cobros previos, crea uno por el precio completo (si computable)
- *  - NO → elimina todos los cobros del proyecto
+ * Cambia cobrado a SI / NO / PARCIAL y sincroniza project_cobros.
+ * Si el proyecto es un pack, aplica el mismo estado a todos sus hijos.
  */
 export async function applyCobradoToggle(
   id: string,
@@ -512,97 +536,28 @@ export async function applyCobradoToggle(
   if (cobrado !== "si" && cobrado !== "no" && cobrado !== "parcial")
     return { ok: false, error: "Estado de cobro inválido" };
 
-  // "parcial" es solo un marcador visual — actualiza el flag sin tocar los registros de cobro
-  if (cobrado === "parcial") {
-    const supabase = await createClient();
-    const { error } = await supabase.from("projects").update({ cobrado }).eq("id", id);
-    if (error) return { ok: false, error: error.message };
-    revalidateAll();
-    return { ok: true };
+  const sb = await createClient();
+  await _cobradoOne(sb, id, cobrado as "si" | "no" | "parcial");
+
+  const { data: children } = await sb.from("projects").select("id").eq("parent_id", id);
+  if (children && children.length > 0) {
+    await Promise.all(children.map((c) => _cobradoOne(sb, c.id, cobrado as "si" | "no" | "parcial")));
   }
-
-  const supabase = await createClient();
-
-  const { error: delErr } = await supabase
-    .from("project_cobros")
-    .delete()
-    .eq("project_id", id);
-  if (delErr) return { ok: false, error: delErr.message };
-
-  if (cobrado === "si") {
-    const { data } = await supabase
-      .from("projects")
-      .select(PROJECT_SELECT)
-      .eq("id", id)
-      .single();
-    if (data) {
-      const proj = data as unknown as ProjectWithRelations;
-      const total = computePrice(proj);
-      if (total != null && total > 0) {
-        // Usar la fecha efectiva del bucket del proyecto, no la fecha de hoy
-        const effectiveDate =
-          proj.phase === "terminado" && proj.finalized_at
-            ? proj.finalized_at.slice(0, 10)
-            : todayAR();
-        await supabase.from("project_cobros").insert({
-          project_id: id,
-          amount: total,
-          paid_at: effectiveDate,
-          note: null,
-        });
-      }
-    }
-  }
-
-  const { error } = await supabase
-    .from("projects")
-    .update({ cobrado })
-    .eq("id", id);
-  if (error) return { ok: false, error: error.message };
 
   revalidateAll();
   return { ok: true };
 }
 
-/**
- * Cambia pagado a pago_total o sin_pagar y sincroniza project_editor_pagos:
- *  - pago_total → elimina pagos previos, crea uno por editor con su costo y paid_at = hoy
- *  - sin_pagar  → elimina todos los pagos del proyecto
- */
-export async function applyPagadoToggle(
-  id: string,
-  pagado: string
-): Promise<ActionResult> {
-  if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
-  if (pagado !== "pago_total" && pagado !== "sin_pagar" && pagado !== "parcial")
-    return { ok: false, error: "Estado de pago inválido" };
-
-  // "parcial" es solo un marcador visual — actualiza el flag sin tocar los registros de pago
+async function _pagadoOne(sb: SB, projectId: string, pagado: "pago_total" | "sin_pagar" | "parcial"): Promise<void> {
   if (pagado === "parcial") {
-    const supabase = await createClient();
-    const { error } = await supabase.from("projects").update({ pagado }).eq("id", id);
-    if (error) return { ok: false, error: error.message };
-    revalidateAll();
-    return { ok: true };
+    await sb.from("projects").update({ pagado }).eq("id", projectId);
+    return;
   }
-
-  const supabase = await createClient();
-
-  const { error: delErr } = await supabase
-    .from("project_editor_pagos")
-    .delete()
-    .eq("project_id", id);
-  if (delErr) return { ok: false, error: delErr.message };
-
+  await sb.from("project_editor_pagos").delete().eq("project_id", projectId);
   if (pagado === "pago_total") {
-    const { data } = await supabase
-      .from("projects")
-      .select(PROJECT_SELECT)
-      .eq("id", id)
-      .single();
+    const { data } = await sb.from("projects").select(PROJECT_SELECT).eq("id", projectId).single();
     if (data) {
       const proj = data as unknown as ProjectWithRelations;
-      // Usar la fecha efectiva del bucket del proyecto, no la fecha de hoy
       const effectiveDate = (() => {
         if (proj.cobrado === "si" && proj.cobros.length > 0) {
           return proj.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a)).paid_at;
@@ -616,8 +571,8 @@ export async function applyPagadoToggle(
         if (!assignment.editor) continue;
         const cost = editorCostInProject(proj, assignment.editor.id);
         if (cost == null || cost === 0) continue;
-        await supabase.from("project_editor_pagos").insert({
-          project_id: id,
+        await sb.from("project_editor_pagos").insert({
+          project_id: projectId,
           editor_id: assignment.editor.id,
           amount: cost,
           paid_at: effectiveDate,
@@ -626,12 +581,28 @@ export async function applyPagadoToggle(
       }
     }
   }
+  await sb.from("projects").update({ pagado }).eq("id", projectId);
+}
 
-  const { error } = await supabase
-    .from("projects")
-    .update({ pagado })
-    .eq("id", id);
-  if (error) return { ok: false, error: error.message };
+/**
+ * Cambia pagado a pago_total / sin_pagar / parcial y sincroniza project_editor_pagos.
+ * Si el proyecto es un pack, aplica el mismo estado a todos sus hijos.
+ */
+export async function applyPagadoToggle(
+  id: string,
+  pagado: string
+): Promise<ActionResult> {
+  if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
+  if (pagado !== "pago_total" && pagado !== "sin_pagar" && pagado !== "parcial")
+    return { ok: false, error: "Estado de pago inválido" };
+
+  const sb = await createClient();
+  await _pagadoOne(sb, id, pagado as "pago_total" | "sin_pagar" | "parcial");
+
+  const { data: children } = await sb.from("projects").select("id").eq("parent_id", id);
+  if (children && children.length > 0) {
+    await Promise.all(children.map((c) => _pagadoOne(sb, c.id, pagado as "pago_total" | "sin_pagar" | "parcial")));
+  }
 
   revalidateAll();
   return { ok: true };
@@ -957,13 +928,13 @@ export async function changeInvoiced(
   if (!parsed.success)
     return { ok: false, error: "Estado de facturación inválido" };
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("projects")
-    .update({ invoiced: parsed.data })
-    .eq("id", id);
-
+  const sb = await createClient();
+  const { error } = await sb.from("projects").update({ invoiced: parsed.data }).eq("id", id);
   if (error) return { ok: false, error: error.message };
+
+  // Cascade to children
+  await sb.from("projects").update({ invoiced: parsed.data }).eq("parent_id", id);
+
   revalidateAll();
   return { ok: true };
 }
