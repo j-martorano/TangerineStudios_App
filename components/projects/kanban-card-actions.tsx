@@ -56,6 +56,7 @@ type Props = {
   /** Controlado externamente — permite que CardView maneje el diálogo de edición. */
   editOpen?: boolean;
   onEditOpenChange?: (v: boolean) => void;
+  onCloneOpenChange?: (v: boolean) => void;
 };
 
 export function KanbanCardActions({
@@ -66,6 +67,7 @@ export function KanbanCardActions({
   onMenuOpenChange,
   editOpen: editOpenProp,
   onEditOpenChange,
+  onCloneOpenChange,
 }: Props) {
   const [editOpenInternal, setEditOpenInternal] = useState(false);
   const editOpen = editOpenProp !== undefined ? editOpenProp : editOpenInternal;
@@ -85,6 +87,7 @@ export function KanbanCardActions({
   function openCloneDialog() {
     setCloneTitle(project.title);
     setCloneOpen(true);
+    onCloneOpenChange?.(true);
   }
 
   function handleClone() {
@@ -93,6 +96,7 @@ export function KanbanCardActions({
       if (result.ok) {
         toast.success(`Proyecto clonado`);
         setCloneOpen(false);
+        onCloneOpenChange?.(false);
       } else {
         toast.error(result.error);
       }
@@ -205,7 +209,10 @@ export function KanbanCardActions({
       <Dialog
         open={cloneOpen}
         onOpenChange={(open) => {
-          if (!open) setCloneOpen(false);
+          if (!open) {
+            setCloneOpen(false);
+            onCloneOpenChange?.(false);
+          }
         }}
       >
         <DialogContent>
@@ -238,7 +245,7 @@ export function KanbanCardActions({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setCloneOpen(false)}
+              onClick={() => { setCloneOpen(false); onCloneOpenChange?.(false); }}
               disabled={pending}
             >
               Cancelar

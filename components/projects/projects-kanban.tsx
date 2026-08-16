@@ -1321,6 +1321,10 @@ function CardView({
     setDndDisabled(open);
   }
 
+  function handleCloneOpenChange(open: boolean) {
+    setDndDisabled(open);
+  }
+
   function handleMenuOpenChange(open: boolean) {
     setMenuFocusId(open ? project.id : null);
   }
@@ -1380,6 +1384,7 @@ function CardView({
                   onMenuOpenChange={handleMenuOpenChange}
                   editOpen={editOpen}
                   onEditOpenChange={handleEditOpenChange}
+                  onCloneOpenChange={handleCloneOpenChange}
                 />
                 <Link
                   href={`/projects?highlight=${project.id}`}
