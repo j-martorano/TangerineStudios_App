@@ -26,7 +26,7 @@ import {
 } from "./format";
 import { PROJECT_SELECT } from "./queries";
 import { notifyClientPhaseChange } from "@/lib/discord/notify";
-import { nowISOArgentina, todayAR } from "@/lib/argentina-date";
+import { nowISOArgentina, todayAR, currentMonthKeyAR } from "@/lib/argentina-date";
 
 async function getClientName(clientId: string | null): Promise<string | null> {
   if (!clientId) return null;
@@ -513,7 +513,11 @@ async function _cobradoOne(sb: SB, projectId: string, cobrado: "si" | "no" | "pa
       const proj = data as unknown as ProjectWithRelations;
       const total = computePrice(proj);
       if (total != null && total > 0) {
-        const effectiveDate = todayAR();
+        const finalizedMK = proj.finalized_at?.slice(0, 7);
+        const effectiveDate =
+          finalizedMK && finalizedMK < currentMonthKeyAR()
+            ? proj.finalized_at!.slice(0, 10)
+            : todayAR();
         await sb.from("project_cobros").insert({ project_id: projectId, amount: total, paid_at: effectiveDate, note: null });
       }
     }
@@ -555,11 +559,15 @@ async function _pagadoOne(sb: SB, projectId: string, pagado: "pago_total" | "sin
     const { data } = await sb.from("projects").select(PROJECT_SELECT).eq("id", projectId).single();
     if (data) {
       const proj = data as unknown as ProjectWithRelations;
+      const currentMK = currentMonthKeyAR();
       const effectiveDate = (() => {
         if (proj.cobrado === "si" && proj.cobros.length > 0) {
           return proj.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a)).paid_at;
         }
-        return todayAR();
+        const finalizedMK = proj.finalized_at?.slice(0, 7);
+        return finalizedMK && finalizedMK < currentMK
+          ? proj.finalized_at!.slice(0, 10)
+          : todayAR();
       })();
       for (const assignment of proj.editors) {
         if (!assignment.editor) continue;
