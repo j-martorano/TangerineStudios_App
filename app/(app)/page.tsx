@@ -434,7 +434,7 @@ function computeMonthMetrics(
     }
 
     // Pagado: bucket por editor_pagos.paid_at; fallback a finalized_at/created_at (igual que kanban)
-    if (!isMensual && p.pagado === "pago_total") {
+    if (p.pagado === "pago_total") {
       const latestPago = p.editor_pagos.length > 0
         ? p.editor_pagos.reduce((a, b) => (b.paid_at > a.paid_at ? b : a))
         : null;

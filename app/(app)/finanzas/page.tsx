@@ -325,7 +325,7 @@ function build(
       const price = computePrice(p);
       if (price != null) cobradoBucket.profit += price;
     }
-    if (!isMensual && p.pagado === "pago_total") {
+    if (p.pagado === "pago_total") {
       const cost = computeCost(p);
       if (cost != null) pagadoBucket.profit -= cost;
     }

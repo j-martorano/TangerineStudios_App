@@ -513,10 +513,7 @@ async function _cobradoOne(sb: SB, projectId: string, cobrado: "si" | "no" | "pa
       const proj = data as unknown as ProjectWithRelations;
       const total = computePrice(proj);
       if (total != null && total > 0) {
-        const effectiveDate =
-          proj.phase === "terminado" && proj.finalized_at
-            ? proj.finalized_at.slice(0, 10)
-            : todayAR();
+        const effectiveDate = todayAR();
         await sb.from("project_cobros").insert({ project_id: projectId, amount: total, paid_at: effectiveDate, note: null });
       }
     }
@@ -561,9 +558,6 @@ async function _pagadoOne(sb: SB, projectId: string, pagado: "pago_total" | "sin
       const effectiveDate = (() => {
         if (proj.cobrado === "si" && proj.cobros.length > 0) {
           return proj.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a)).paid_at;
-        }
-        if (proj.phase === "terminado" && proj.finalized_at) {
-          return proj.finalized_at.slice(0, 10);
         }
         return todayAR();
       })();

@@ -995,7 +995,7 @@ function TerminadoStats({ items, mk: mkProp }: { items: ProjectWithRelations[]; 
     }
 
     // Costo: independiente del cobrado, se bucketa por la fecha del pago al editor
-    if (p.pagado === "pago_total" && p.client?.payment_type !== "mensual") {
+    if (p.pagado === "pago_total") {
       const latestPago = p.editor_pagos.length > 0
         ? p.editor_pagos.reduce((a, b) => (b.paid_at > a.paid_at ? b : a))
         : null;
