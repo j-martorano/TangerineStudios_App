@@ -125,8 +125,10 @@ function getCobradoMK(p: ProjectWithRelations): string | null {
     ? p.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a))
     : null;
   if (latestCobro) return latestCobro.paid_at.slice(0, 7);
-  // fallback: usar mes natural del proyecto
-  return monthKey(p.finalized_at ?? p.created_at);
+  // Sin cobro registrado: terminado usa finalized_at/created_at (columna histórica);
+  // fases activas usan el mes actual (el cobro se marcó hoy, no existe registro de fecha).
+  if (p.phase === "terminado") return monthKey(p.finalized_at ?? p.created_at);
+  return currentMonthKeyAR();
 }
 
 const statCurrencyFmt = new Intl.NumberFormat("en-US", {
