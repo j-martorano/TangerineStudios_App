@@ -515,7 +515,7 @@ async function _cobradoOne(sb: SB, projectId: string, cobrado: "si" | "no" | "pa
       if (total != null && total > 0) {
         const finalizedMK = proj.finalized_at?.slice(0, 7);
         const effectiveDate =
-          finalizedMK && finalizedMK < currentMonthKeyAR()
+          proj.phase === "terminado" && finalizedMK && finalizedMK < currentMonthKeyAR()
             ? proj.finalized_at!.slice(0, 10)
             : todayAR();
         await sb.from("project_cobros").insert({ project_id: projectId, amount: total, paid_at: effectiveDate, note: null });
@@ -565,7 +565,7 @@ async function _pagadoOne(sb: SB, projectId: string, pagado: "pago_total" | "sin
           return proj.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a)).paid_at;
         }
         const finalizedMK = proj.finalized_at?.slice(0, 7);
-        return finalizedMK && finalizedMK < currentMK
+        return proj.phase === "terminado" && finalizedMK && finalizedMK < currentMK
           ? proj.finalized_at!.slice(0, 10)
           : todayAR();
       })();
