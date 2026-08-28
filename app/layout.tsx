@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ProgressBar } from "@/components/ui/progress-bar";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -27,6 +28,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full" suppressHydrationWarning>
+        <ProgressBar />
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster />
       </body>
