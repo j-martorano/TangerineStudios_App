@@ -358,3 +358,18 @@ export async function deleteEditor(id: string): Promise<EditorActionResult> {
   revalidateAll();
   return { ok: true };
 }
+
+export async function toggleEditorDisabled(
+  id: string,
+  disabled: boolean
+): Promise<EditorActionResult> {
+  const supabase = await createSupabaseClient();
+  const { error } = await supabase
+    .from("editors")
+    .update({ disabled_at: disabled ? new Date().toISOString() : null })
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true };
+}

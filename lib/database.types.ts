@@ -297,6 +297,7 @@ export type Database = {
           created_at: string
           discord_id: string | null
           discord_link_token: string | null
+          disabled_at: string | null
           docs_url: string | null
           flat_amount: number | null
           id: string
@@ -309,6 +310,7 @@ export type Database = {
           created_at?: string
           discord_id?: string | null
           discord_link_token?: string | null
+          disabled_at?: string | null
           docs_url?: string | null
           flat_amount?: number | null
           id?: string
@@ -321,6 +323,7 @@ export type Database = {
           created_at?: string
           discord_id?: string | null
           discord_link_token?: string | null
+          disabled_at?: string | null
           docs_url?: string | null
           flat_amount?: number | null
           id?: string

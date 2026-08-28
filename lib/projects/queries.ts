@@ -300,9 +300,10 @@ export const fetchEditors = unstable_cache(
     const { data, error } = await supabase
       .from("editors")
       .select(
-        "id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)"
+        "id, name, payment_type, rate, flat_amount, disabled_at, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)"
       )
-      .order("name");
+      .order("name")
+      .is('disabled_at', null);
     if (error) throw new Error(error.message);
     return (data ?? []) as unknown as EditorMini[];
   },
@@ -320,7 +321,7 @@ export type EditorWithCount = EditorRow & {
 };
 
 const EDITOR_FULL_SELECT =
-  "id, name, contact_links, discord_id, discord_link_token, docs_url, payment_type, rate, flat_amount, created_at, project_editors(count), client_editors(payment_type, rate, flat_amount, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct)), editor_payment_methods(method_id, info, method:payment_methods(id, name, icon, color)), editor_payment_tiers(min_minutes, max_minutes, amount)";
+  "id, name, contact_links, discord_id, discord_link_token, docs_url, payment_type, rate, flat_amount, disabled_at, created_at, project_editors(count), client_editors(payment_type, rate, flat_amount, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct)), editor_payment_methods(method_id, info, method:payment_methods(id, name, icon, color)), editor_payment_tiers(min_minutes, max_minutes, amount)";
 
 function mapEditor(
   e: {
@@ -329,6 +330,7 @@ function mapEditor(
     contact_links: unknown;
     discord_id: string | null;
     discord_link_token?: string | null;
+    disabled_at?: string | null;
     docs_url: string | null;
     payment_type: EditorPaymentType;
     rate: number | null;
@@ -379,6 +381,7 @@ function mapEditor(
     contact_links: e.contact_links as import("@/lib/database.types").Json,
     discord_id: e.discord_id,
     discord_link_token: e.discord_link_token ?? null,
+    disabled_at: e.disabled_at ?? null,
     docs_url: e.docs_url,
     payment_type: e.payment_type,
     rate: e.rate,
@@ -496,7 +499,7 @@ export const fetchClients = unstable_cache(
     const { data, error } = await supabase
       .from("clients")
       .select(
-        "id, name, color, payment_type, agreed_price, retainer_discount_pct, client_payments(minutes_credited), projects(duration_minutes, archived), client_editors(payment_type, rate, flat_amount, editor:editors(id, name, payment_type, rate, flat_amount, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))"
+        "id, name, color, payment_type, agreed_price, retainer_discount_pct, client_payments(minutes_credited), projects(duration_minutes, archived), client_editors(payment_type, rate, flat_amount, editor:editors(id, name, payment_type, rate, flat_amount, disabled_at, tiers:editor_payment_tiers(min_minutes, max_minutes, amount)))"
       )
       .order("name");
     if (error) throw new Error(error.message);
@@ -526,7 +529,7 @@ export const fetchClients = unstable_cache(
               flat_amount: ce.flat_amount !== null ? ce.flat_amount : ce.editor.flat_amount,
             };
           })
-          .filter((e): e is EditorMini => e != null),
+          .filter((e): e is EditorMini => e != null && !(e as { disabled_at?: string | null }).disabled_at),
       };
     });
   },

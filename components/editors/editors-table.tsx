@@ -11,6 +11,7 @@ import {
 
 import { EditEditorButton } from "./edit-editor-button";
 import { DeleteEditorButton } from "./delete-editor-button";
+import { ToggleDisabledButton } from "./toggle-disabled-button";
 import { PaymentMethodChips } from "./payment-method-chips";
 import { DiscordLinkCell } from "./discord-link-cell";
 import type { EditorWithCount } from "@/lib/projects/queries";
@@ -63,9 +64,18 @@ export function EditorsTable({
       </TableHeader>
       <TableBody>
         {editors.map((e) => (
-          <TableRow key={e.id}>
+          <TableRow key={e.id} className={e.disabled_at ? "opacity-50" : ""}>
             {visible.has("name") && (
-              <TableCell className="font-medium">{e.name}</TableCell>
+              <TableCell className="font-medium">
+                <span className="flex items-center gap-2">
+                  {e.name}
+                  {e.disabled_at && (
+                    <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-500 ring-1 ring-amber-500/20">
+                      Deshabilitado
+                    </span>
+                  )}
+                </span>
+              </TableCell>
             )}
             {visible.has("clients") && (
               <TableCell>
@@ -137,6 +147,11 @@ export function EditorsTable({
                     editor={e}
                     availableClients={availableClients}
                     paymentMethodsCatalog={paymentMethodsCatalog}
+                  />
+                  <ToggleDisabledButton
+                    id={e.id}
+                    name={e.name}
+                    disabledAt={e.disabled_at ?? null}
                   />
                   <DeleteEditorButton
                     id={e.id}
