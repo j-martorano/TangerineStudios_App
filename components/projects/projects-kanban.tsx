@@ -77,6 +77,7 @@ import {
   computePrice,
 } from "@/lib/projects/format";
 import { reorderProjects, type ReorderUpdate } from "@/lib/projects/actions";
+import { Money } from "@/components/ui/amount";
 import type { RetainerPayment } from "@/lib/finanzas/queries";
 import { todayAR, currentMonthKeyAR } from "@/lib/argentina-date";
 
@@ -952,7 +953,9 @@ function StatCard({
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
         {label}
       </p>
-      <p className={`text-2xl font-bold leading-tight ${colorClass}`}>{formatStat(value)}</p>
+      <p className={`text-2xl font-bold leading-tight ${colorClass}`}>
+        <Money>{formatStat(value)}</Money>
+      </p>
     </div>
   );
 }

@@ -23,6 +23,7 @@ import {
 } from "@/lib/projects/actions";
 import { computePrice, formatPrice } from "@/lib/projects/format";
 import { COBRADO_LABEL, COBRADO_CLASS } from "@/lib/projects/format";
+import { AmountsToggle, Money } from "@/components/ui/amount";
 import type {
   CobradoStatus,
   ProjectWithRelations,
@@ -137,15 +138,20 @@ export function CobroManagerPanel({ project, disabled = false, onSuccess }: Prop
     <div className="flex flex-col gap-4">
       {/* Totales */}
       <div className="grid grid-cols-3 gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-center">
-        <Total label="Total" value={total != null ? formatPrice(total) : "—"} />
+        <Total
+          label="Total"
+          value={total != null ? <Money>{formatPrice(total)}</Money> : "—"}
+        />
         <Total
           label="Cobrado"
-          value={formatPrice(cobrado)}
+          value={<Money>{formatPrice(cobrado)}</Money>}
           tone="positive"
         />
         <Total
           label="Falta"
-          value={remaining != null ? formatPrice(remaining) : "—"}
+          value={
+            remaining != null ? <Money>{formatPrice(remaining)}</Money> : "—"
+          }
           tone={remaining && remaining > 0 ? "warning" : "muted"}
         />
       </div>
@@ -173,7 +179,7 @@ export function CobroManagerPanel({ project, disabled = false, onSuccess }: Prop
                   )}
                 </span>
                 <span className="font-medium tabular-nums">
-                  {formatPrice(Number(c.amount))}
+                  <Money>{formatPrice(Number(c.amount))}</Money>
                 </span>
                 {interactive ? (
                   <button
@@ -256,7 +262,7 @@ export function CobroManagerPanel({ project, disabled = false, onSuccess }: Prop
                   onClick={handleRegisterRemaining}
                   disabled={pending}
                 >
-                  Registrar {formatPrice(remaining)} (resto)
+                  Registrar <Money>{formatPrice(remaining)}</Money> (resto)
                 </Button>
               ) : null}
             </div>
@@ -320,6 +326,7 @@ export function CobroManager({ project, disabled = false }: Props) {
             >
               {COBRADO_LABEL[project.cobrado]}
             </span>
+            <AmountsToggle className="ml-auto mr-6 size-7" />
           </DialogTitle>
         </DialogHeader>
         <CobroManagerPanel project={project} disabled={disabled} />
@@ -334,7 +341,7 @@ function Total({
   tone,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   tone?: "positive" | "warning" | "muted";
 }) {
   const cls =

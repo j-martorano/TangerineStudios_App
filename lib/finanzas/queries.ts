@@ -24,7 +24,9 @@ export const fetchRetainerPayments = unstable_cache(
     const supabase = createBotClient();
     const { data, error } = await supabase
       .from("client_payments")
-      .select("client_id, amount, paid_at");
+      .select("client_id, amount, paid_at")
+      // Los ajustes de minutos (amount = 0) no son ingresos: quedan afuera.
+      .gt("amount", 0);
     if (error) throw new Error(error.message);
     return (data ?? []).map((p) => ({
       client_id: p.client_id,

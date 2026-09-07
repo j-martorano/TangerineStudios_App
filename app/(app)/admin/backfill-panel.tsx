@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { runBackfill } from "@/lib/projects/backfill";
 import type { BackfillPreview } from "@/lib/projects/backfill";
 import { formatPrice } from "@/lib/projects/format";
+import { Money } from "@/components/ui/amount";
 
 export function BackfillPanel({ preview }: { preview: BackfillPreview }) {
   const [done, setDone] = useState(false);
@@ -99,7 +100,11 @@ export function BackfillPanel({ preview }: { preview: BackfillPreview }) {
                     </span>
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums">
-                    {item.amount != null ? formatPrice(item.amount) : "—"}
+                    {item.amount != null ? (
+                      <Money>{formatPrice(item.amount)}</Money>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
                     {item.paidAt}

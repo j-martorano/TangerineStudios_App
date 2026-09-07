@@ -43,6 +43,7 @@ import {
   formatDate,
 } from "@/lib/projects/format";
 import { editorNames, isPack } from "@/lib/projects/types";
+import { Money } from "@/components/ui/amount";
 import type {
   ClientForProject,
   EditorMini,
@@ -207,12 +208,12 @@ export function ProjectRow({
           <span className="inline-flex items-center gap-1 rounded-md bg-black/20 px-1.5 py-1">
             {price != null ? (
               <span className="inline-flex items-center rounded border border-[#37ACFF]/30 bg-[#37ACFF]/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-[#37ACFF]">
-                {fmt(price)}
+                <Money>{fmt(price)}</Money>
               </span>
             ) : null}
             {cost != null ? (
               <span className="inline-flex items-center rounded border border-red-500/25 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-red-400">
-                {fmt(cost)}
+                <Money>{fmt(cost)}</Money>
               </span>
             ) : null}
             {profit != null ? (
@@ -223,7 +224,7 @@ export function ProjectRow({
                     : "border-red-500/25 bg-red-500/10 text-red-400"
                 }`}
               >
-                {fmt(profit)}
+                <Money>{fmt(profit)}</Money>
               </span>
             ) : null}
             {price == null && cost == null && profit == null ? (

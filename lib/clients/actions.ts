@@ -1,6 +1,7 @@
 ﻿"use server";
 
 import { z } from "zod";
+import { todayAR } from "@/lib/argentina-date";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
@@ -281,6 +282,62 @@ export async function registerClientPayment(input: {
     amount: parsed.data.amount,
     minutes_credited: minutes,
     paid_at: parsed.data.paid_at,
+    note: normalizeText(parsed.data.note),
+  });
+  if (error) return { ok: false, error: error.message };
+
+  revalidateAll();
+  return { ok: true };
+}
+
+// -------------------------------------------------------------------------
+// Ajustes: restar minutos del saldo mensual
+// -------------------------------------------------------------------------
+
+const minutesDebitSchema = z.object({
+  client_id: z.string().regex(uuidRegex, "Cliente inválido"),
+  minutes: z
+    .number()
+    .positive("Los minutos a restar deben ser mayores a 0")
+    .max(100000, "Cantidad de minutos demasiado grande"),
+  note: z.string().nullable().default(null),
+});
+
+/**
+ * Resta minutos del saldo de un cliente mensual. Se guarda como un registro
+ * más de `client_payments` con `amount = 0` y `minutes_credited` negativo,
+ * fechado el día del registro (hora Argentina). Así el saldo (acreditados −
+ * consumidos) lo absorbe sin tocar los ingresos.
+ */
+export async function registerClientMinutesDebit(input: {
+  client_id: string;
+  minutes: number;
+  note?: string | null;
+}): Promise<ClientPaymentResult> {
+  const parsed = minutesDebitSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+
+  const supabase = await createSupabaseClient();
+  const { data: client, error: clientErr } = await supabase
+    .from("clients")
+    .select("payment_type")
+    .eq("id", parsed.data.client_id)
+    .single();
+  if (clientErr || !client) {
+    return { ok: false, error: "Cliente no encontrado" };
+  }
+  if (client.payment_type !== "mensual") {
+    return {
+      ok: false,
+      error: "Solo los clientes mensuales tienen saldo de minutos",
+    };
+  }
+
+  const { error } = await supabase.from("client_payments").insert({
+    client_id: parsed.data.client_id,
+    amount: 0,
+    minutes_credited: -parsed.data.minutes,
+    paid_at: todayAR(),
     note: normalizeText(parsed.data.note),
   });
   if (error) return { ok: false, error: error.message };

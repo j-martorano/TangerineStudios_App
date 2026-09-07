@@ -27,6 +27,7 @@ import {
   editorCostInProject,
   formatPrice,
 } from "@/lib/projects/format";
+import { AmountsToggle, Money } from "@/components/ui/amount";
 import type {
   PagadoStatus,
   ProjectWithRelations,
@@ -155,6 +156,7 @@ export function PagoManager({ project, disabled = false }: Props) {
             >
               {PAGADO_LABEL[project.pagado]}
             </span>
+            <AmountsToggle className="ml-auto mr-6 size-7" />
           </DialogTitle>
         </DialogHeader>
         <div className="max-h-[55vh] overflow-y-auto pr-1">
@@ -270,16 +272,18 @@ function EditorSection({
       <div className="grid grid-cols-3 gap-2 text-center">
         <SubTotal
           label="Cost"
-          value={cost != null ? formatPrice(cost) : "—"}
+          value={cost != null ? <Money>{formatPrice(cost)}</Money> : "—"}
         />
         <SubTotal
           label="Pagado"
-          value={formatPrice(pagado)}
+          value={<Money>{formatPrice(pagado)}</Money>}
           tone="positive"
         />
         <SubTotal
           label="Falta"
-          value={remaining != null ? formatPrice(remaining) : "—"}
+          value={
+            remaining != null ? <Money>{formatPrice(remaining)}</Money> : "—"
+          }
           tone={remaining && remaining > 0 ? "warning" : "muted"}
         />
       </div>
@@ -295,7 +299,7 @@ function EditorSection({
                 {p.note ?? "—"}
               </span>
               <span className="font-medium tabular-nums">
-                {formatPrice(Number(p.amount))}
+                <Money>{formatPrice(Number(p.amount))}</Money>
               </span>
               {interactive ? (
                 <button
@@ -359,7 +363,7 @@ function EditorSection({
                 onClick={handleRegisterRemaining}
                 disabled={pending}
               >
-                Registrar pago {formatPrice(remaining)} (resto)
+                Registrar pago <Money>{formatPrice(remaining)}</Money> (resto)
               </Button>
             ) : null}
           </div>
@@ -375,7 +379,7 @@ function SubTotal({
   tone,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   tone?: "positive" | "warning" | "muted";
 }) {
   const cls =

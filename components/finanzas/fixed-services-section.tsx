@@ -28,6 +28,7 @@ import {
   seedMonthEntries,
 } from "@/lib/finanzas/actions";
 import { formatPrice } from "@/lib/projects/format";
+import { Money } from "@/components/ui/amount";
 import type { FixedService } from "@/lib/finanzas/queries";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -73,7 +74,7 @@ export function FixedServicesSection({
             Servicios fijos
           </h2>
           <span className="text-xs text-muted-foreground">
-            {formatPrice(activeTotal)} / mes ·{" "}
+            <Money>{formatPrice(activeTotal)}</Money> / mes ·{" "}
             {services.filter((s) => s.active).length} activo
             {services.filter((s) => s.active).length === 1 ? "" : "s"}
           </span>
@@ -111,9 +112,11 @@ export function FixedServicesSection({
             <span className="text-xs text-muted-foreground">
               {monthlyApplication.length} mes
               {monthlyApplication.length === 1 ? "" : "es"} ·{" "}
-              {formatPrice(
-                monthlyApplication.reduce((s, m) => s + m.servicesCost, 0)
-              )}{" "}
+              <Money>
+                {formatPrice(
+                  monthlyApplication.reduce((s, m) => s + m.servicesCost, 0)
+                )}
+              </Money>{" "}
               total descontado
             </span>
           </div>
@@ -243,7 +246,13 @@ function MonthApplicationRow({
             entry.servicesCost > 0 ? "text-destructive" : "text-muted-foreground"
           }`}
         >
-          {entry.servicesCost > 0 ? `−${formatPrice(entry.servicesCost)}` : "—"}
+          {entry.servicesCost > 0 ? (
+            <>
+              −<Money>{formatPrice(entry.servicesCost)}</Money>
+            </>
+          ) : (
+            "—"
+          )}
         </span>
       </button>
 
@@ -265,7 +274,7 @@ function MonthApplicationRow({
                   >
                     <span className="text-xs text-muted-foreground">{e.name}</span>
                     <span className="tabular-nums text-xs text-muted-foreground">
-                      −{formatPrice(e.amount)}
+                      −<Money>{formatPrice(e.amount)}</Money>
                     </span>
                   </li>
                 ))

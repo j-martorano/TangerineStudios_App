@@ -9,6 +9,7 @@ import {
 import { fetchClientsForInvoice } from "@/lib/invoices/queries";
 import { fetchRetainerPayments } from "@/lib/finanzas/queries";
 import { isPack } from "@/lib/projects/types";
+import { AmountsToggle } from "@/components/ui/amount";
 
 
 type SearchParams = Promise<{ q?: string; focus?: string }>;
@@ -56,9 +57,12 @@ export default async function KanbanPage({
             />
             <NewClientPaymentButton clients={clients} />
           </div>
-          <h1 className="mt-3 text-5xl font-bold uppercase tracking-tight">
-            Kanban
-          </h1>
+          <div className="mt-3 flex items-center gap-3">
+            <h1 className="text-5xl font-bold uppercase tracking-tight">
+              Kanban
+            </h1>
+            <AmountsToggle />
+          </div>
           <p className="mt-1 text-sm font-light text-muted-foreground">
             {projects.length} proyecto{projects.length === 1 ? "" : "s"}
             {query ? <> · filtro: «{query}»</> : null}

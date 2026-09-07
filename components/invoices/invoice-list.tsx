@@ -26,6 +26,7 @@ import {
 
 import { deleteInvoice, getInvoicePdfUrl } from "@/lib/invoices/actions";
 import type { InvoiceWithProjects } from "@/lib/invoices/types";
+import { Money } from "@/components/ui/amount";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ function InvoiceRow({ invoice }: { invoice: InvoiceWithProjects }) {
 
       {/* Total */}
       <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold tabular-nums">
-        {fmt(invoice.currency_symbol, invoice.total)}
+        <Money>{fmt(invoice.currency_symbol, invoice.total)}</Money>
       </td>
 
       {/* Proyectos */}

@@ -19,6 +19,7 @@ import {
   RegisterRetainerPaymentDialog,
   type RetainerClient,
 } from "@/components/finanzas/register-retainer-payment-dialog";
+import { SubtractMinutesDialog } from "@/components/finanzas/subtract-minutes-dialog";
 import {
   computeCost,
   computePrice,
@@ -29,6 +30,7 @@ import type { ProjectWithRelations } from "@/lib/projects/types";
 import type { FinanzasPayment } from "@/lib/finanzas/queries";
 import { ProjectSettleButton } from "@/components/finanzas/project-settle-button";
 import { currentMonthKeyAR, todayAR } from "@/lib/argentina-date";
+import { AmountsToggle, Money } from "@/components/ui/amount";
 
 // Tinte de fondo basado en el color del cliente (hex de 8 dígitos = RRGGBB + alpha 0x33).
 function clientTint(hex: string | null | undefined): string | undefined {
@@ -66,6 +68,8 @@ type PaymentItem = {
   minutesCredited: number;
   note: string | null;
   paidAt: string;
+  /** Ajuste manual de minutos (amount = 0, minutos negativos), no un pago. */
+  isAdjustment: boolean;
 };
 
 type ProjectSettleItem = {
@@ -186,6 +190,7 @@ function build(
       minutesCredited: pay.minutes_credited,
       note: pay.note,
       paidAt: pay.paid_at,
+      isAdjustment: pay.minutes_credited < 0,
     });
   }
 
@@ -688,22 +693,22 @@ export default async function FinanzasPage({
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <FinanzaStatCard
           label="Total"
-          value={formatPrice(totalCollected)}
+          value={<Money>{formatPrice(totalCollected)}</Money>}
           blobColor="#37ACFF80"
         />
         <FinanzaStatCard
           label="Costos"
-          value={formatPrice(totalPaid)}
+          value={<Money>{formatPrice(totalPaid)}</Money>}
           blobColor="#FF373780"
         />
         <FinanzaStatCard
           label="Ganancias"
-          value={formatPrice(totalProfit)}
+          value={<Money>{formatPrice(totalProfit)}</Money>}
           blobColor={totalProfit < 0 ? "#FF373780" : "#37FF6280"}
         />
         <FinanzaStatCard
           label="Servicios / mes"
-          value={formatPrice(servicesMonthlyTotal)}
+          value={<Money>{formatPrice(servicesMonthlyTotal)}</Money>}
         />
       </section>
 
@@ -711,13 +716,13 @@ export default async function FinanzasPage({
       <section className="grid grid-cols-2 gap-3">
         <FinanzaStatCard
           label="Por cobrar"
-          value={formatPrice(totalPendingCollect)}
+          value={<Money>{formatPrice(totalPendingCollect)}</Money>}
           blobColor="#37ACFF50"
           small
         />
         <FinanzaStatCard
           label="Por pagar"
-          value={formatPrice(totalPendingPay)}
+          value={<Money>{formatPrice(totalPendingPay)}</Money>}
           blobColor="#FF373750"
           small
         />
@@ -805,7 +810,10 @@ export default async function FinanzasPage({
   return (
     <main className="flex w-full flex-col gap-6 p-4 md:p-5">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Finanzas</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">Finanzas</h1>
+          <AmountsToggle />
+        </div>
         <p className="text-sm text-muted-foreground">
           {buckets.length} mes{buckets.length === 1 ? "" : "es"} con actividad
         </p>
@@ -845,7 +853,7 @@ function FinanzaStatCard({
   small = false,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   blobColor?: string;
   small?: boolean;
 }) {
@@ -902,7 +910,11 @@ function PagosSection({
   items: PaymentItem[];
   retainerClients: RetainerClient[];
 }) {
-  const total = items.reduce((sum, i) => sum + i.amount, 0);
+  const pagos = items.filter((i) => !i.isAdjustment);
+  const total = pagos.reduce((sum, i) => sum + i.amount, 0);
+  const minutesAdjusted = items
+    .filter((i) => i.isAdjustment)
+    .reduce((sum, i) => sum + i.minutesCredited, 0);
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -911,11 +923,17 @@ function PagosSection({
             Pagos de clientes retainer
           </h2>
           <span className="text-xs text-muted-foreground">
-            {items.length} pago{items.length === 1 ? "" : "s"} ·{" "}
-            {formatPrice(total)}
+            {pagos.length} pago{pagos.length === 1 ? "" : "s"} ·{" "}
+            <Money>{formatPrice(total)}</Money>
+            {minutesAdjusted < 0 ? (
+              <> · {fmtMin(minutesAdjusted)} en ajustes</>
+            ) : null}
           </span>
         </div>
-        <RegisterRetainerPaymentDialog clients={retainerClients} />
+        <div className="flex flex-wrap items-center gap-2">
+          <SubtractMinutesDialog clients={retainerClients} />
+          <RegisterRetainerPaymentDialog clients={retainerClients} />
+        </div>
       </div>
       {items.length === 0 ? (
         <p className="text-sm italic text-muted-foreground">
@@ -939,8 +957,13 @@ function PagosSection({
                     />
                   ) : null}
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium">
+                    <span className="flex items-center gap-2 text-sm font-medium">
                       {it.clientName}
+                      {it.isAdjustment ? (
+                        <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-destructive">
+                          Ajuste
+                        </span>
+                      ) : null}
                     </span>
                     <span className="text-xs text-muted-foreground capitalize">
                       {it.monthLabel} · {fmtMin(it.minutesCredited)}
@@ -948,8 +971,16 @@ function PagosSection({
                     </span>
                   </div>
                 </div>
-                <span className="text-sm font-semibold tabular-nums">
-                  {formatPrice(it.amount)}
+                <span
+                  className={`text-sm font-semibold tabular-nums ${
+                    it.isAdjustment ? "text-destructive" : ""
+                  }`}
+                >
+                  {it.isAdjustment ? (
+                    fmtMin(it.minutesCredited)
+                  ) : (
+                    <Money>{formatPrice(it.amount)}</Money>
+                  )}
                 </span>
               </div>
             ))}
@@ -1005,7 +1036,7 @@ function ProjectList({
           {title}
           {totalRemaining > 0 ? (
             <span className="text-xs font-normal text-amber-500 tabular-nums">
-              {formatPrice(totalRemaining)} pendiente
+              <Money>{formatPrice(totalRemaining)}</Money> pendiente
             </span>
           ) : null}
         </CardTitle>
@@ -1054,7 +1085,7 @@ function PendingCobrosSection({ items }: { items: ProjectSettleItem[] }) {
             <span className="text-xs text-muted-foreground">
               {pending.length} proyecto{pending.length === 1 ? "" : "s"} ·{" "}
               <span className="text-amber-500 tabular-nums">
-                {formatPrice(total)} por cobrar
+                <Money>{formatPrice(total)}</Money> por cobrar
               </span>
             </span>
           ) : null}

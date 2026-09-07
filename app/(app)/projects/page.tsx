@@ -10,6 +10,7 @@ import {
   fetchProjects,
 } from "@/lib/projects/queries";
 import { fetchUserPrefs } from "@/lib/settings/queries";
+import { AmountsToggle } from "@/components/ui/amount";
 
 type SearchParams = Promise<{ q?: string; year?: string; archived?: string; highlight?: string }>;
 
@@ -112,9 +113,12 @@ export default async function ProjectsPage({
               availableParents={availableParents}
             />
           </div>
-          <h1 className="mt-3 text-5xl font-bold uppercase tracking-tight">
-            Spreadsheet
-          </h1>
+          <div className="mt-3 flex items-center gap-3">
+            <h1 className="text-5xl font-bold uppercase tracking-tight">
+              Spreadsheet
+            </h1>
+            <AmountsToggle />
+          </div>
           <p className="mt-1 text-sm font-light text-muted-foreground">
             {projects.length} proyecto{projects.length === 1 ? "" : "s"}
           </p>

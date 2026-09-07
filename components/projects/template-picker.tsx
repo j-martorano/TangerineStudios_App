@@ -29,6 +29,7 @@ import {
 import { PHASE_LABEL } from "@/lib/projects/format";
 import { PROJECT_TYPE_LABEL } from "@/lib/projects/types";
 import type { ProjectTemplate } from "@/lib/projects/types";
+import { Money } from "@/components/ui/amount";
 
 const USD = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -115,7 +116,7 @@ export function TemplatePicker({ onApply, currentConfig }: Props) {
                 <span>{t.name}</span>
                 {t.price != null ? (
                   <span className="ml-2 text-xs text-muted-foreground">
-                    {USD.format(t.price)}
+                    <Money>{USD.format(t.price)}</Money>
                   </span>
                 ) : null}
               </SelectItem>
@@ -216,8 +217,18 @@ export function TemplatePicker({ onApply, currentConfig }: Props) {
                       {PROJECT_TYPE_LABEL[t.project_type]}
                       {" · "}
                       {PHASE_LABEL[t.phase]}
-                      {t.price != null ? ` · ${USD.format(t.price)}` : ""}
-                      {t.cost != null ? ` · costo ${USD.format(t.cost)}` : ""}
+                      {t.price != null ? (
+                        <>
+                          {" · "}
+                          <Money>{USD.format(t.price)}</Money>
+                        </>
+                      ) : null}
+                      {t.cost != null ? (
+                        <>
+                          {" · costo "}
+                          <Money>{USD.format(t.cost)}</Money>
+                        </>
+                      ) : null}
                     </span>
                   </div>
                   <button

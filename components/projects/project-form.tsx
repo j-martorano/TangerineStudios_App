@@ -49,6 +49,7 @@ import {
 import { createProject, updateProject } from "@/lib/projects/actions";
 import { getSubClientsForClient } from "@/lib/sub-clients/actions";
 import { TemplatePicker } from "./template-picker";
+import { AmountsToggle, Money } from "@/components/ui/amount";
 import type { ProjectTemplate } from "@/lib/projects/types";
 
 /**
@@ -931,20 +932,32 @@ export function ProjectForm({
             const isMensual = selectedClient?.payment_type === "mensual";
             return (
               <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-xs">
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Resumen
+                  </span>
+                  <AmountsToggle className="size-6" />
+                </div>
                 <div className="flex justify-between gap-3">
                   <span className="text-muted-foreground">Precio (calc.)</span>
                   <span className="font-medium tabular-nums">
-                    {isMensual
-                      ? "RETAINER"
-                      : computedPrice != null
-                        ? formatPrice(computedPrice)
-                        : "—"}
+                    {isMensual ? (
+                      "RETAINER"
+                    ) : computedPrice != null ? (
+                      <Money>{formatPrice(computedPrice)}</Money>
+                    ) : (
+                      "—"
+                    )}
                   </span>
                 </div>
                 <div className="mt-1 flex justify-between gap-3">
                   <span className="text-muted-foreground">Costo (calc.)</span>
                   <span className="font-medium tabular-nums">
-                    {computedCost != null ? formatPrice(computedCost) : "—"}
+                    {computedCost != null ? (
+                      <Money>{formatPrice(computedCost)}</Money>
+                    ) : (
+                      "—"
+                    )}
                   </span>
                 </div>
                 <div className="mt-1 flex justify-between gap-3">
@@ -956,11 +969,13 @@ export function ProjectForm({
                         : ""
                     }`}
                   >
-                    {isMensual
-                      ? "—"
-                      : computedProfit != null
-                        ? formatPrice(computedProfit)
-                        : "—"}
+                    {isMensual ? (
+                      "—"
+                    ) : computedProfit != null ? (
+                      <Money>{formatPrice(computedProfit)}</Money>
+                    ) : (
+                      "—"
+                    )}
                   </span>
                 </div>
               </div>

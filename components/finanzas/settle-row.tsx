@@ -7,6 +7,7 @@ import { CobroManagerPanel } from "@/components/projects/cobro-manager";
 import { PagoManagerPanel } from "@/components/projects/pago-manager";
 import { ProjectSettleButton } from "@/components/finanzas/project-settle-button";
 import { formatPrice } from "@/lib/projects/format";
+import { Money } from "@/components/ui/amount";
 import type { ProjectWithRelations } from "@/lib/projects/types";
 
 export type SettleRowItem = {
@@ -90,19 +91,29 @@ export function SettleRow({ item }: { item: SettleRowItem }) {
         <div className="flex flex-col items-end gap-1">
           {item.settled ? (
             <span className="text-sm font-semibold tabular-nums text-emerald-500">
-              {item.total != null ? formatPrice(item.total) : "—"}
+              {item.total != null ? (
+                <Money>{formatPrice(item.total)}</Money>
+              ) : (
+                "—"
+              )}
             </span>
           ) : (
             <>
               <span className="text-sm font-semibold tabular-nums text-amber-500">
-                {item.remaining != null
-                  ? formatPrice(item.remaining)
-                  : "—"}{" "}
+                {item.remaining != null ? (
+                  <Money>{formatPrice(item.remaining)}</Money>
+                ) : (
+                  "—"
+                )}{" "}
                 falta
               </span>
               <span className="text-[10px] text-muted-foreground tabular-nums">
-                {formatPrice(item.progress)} de{" "}
-                {item.total != null ? formatPrice(item.total) : "—"}
+                <Money>{formatPrice(item.progress)}</Money> de{" "}
+                {item.total != null ? (
+                  <Money>{formatPrice(item.total)}</Money>
+                ) : (
+                  "—"
+                )}
               </span>
             </>
           )}

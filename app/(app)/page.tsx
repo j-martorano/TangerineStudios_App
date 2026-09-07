@@ -31,6 +31,7 @@ import {
 } from "@/components/dashboard/month-nav";
 import { NewProjectButton } from "@/components/projects/new-project-button";
 import { NewClientButton } from "@/components/clients/new-client-button";
+import { AmountsToggle, Money } from "@/components/ui/amount";
 
 
 type TaskType = "factura" | "cobro" | "pago";
@@ -170,6 +171,7 @@ export default async function DashboardPage({
           <h1 className="text-5xl font-bold uppercase tracking-tight">
             {monthLabelUpper(selectedMonth)}
           </h1>
+          <AmountsToggle className="ml-1" />
         </div>
         <p className="mt-1 text-sm font-light text-muted-foreground">
           {todayLabel()}
@@ -181,20 +183,26 @@ export default async function DashboardPage({
         <div className="grid flex-1 grid-cols-3 gap-3">
           <GradientStatCard
             label="Total"
-            value={formatPrice(monthMetrics.cobrado)}
+            value={<Money>{formatPrice(monthMetrics.cobrado)}</Money>}
             delta={moneyDelta(monthMetrics.cobrado, previousMetrics.cobrado)}
             blobColor="#37ACFF80"
           />
           <GradientStatCard
             label="Costos"
-            value={formatPrice(monthMetrics.pagado)}
+            value={<Money>{formatPrice(monthMetrics.pagado)}</Money>}
             delta={moneyDelta(monthMetrics.pagado, previousMetrics.pagado)}
             blobColor="#FF373780"
-            note={selectedServicesCost > 0 ? `(+${formatPrice(selectedServicesCost)} serv.)` : undefined}
+            note={
+              selectedServicesCost > 0 ? (
+                <>
+                  (+<Money>{formatPrice(selectedServicesCost)}</Money> serv.)
+                </>
+              ) : undefined
+            }
           />
           <GradientStatCard
             label="Ganancias"
-            value={formatPrice(monthMetrics.profit)}
+            value={<Money>{formatPrice(monthMetrics.profit)}</Money>}
             delta={moneyDelta(monthMetrics.profit, previousMetrics.profit)}
             blobColor={monthMetrics.profit < 0 ? "#FF373780" : "#37FF6280"}
           />
@@ -249,10 +257,10 @@ function GradientStatCard({
   note,
 }: {
   label: string;
-  value: string;
-  delta?: { raw: number; text: string };
+  value: React.ReactNode;
+  delta?: { raw: number; text: React.ReactNode };
   blobColor: string;
-  note?: string;
+  note?: React.ReactNode;
 }) {
   const deltaColor =
     !delta
@@ -459,10 +467,18 @@ function computeMonthMetrics(
 function moneyDelta(
   current: number,
   previous: number
-): { raw: number; text: string } | undefined {
+): { raw: number; text: React.ReactNode } | undefined {
   const raw = current - previous;
   if (raw === 0 && previous === 0) return undefined;
   const sign = raw > 0 ? "+" : raw < 0 ? "−" : "";
   const abs = Math.abs(raw);
-  return { raw, text: `${sign}${formatPrice(abs)}` };
+  return {
+    raw,
+    text: (
+      <>
+        {sign}
+        <Money>{formatPrice(abs)}</Money>
+      </>
+    ),
+  };
 }

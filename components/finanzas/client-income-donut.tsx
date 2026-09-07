@@ -8,6 +8,8 @@ import {
   Tooltip,
 } from "recharts";
 
+import { Money } from "@/components/ui/amount";
+
 export type ClientIncomeDatum = {
   name: string;
   color: string;
@@ -41,7 +43,7 @@ function TooltipContent({
         />
         <span>{item.payload.name}</span>
         <span className="ml-3 font-medium tabular-nums">
-          {USD.format(item.payload.originalValue)}
+          <Money>{USD.format(item.payload.originalValue)}</Money>
         </span>
       </div>
     </div>
@@ -127,7 +129,7 @@ export function ClientIncomeDonut({
                   isNeg ? "text-destructive" : ""
                 }`}
               >
-                {USD.format(d.value)}
+                <Money>{USD.format(d.value)}</Money>
               </span>
             </li>
           );

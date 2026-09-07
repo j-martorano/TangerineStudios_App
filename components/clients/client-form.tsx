@@ -271,6 +271,8 @@ export function ClientForm({
               >
                 <ClientPaymentsSection
                   clientId={client.id}
+                  clientName={client.name}
+                  clientColor={client.color}
                   rate={client.agreed_price}
                   discountPct={client.retainer_discount_pct}
                   payments={client.payments ?? []}

@@ -13,9 +13,13 @@ import {
   registerClientPayment,
 } from "@/lib/clients/actions";
 import type { ClientPayment } from "@/lib/projects/types";
+import { AmountsToggle, Money } from "@/components/ui/amount";
+import { SubtractMinutesDialog } from "@/components/finanzas/subtract-minutes-dialog";
 
 type Props = {
   clientId: string;
+  clientName: string;
+  clientColor: string;
   /** Rate por minuto guardado del cliente. */
   rate: number | null;
   /** % de descuento de retainer guardado. */
@@ -38,6 +42,8 @@ function todayISO(): string {
  */
 export function ClientPaymentsSection({
   clientId,
+  clientName,
+  clientColor,
   rate,
   discountPct,
   payments,
@@ -57,12 +63,15 @@ export function ClientPaymentsSection({
           Cargá un rate por minuto válido para poder registrar pagos.
         </p>
       ) : (
-        <p className="text-xs text-muted-foreground">
-          Rate efectivo: {rate} − {discountPct}% ={" "}
-          <span className="font-medium text-foreground tabular-nums">
-            {effRate.toFixed(2)} USD/min
-          </span>
-        </p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            Rate efectivo: {rate} − {discountPct}% ={" "}
+            <span className="font-medium text-foreground tabular-nums">
+              <Money>{effRate.toFixed(2)} USD/min</Money>
+            </span>
+          </p>
+          <AmountsToggle className="size-7" />
+        </div>
       )}
 
       {payments.length > 0 ? (
@@ -72,10 +81,11 @@ export function ClientPaymentsSection({
           ))}
           <div className="flex items-center justify-between px-3 py-2 text-xs">
             <span className="text-muted-foreground">
-              {payments.length} pago{payments.length === 1 ? "" : "s"}
+              {payments.length} movimiento
+              {payments.length === 1 ? "" : "s"}
             </span>
             <span className="font-medium tabular-nums">
-              Total acreditado: {fmtMin(totalCredited)}
+              Saldo acreditado: {fmtMin(totalCredited)}
             </span>
           </div>
         </div>
@@ -86,17 +96,33 @@ export function ClientPaymentsSection({
       )}
 
       <AddPaymentRow clientId={clientId} effRate={effRate} />
+
+      <div className="flex justify-end">
+        <SubtractMinutesDialog
+          clientId={clientId}
+          clients={[
+            {
+              id: clientId,
+              name: clientName,
+              color: clientColor,
+              rate,
+              discountPct,
+            },
+          ]}
+        />
+      </div>
     </div>
   );
 }
 
 function PaymentRow({ payment }: { payment: ClientPayment }) {
   const [pending, startTransition] = useTransition();
+  const isAdjustment = payment.minutes_credited < 0;
 
   function handleDelete() {
     startTransition(async () => {
       const result = await deleteClientPayment(payment.id);
-      if (result.ok) toast.success("Pago eliminado");
+      if (result.ok) toast.success("Movimiento eliminado");
       else toast.error(result.error);
     });
   }
@@ -105,10 +131,25 @@ function PaymentRow({ payment }: { payment: ClientPayment }) {
     <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
       <div className="flex min-w-0 flex-col">
         <span className="font-medium tabular-nums">
-          {payment.paid_at} · USD {payment.amount}
+          {payment.paid_at}
+          {isAdjustment ? (
+            <span className="ml-2 rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-destructive">
+              Ajuste
+            </span>
+          ) : (
+            <>
+              {" · "}
+              <Money>USD {payment.amount}</Money>
+            </>
+          )}
         </span>
-        <span className="text-muted-foreground">
-          {fmtMin(payment.minutes_credited)} acreditados
+        <span
+          className={
+            isAdjustment ? "text-destructive" : "text-muted-foreground"
+          }
+        >
+          {fmtMin(payment.minutes_credited)}{" "}
+          {isAdjustment ? "restados" : "acreditados"}
           {payment.note ? ` · ${payment.note}` : ""}
         </span>
       </div>
@@ -118,7 +159,7 @@ function PaymentRow({ payment }: { payment: ClientPayment }) {
         size="icon-sm"
         disabled={pending}
         onClick={handleDelete}
-        aria-label="Eliminar pago"
+        aria-label="Eliminar movimiento"
         className="text-destructive hover:bg-destructive/20 hover:text-destructive"
       >
         <Trash2Icon className="size-4" />

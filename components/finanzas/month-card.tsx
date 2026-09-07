@@ -12,6 +12,7 @@ import {
   computeProfit,
   formatPrice,
 } from "@/lib/projects/format";
+import { Money } from "@/components/ui/amount";
 import type {
   CobradoStatus,
   PagadoStatus,
@@ -94,16 +95,26 @@ export function MonthCard({
             <CardTitle className="uppercase tracking-wide">{label}</CardTitle>
           </div>
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
-            <Inline label="Cobrado" value={formatPrice(collected)} valueClass="text-sky-400" />
+            <Inline
+              label="Cobrado"
+              value={<Money>{formatPrice(collected)}</Money>}
+              valueClass="text-sky-400"
+            />
             <Inline
               label="Pagado"
-              value={formatPrice(paid)}
+              value={<Money>{formatPrice(paid)}</Money>}
               valueClass="text-red-400"
-              note={servicesCost > 0 ? `(+${formatPrice(servicesCost)} serv.)` : undefined}
+              note={
+                servicesCost > 0 ? (
+                  <>
+                    (+<Money>{formatPrice(servicesCost)}</Money> serv.)
+                  </>
+                ) : undefined
+              }
             />
             <Inline
               label="Ganancia"
-              value={formatPrice(profit)}
+              value={<Money>{formatPrice(profit)}</Money>}
               valueClass={profitClass}
               bold
             />
@@ -119,27 +130,31 @@ export function MonthCard({
           <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
             <MonthRow
               label="Cobrado"
-              primary={formatPrice(collected)}
+              primary={<Money>{formatPrice(collected)}</Money>}
               secondaryLabel="Por cobrar"
-              secondary={formatPrice(pendingCollect)}
+              secondary={<Money>{formatPrice(pendingCollect)}</Money>}
               tone="cobrado"
             />
             <MonthRow
               label="Pagado"
-              primary={formatPrice(paid)}
+              primary={<Money>{formatPrice(paid)}</Money>}
               secondaryLabel="Por pagar"
-              secondary={formatPrice(pendingPay)}
+              secondary={<Money>{formatPrice(pendingPay)}</Money>}
               tone="pagado"
             />
             {servicesCost > 0 ? (
               <MonthRow
                 label="Servicios fijos"
-                primary={`− ${formatPrice(servicesCost)}`}
+                primary={
+                  <>
+                    − <Money>{formatPrice(servicesCost)}</Money>
+                  </>
+                }
               />
             ) : null}
             <MonthRow
               label="Ganancia"
-              primary={formatPrice(profit)}
+              primary={<Money>{formatPrice(profit)}</Money>}
               tone={profit < 0 ? "negative" : "positive"}
             />
           </div>
@@ -161,14 +176,21 @@ export function MonthCard({
                   const price = isMensual ? null : computePrice(p);
                   const cost = computeCost(p);
                   const profitP = computeProfit(p);
-                  const cobradoStr = isMensual
-                    ? "RETAINER"
-                    : price != null
-                      ? formatPrice(price)
-                      : "—";
-                  const pagadoStr = cost != null ? formatPrice(cost) : "—";
+                  const cobradoStr = isMensual ? (
+                    "RETAINER"
+                  ) : price != null ? (
+                    <Money>{formatPrice(price)}</Money>
+                  ) : (
+                    "—"
+                  );
+                  const pagadoStr =
+                    cost != null ? <Money>{formatPrice(cost)}</Money> : "—";
                   const profitStr =
-                    profitP != null ? formatPrice(profitP) : "—";
+                    profitP != null ? (
+                      <Money>{formatPrice(profitP)}</Money>
+                    ) : (
+                      "—"
+                    );
                   return (
                     <div
                       key={p.id}
@@ -220,10 +242,10 @@ function Inline({
   note,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   valueClass?: string;
   bold?: boolean;
-  note?: string;
+  note?: React.ReactNode;
 }) {
   return (
     <span className="inline-flex items-baseline gap-1">
@@ -252,9 +274,9 @@ function MonthRow({
   tone,
 }: {
   label: string;
-  primary: string;
+  primary: React.ReactNode;
   secondaryLabel?: string;
-  secondary?: string;
+  secondary?: React.ReactNode;
   tone?: "positive" | "negative" | "cobrado" | "pagado";
 }) {
   const primaryClass =

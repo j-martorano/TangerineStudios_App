@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 
 import { registerClientPayment } from "@/lib/clients/actions";
+import { AmountsToggle, Money } from "@/components/ui/amount";
 
 export type RetainerClient = {
   id: string;
@@ -128,7 +129,10 @@ export function RegisterRetainerPaymentDialog({
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Registrar pago retainer</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            Registrar pago retainer
+            <AmountsToggle className="ml-auto mr-6 size-7" />
+          </DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
@@ -177,7 +181,7 @@ export function RegisterRetainerPaymentDialog({
               <p className="text-xs text-muted-foreground">
                 Rate efectivo: {selected.rate} − {selected.discountPct}% ={" "}
                 <span className="font-medium text-foreground tabular-nums">
-                  {effRate.toFixed(2)} USD/min
+                  <Money>{effRate.toFixed(2)} USD/min</Money>
                 </span>
               </p>
             ) : (

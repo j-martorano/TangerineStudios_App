@@ -11,6 +11,8 @@ import {
   YAxis,
 } from "recharts";
 
+import { Money, useMaskAmount } from "@/components/ui/amount";
+
 export type MonthlyDatum = {
   month: string;
   cobrado: number;
@@ -53,7 +55,7 @@ function TooltipContent({
             />
             <span className="text-muted-foreground">{p.name}</span>
             <span className="ml-auto font-medium tabular-nums">
-              {USD.format(p.value)}
+              <Money>{USD.format(p.value)}</Money>
             </span>
           </div>
         ))}
@@ -63,6 +65,7 @@ function TooltipContent({
 }
 
 export function MonthlyBarsChart({ data }: { data: MonthlyDatum[] }) {
+  const mask = useMaskAmount();
   if (data.length === 0) {
     return (
       <p className="text-sm italic text-muted-foreground">
@@ -91,7 +94,7 @@ export function MonthlyBarsChart({ data }: { data: MonthlyDatum[] }) {
           stroke="currentColor"
           className="text-muted-foreground"
           tick={{ fontSize: 11 }}
-          tickFormatter={fmtAxis}
+          tickFormatter={(v: number) => mask(fmtAxis(v))}
         />
         <Tooltip
           cursor={{ fill: "currentColor", fillOpacity: 0.05 }}

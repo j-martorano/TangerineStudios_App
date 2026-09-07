@@ -4,6 +4,7 @@ import { DataPagination } from "@/components/data-pagination";
 import { DataSearch } from "@/components/data-search";
 import { fetchClientsList, fetchEditors, fetchClientsForParentSelect } from "@/lib/projects/queries";
 import { fetchUserPrefs } from "@/lib/settings/queries";
+import { AmountsToggle } from "@/components/ui/amount";
 
 
 type SearchParams = Promise<{ q?: string; page?: string }>;
@@ -31,6 +32,7 @@ export default async function ClientsPage({
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <div className="flex items-baseline gap-4">
           <h1 className="text-2xl font-semibold tracking-tight">Clientes</h1>
+          <AmountsToggle className="self-center" />
           <p className="text-sm text-muted-foreground">
             {total} cliente{total === 1 ? "" : "s"}
           </p>

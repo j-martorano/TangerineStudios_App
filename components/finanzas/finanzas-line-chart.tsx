@@ -13,6 +13,8 @@ import {
 } from "recharts";
 import { ChevronDown } from "lucide-react";
 
+import { Money, useMaskAmount } from "@/components/ui/amount";
+
 export type ChartPoint = {
   label: string;
   cobrado: number;
@@ -66,7 +68,7 @@ function TooltipContent({
             />
             <span className="text-muted-foreground">{p.name}</span>
             <span className="ml-auto font-medium tabular-nums">
-              {USD.format(p.value)}
+              <Money>{USD.format(p.value)}</Money>
             </span>
           </div>
         ))}
@@ -83,6 +85,7 @@ export function FinanzasLineChart({
   dailyByMonth: Record<string, ChartPoint[]>;
 }) {
   const [mode, setMode] = useState<ViewMode>("historico");
+  const mask = useMaskAmount();
 
   const monthKeys = Object.keys(dailyByMonth).sort();
   const latestMonth = monthKeys[monthKeys.length - 1] ?? "";
@@ -196,7 +199,7 @@ export function FinanzasLineChart({
             stroke="currentColor"
             className="text-muted-foreground"
             tick={{ fontSize: 11 }}
-            tickFormatter={fmtAxis}
+            tickFormatter={(v: number) => mask(fmtAxis(v))}
           />
           <Tooltip
             cursor={{ stroke: "currentColor", strokeOpacity: 0.15 }}

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { AmountsProvider } from "@/components/ui/amount";
 import {
   SidebarInset,
   SidebarProvider,
@@ -15,11 +16,13 @@ export default async function AppLayout({
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
 
   return (
-    <SidebarProvider defaultOpen={defaultOpen}>
-      <AppSidebar />
-      <SidebarInset>
-        <div className="flex-1">{children}</div>
-      </SidebarInset>
-    </SidebarProvider>
+    <AmountsProvider>
+      <SidebarProvider defaultOpen={defaultOpen}>
+        <AppSidebar />
+        <SidebarInset>
+          <div className="flex-1">{children}</div>
+        </SidebarInset>
+      </SidebarProvider>
+    </AmountsProvider>
   );
 }
