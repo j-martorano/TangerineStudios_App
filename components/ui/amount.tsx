@@ -1,21 +1,17 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 /**
- * Visibilidad global de los montos. Por defecto están ocultos: se revelan
- * únicamente mientras se mantiene apretado el «ojito» (`AmountsToggle`).
- * Al soltar (o al salir del botón / perder foco) vuelven a ocultarse.
+ * Visibilidad global de los montos. Por defecto están ocultos; el «ojito»
+ * (`AmountsToggle`) los muestra y los vuelve a ocultar. Es un toggle, no un
+ * mantener-apretado, así se puede scrollear con los montos a la vista.
+ *
+ * El estado vive en el layout de la app, así que se mantiene al navegar entre
+ * páginas y se resetea a oculto al recargar.
  */
 type AmountsContextValue = {
   revealed: boolean;
@@ -30,21 +26,6 @@ const AmountsContext = createContext<AmountsContextValue>({
 export function AmountsProvider({ children }: { children: React.ReactNode }) {
   const [revealed, setRevealed] = useState(false);
 
-  // Si el usuario suelta el mouse/dedo fuera del botón (o la pestaña pierde
-  // foco) igual ocultamos: nunca queremos que quede revelado "pegado".
-  useEffect(() => {
-    if (!revealed) return;
-    const hide = () => setRevealed(false);
-    window.addEventListener("pointerup", hide);
-    window.addEventListener("pointercancel", hide);
-    window.addEventListener("blur", hide);
-    return () => {
-      window.removeEventListener("pointerup", hide);
-      window.removeEventListener("pointercancel", hide);
-      window.removeEventListener("blur", hide);
-    };
-  }, [revealed]);
-
   const value = useMemo(() => ({ revealed, setRevealed }), [revealed]);
 
   return (
@@ -52,7 +33,7 @@ export function AmountsProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** `true` mientras el ojito esté apretado. */
+/** `true` cuando los montos están a la vista. */
 export function useAmountsRevealed(): boolean {
   return useContext(AmountsContext).revealed;
 }
@@ -78,7 +59,7 @@ export function Money({
   return (
     <span
       aria-label="Monto oculto"
-      title="Mantené apretado el ojito para ver los montos"
+      title="Tocá el ojito para ver los montos"
       className={cn(
         "select-none align-baseline tracking-[0.12em] text-muted-foreground/70",
         className
@@ -103,40 +84,27 @@ export function useMaskAmount(): (formatted: string) => string {
 }
 
 /**
- * El «ojito». Se mantiene apretado para revelar todos los montos de la app;
- * al soltar se vuelven a ocultar.
+ * El «ojito». Toggle: un click muestra todos los montos de la app y el
+ * siguiente los vuelve a ocultar. Al ser toggle se puede scrollear, abrir
+ * diálogos y navegar con los montos a la vista.
  */
 export function AmountsToggle({ className }: { className?: string }) {
   const { revealed, setRevealed } = useContext(AmountsContext);
-  const show = useCallback(() => setRevealed(true), [setRevealed]);
-  const hide = useCallback(() => setRevealed(false), [setRevealed]);
+  const toggle = useCallback(
+    () => setRevealed(!revealed),
+    [revealed, setRevealed]
+  );
+  const label = revealed ? "Ocultar los montos" : "Mostrar los montos";
 
   return (
     <button
       type="button"
       aria-pressed={revealed}
-      aria-label="Mantené apretado para ver los montos"
-      title="Mantené apretado para ver los montos"
-      onPointerDown={show}
-      onPointerUp={hide}
-      onPointerLeave={hide}
-      onPointerCancel={hide}
-      onBlur={hide}
-      onKeyDown={(e) => {
-        if (e.key === " " || e.key === "Enter") {
-          e.preventDefault();
-          show();
-        }
-      }}
-      onKeyUp={(e) => {
-        if (e.key === " " || e.key === "Enter") {
-          e.preventDefault();
-          hide();
-        }
-      }}
-      onContextMenu={(e) => e.preventDefault()}
+      aria-label={label}
+      title={label}
+      onClick={toggle}
       className={cn(
-        "inline-flex size-8 shrink-0 cursor-pointer touch-none select-none items-center justify-center rounded-md border border-border/60 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+        "inline-flex size-8 shrink-0 cursor-pointer select-none items-center justify-center rounded-md border border-border/60 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
         revealed && "border-primary/50 bg-accent text-foreground",
         className
       )}
