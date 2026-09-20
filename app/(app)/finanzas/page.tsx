@@ -30,6 +30,7 @@ import type { ProjectWithRelations } from "@/lib/projects/types";
 import type { FinanzasPayment } from "@/lib/finanzas/queries";
 import { ProjectSettleButton } from "@/components/finanzas/project-settle-button";
 import { currentMonthKeyAR, todayAR } from "@/lib/argentina-date";
+import { projectEffectiveMonthKey } from "@/lib/projects/month-bucket";
 import { AmountsToggle, Money } from "@/components/ui/amount";
 
 // Tinte de fondo basado en el color del cliente (hex de 8 dígitos = RRGGBB + alpha 0x33).
@@ -205,20 +206,12 @@ function build(
     const naturalIso = p.finalized_at ?? p.created_at;
     if (!naturalIso) continue;
 
-    // Determinar el mes de display: mismo criterio que kanban y spreadsheet.
+    // Mes de display: regla compartida con kanban y spreadsheet.
     const isMensualClient = p.client?.payment_type === "mensual";
-    let displayKey: string;
-    if (!isMensualClient && p.cobrado === "si") {
-      const latestCobroIso = p.cobros.length > 0
-        ? p.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a)).paid_at
-        : null;
-      displayKey = monthKey(latestCobroIso ?? naturalIso);
-    } else if (p.phase === "terminado" && p.finalized_at) {
-      displayKey = monthKey(p.finalized_at);
-    } else {
-      displayKey = currentMK;
-    }
-    const displayIso = displayKey === currentMK ? `${currentMK}-01T00:00:00Z` : naturalIso;
+    const displayKey = projectEffectiveMonthKey(p, currentMK);
+    // El label del bucket sale del propio mes, no de la fecha natural del
+    // proyecto: si se cobró en otro mes, la fecha natural etiquetaría mal.
+    const displayIso = `${displayKey}-01T00:00:00Z`;
     const bucket = ensureBucket(displayKey, displayIso);
     const monthIso = naturalIso; // usado más abajo para cobradoBucket/pagadoBucket
     bucket.projects.push(p);

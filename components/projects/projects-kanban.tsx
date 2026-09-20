@@ -80,6 +80,7 @@ import { reorderProjects, type ReorderUpdate } from "@/lib/projects/actions";
 import { Money } from "@/components/ui/amount";
 import type { RetainerPayment } from "@/lib/finanzas/queries";
 import { todayAR, currentMonthKeyAR } from "@/lib/argentina-date";
+import { projectEffectiveMonthKey } from "@/lib/projects/month-bucket";
 
 type Props = {
   projects: ProjectWithRelations[];
@@ -118,20 +119,6 @@ function monthLabel(key: string): string {
   return year === "0000" ? "Sin fecha" : `${name} ${year}`;
 }
 
-/** Para proyectos no-retainer cobrados: devuelve el mes del cobro más reciente.
- *  Para los demás (retainer o no cobrado) devuelve null. */
-function getCobradoMK(p: ProjectWithRelations): string | null {
-  if (p.cobrado !== "si" || p.client?.payment_type === "mensual") return null;
-  const latestCobro = p.cobros.length > 0
-    ? p.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a))
-    : null;
-  if (latestCobro) return latestCobro.paid_at.slice(0, 7);
-  // Sin cobro registrado: terminado usa finalized_at/created_at (columna histórica);
-  // fases activas usan el mes actual (el cobro se marcó hoy, no existe registro de fecha).
-  if (p.phase === "terminado") return monthKey(p.finalized_at ?? p.created_at);
-  return currentMonthKeyAR();
-}
-
 const statCurrencyFmt = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -148,8 +135,8 @@ function groupTerminadoByMonth(
 ): { key: string; label: string; items: ProjectWithRelations[] }[] {
   const map = new Map<string, ProjectWithRelations[]>();
   for (const p of items) {
-    // Prioridad: mes de cobro (no-retainer cobrado) > mes de terminado
-    const key = getCobradoMK(p) ?? monthKey(p.finalized_at);
+    // Regla compartida: manda el cobro; sin cobrar queda en el mes actual.
+    const key = projectEffectiveMonthKey(p, currentMonthKeyAR());
     const arr = map.get(key);
     if (arr) arr.push(p);
     else map.set(key, [p]);
@@ -176,10 +163,10 @@ function buildColumns(projects: ProjectWithRelations[], currentMK: string): Colu
   const map = {} as ColumnsMap;
   for (const phase of PROJECT_PHASES) map[phase] = [];
   for (const p of projects) {
-    // Proyecto no-retainer cobrado en un mes pasado → columna histórica (terminado)
+    // Proyecto cobrado en un mes pasado → columna histórica (terminado)
     if (p.phase !== "terminado") {
-      const cobradoMK = getCobradoMK(p);
-      if (cobradoMK && cobradoMK !== currentMK) {
+      const mk = projectEffectiveMonthKey(p, currentMK);
+      if (mk !== currentMK && mk !== "0000-00") {
         map["terminado"].push(p);
         continue;
       }
@@ -211,8 +198,7 @@ function getHistMonthFromDrop(
   const overProject = terminadoItems.find((p) => p.id === overId);
   if (!overProject) return null;
   const currentMK = currentMonthKeyAR();
-  // Para proyectos cobrados (no-retainer), usar el mes del cobro como referencia
-  const projectMK = getCobradoMK(overProject) ?? monthKey(overProject.finalized_at);
+  const projectMK = projectEffectiveMonthKey(overProject, currentMK);
   return projectMK !== currentMK && projectMK !== "0000-00" ? projectMK : null;
 }
 
@@ -304,7 +290,7 @@ export function ProjectsKanban(props: Props) {
     if (month === "all") return props.projects;
     return props.projects.filter((p) => {
       if (p.phase === "terminado") {
-        return monthKey(p.finalized_at) === month;
+        return projectEffectiveMonthKey(p, currentMonthKeyAR()) === month;
       }
       return monthKey(p.created_at) <= month;
     });
@@ -667,6 +653,33 @@ function InteractiveKanban({
       const histMonth = getHistMonthFromDrop(overIdStr, next.terminado);
 
       if (histMonth) {
+        // Un proyecto sin cobrar no tiene mes propio: vive en el mes actual
+        // hasta que se registre el cobro. Soltarlo en un mes viejo no lo
+        // movería, así que lo avisamos en vez de dejarlo volver solo.
+        const dragged = projects.find((p) => p.id === activeIdStr);
+        const isRetainer = dragged?.client?.payment_type === "mensual";
+        if (dragged && !isRetainer && dragged.cobrado !== "si") {
+          toast.info(
+            `«${dragged.title}» todavía no está cobrado — queda en el mes actual hasta que registres el cobro.`
+          );
+          const today = todayUTC();
+          const keepUpdates = updates.map((u) =>
+            u.id === activeIdStr
+              ? {
+                  ...u,
+                  phase: "terminado" as ProjectPhase,
+                  finalized: true,
+                  finalized_at: dragged.finalized_at ?? `${today}T12:00:00Z`,
+                }
+              : u
+          );
+          startTransition(async () => {
+            const result = await reorderProjects(keepUpdates);
+            if (!result.ok) toast.error(result.error);
+          });
+          return;
+        }
+
         // Mes histórico: actualizar finalized_at sin dialog (funciona también al
         // reubicar un proyecto ya terminado entre meses históricos).
         const finalUpdates = updates.map((u) =>

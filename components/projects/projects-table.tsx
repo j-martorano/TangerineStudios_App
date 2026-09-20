@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { currentMonthKeyAR } from "@/lib/argentina-date";
+import { projectEffectiveMonthKey } from "@/lib/projects/month-bucket";
 
 import { PlusIcon } from "lucide-react";
 
@@ -38,39 +39,11 @@ const MONTH_NAMES = [
   "Diciembre",
 ];
 
-function monthKey(iso: string | null | undefined): string {
-  if (!iso) return "0000-00";
-  const d = new Date(iso);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
 function monthLabel(key: string): string {
   const [year, month] = key.split("-");
   const idx = Number(month) - 1;
   const name = MONTH_NAMES[idx] ?? "Sin fecha";
   return year === "0000" ? "Sin fecha" : `${name} ${year}`;
-}
-
-function projectEffectiveMK(p: ProjectWithRelations, currentMK: string): string {
-  // Retainer: solo el terminado determina el mes histórico
-  if (p.client?.payment_type === "mensual") {
-    if (p.phase === "terminado" && p.finalized_at) return monthKey(p.finalized_at);
-    return currentMK;
-  }
-  // No-retainer: cobrado tiene prioridad (mes del cobro más reciente)
-  if (p.cobrado === "si") {
-    const latestCobro = p.cobros.length > 0
-      ? p.cobros.reduce((a, b) => (b.paid_at > a.paid_at ? b : a))
-      : null;
-    if (latestCobro) return latestCobro.paid_at.slice(0, 7);
-    if (p.finalized_at) return monthKey(p.finalized_at);
-    if (p.created_at) return monthKey(p.created_at);
-    return currentMK;
-  }
-  // Terminado pero no cobrado
-  if (p.phase === "terminado" && p.finalized_at) return monthKey(p.finalized_at);
-  // Activo (no cobrado, no terminado) → mes actual siempre
-  return currentMK;
 }
 
 function groupByMonth(
@@ -80,7 +53,7 @@ function groupByMonth(
   const currentMK = currentMonthKeyAR();
   const map = new Map<string, ProjectWithRelations[]>();
   for (const p of topLevel) {
-    const key = projectEffectiveMK(p, currentMK);
+    const key = projectEffectiveMonthKey(p, currentMK);
     const arr = map.get(key);
     if (arr) arr.push(p);
     else map.set(key, [p]);
