@@ -99,18 +99,39 @@ async function syncClientEditors(
   if (editorIds === undefined) return { ok: true };
   const supabase = await createSupabaseClient();
 
-  const { error: delErr } = await supabase
+  // OJO: acá NO se puede borrar todo y re-insertar. La fila de client_editors
+  // guarda además la config de pago del par (payment_type, rate, flat_amount)
+  // y los tramos por rango cuelgan de ella con ON DELETE CASCADE. El form de
+  // cliente no maneja esa config, así que un delete+insert la borraba entera y
+  // el editor volvía a su modelo global — por ejemplo un editor con 10/min
+  // para un cliente pasaba a cobrar los tramos de otro.
+  // Tocamos sólo las altas y las bajas; los pares que siguen, quedan intactos.
+  const { data: existing, error: selErr } = await supabase
     .from("client_editors")
-    .delete()
+    .select("editor_id")
     .eq("client_id", clientId);
-  if (delErr) return { ok: false, error: delErr.message };
+  if (selErr) return { ok: false, error: selErr.message };
 
-  if (editorIds.length === 0) return { ok: true };
+  const current = new Set((existing ?? []).map((r) => r.editor_id));
+  const next = new Set(editorIds);
 
-  const { error: insErr } = await supabase
-    .from("client_editors")
-    .insert(editorIds.map((eid) => ({ client_id: clientId, editor_id: eid })));
-  if (insErr) return { ok: false, error: insErr.message };
+  const toRemove = [...current].filter((id) => !next.has(id));
+  if (toRemove.length > 0) {
+    const { error: delErr } = await supabase
+      .from("client_editors")
+      .delete()
+      .eq("client_id", clientId)
+      .in("editor_id", toRemove);
+    if (delErr) return { ok: false, error: delErr.message };
+  }
+
+  const toAdd = [...next].filter((id) => !current.has(id));
+  if (toAdd.length > 0) {
+    const { error: insErr } = await supabase
+      .from("client_editors")
+      .insert(toAdd.map((eid) => ({ client_id: clientId, editor_id: eid })));
+    if (insErr) return { ok: false, error: insErr.message };
+  }
 
   return { ok: true };
 }
