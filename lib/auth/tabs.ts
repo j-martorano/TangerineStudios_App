@@ -25,17 +25,27 @@ export type TabKey = (typeof TABS)[number]["key"];
 
 export const TAB_KEYS: readonly TabKey[] = TABS.map((t) => t.key);
 
+/**
+ * Qué ve y qué puede tocar quien tiene cada pestaña. Lo lee Joaco al dar
+ * permisos, así que menciona lo que se "arrastra" (p. ej. el formulario de
+ * proyecto deja crear clientes). Coincide con lib/auth/scopes.ts y con la
+ * función SQL tabs_for.
+ */
 export const TAB_DESCRIPTIONS: Record<TabKey, string> = {
-  dashboard: "Resumen del mes con cobrado, pagado y ganancia.",
-  kanban: "Tablero de proyectos. Incluye montos del mes.",
-  projects: "Tabla anual de todos los proyectos.",
-  clients: "Clientes y sus precios.",
-  editors: "Editores y lo que cobra cada uno.",
-  finanzas: "Toda la plata: cobros, pagos y ganancia.",
+  dashboard:
+    "Resumen del mes con cobrado, pagado y ganancia. Puede crear proyectos y clientes.",
+  kanban:
+    "Tablero de proyectos con precios, costos y montos del mes. Mueve cards, marca cobros y pagos, y hace facturas.",
+  projects:
+    "Tabla anual de proyectos con precios y costos. Edita proyectos y puede crear clientes.",
+  clients: "Clientes, precios acordados y pagos de retainer. Puede crear editores.",
+  editors: "Editores, lo que cobra cada uno y su vínculo con Discord.",
+  finanzas: "Toda la plata: cobros, pagos, ganancia y servicios fijos.",
   facturas: "Facturas emitidas y sus PDFs.",
   boveda: "Contraseñas compartidas. Cada una se habilita aparte.",
-  configuracion: "Catálogos compartidos y datos de facturación.",
-  mantenimiento: "Herramientas de mantenimiento (backfill de fechas).",
+  configuracion:
+    "Métodos de pago, servicios fijos y datos de facturación del estudio.",
+  mantenimiento: "Backfill de fechas de cobros y pagos.",
 };
 
 export function isTabKey(v: string): v is TabKey {

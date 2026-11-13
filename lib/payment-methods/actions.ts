@@ -1,5 +1,7 @@
 ﻿"use server";
 
+import { assertScope } from "@/lib/auth/permissions";
+
 import { z } from "zod";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
@@ -62,6 +64,8 @@ export async function createPaymentMethod(input: {
   icon?: string | null;
   color?: string;
 }): Promise<PaymentMethodCreateResult> {
+  const guard = await assertScope("paymentMethods");
+  if (!guard.ok) return guard;
   const parsed = createSchema.safeParse({
     name: input.name,
     icon: input.icon ?? null,
@@ -103,6 +107,8 @@ export async function updatePaymentMethod(input: {
   icon: string | null;
   color: string;
 }): Promise<PaymentMethodResult> {
+  const guard = await assertScope("paymentMethods");
+  if (!guard.ok) return guard;
   const parsed = updateSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -139,6 +145,8 @@ export async function updatePaymentMethod(input: {
 export async function deletePaymentMethod(
   id: string
 ): Promise<PaymentMethodResult> {
+  const guard = await assertScope("paymentMethods");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(id)) {
     return { ok: false, error: "ID inválido" };
   }

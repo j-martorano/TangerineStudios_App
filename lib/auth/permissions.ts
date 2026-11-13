@@ -10,6 +10,7 @@ import {
   type TabKey,
   type ViewerProfile,
 } from "./tabs";
+import { SCOPES, type Scope } from "./scopes";
 
 /**
  * Perfil del usuario logueado, leído una vez por request.
@@ -82,6 +83,26 @@ export async function assertAdmin(): Promise<GuardResult> {
     return { ok: false, error: "No tenés permiso para hacer esto" };
   }
   return { ok: true, viewer };
+}
+
+/**
+ * Guard para server actions: pasa si el usuario es admin o tiene alguna de
+ * las pestañas del scope (ver lib/auth/scopes.ts).
+ */
+export async function assertScope(scope: Scope): Promise<GuardResult> {
+  const viewer = await getViewer();
+  const tabs: readonly TabKey[] = SCOPES[scope];
+  if (!viewer || !tabs.some((t) => viewer.tabs.includes(t))) {
+    return { ok: false, error: "No tenés permiso para hacer esto" };
+  }
+  return { ok: true, viewer };
+}
+
+/** Igual que assertScope pero tira error (para actions que no devuelven Result). */
+export async function requireScope(scope: Scope): Promise<ViewerProfile> {
+  const res = await assertScope(scope);
+  if (!res.ok) throw new Error(res.error);
+  return res.viewer;
 }
 
 /** Guard para server actions de una pestaña. */

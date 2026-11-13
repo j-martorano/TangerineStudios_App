@@ -1,5 +1,7 @@
 "use server";
 
+import { assertScope, requireScope } from "@/lib/auth/permissions";
+
 import { revalidatePath, revalidateTag } from "next/cache";
 import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -7,7 +9,7 @@ import { createBotClient } from "@/lib/supabase/bot";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { ProjectTemplate } from "./types";
 
-export const fetchTemplates = unstable_cache(
+const fetchTemplatesCached = unstable_cache(
   async (): Promise<ProjectTemplate[]> => {
     const supabase = createBotClient();
     const { data } = await supabase
@@ -20,9 +22,17 @@ export const fetchTemplates = unstable_cache(
   { tags: [CACHE_TAGS.templates] }
 );
 
+/** Plantillas de proyecto. Es server action (este archivo es "use server"), así que chequea permiso. */
+export async function fetchTemplates(): Promise<ProjectTemplate[]> {
+  await requireScope("projectForm");
+  return fetchTemplatesCached();
+}
+
 export async function createTemplate(
   input: Omit<ProjectTemplate, "id" | "created_at">
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await assertScope("projectForm");
+  if (!guard.ok) return guard;
   const supabase = await createClient();
   const { error } = await supabase.from("project_templates").insert(input);
   if (error) return { ok: false, error: error.message };
@@ -34,6 +44,8 @@ export async function createTemplate(
 export async function deleteTemplate(
   id: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await assertScope("projectForm");
+  if (!guard.ok) return guard;
   const supabase = await createClient();
   const { error } = await supabase
     .from("project_templates")

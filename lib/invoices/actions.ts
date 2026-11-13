@@ -1,5 +1,7 @@
 ﻿"use server";
 
+import { assertScope } from "@/lib/auth/permissions";
+
 import { revalidatePath, revalidateTag } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { z } from "zod";
@@ -46,6 +48,8 @@ const invoiceInputSchema = z.object({
 // ── Crear factura ─────────────────────────────────────────────────────────────
 
 export async function createInvoice(input: InvoiceInput): Promise<ActionResult> {
+  const guard = await assertScope("invoices");
+  if (!guard.ok) return guard;
   const parsed = invoiceInputSchema.safeParse(input);
   if (!parsed.success) {
     const msg = parsed.error.issues[0]?.message ?? "Datos inválidos";
@@ -194,6 +198,8 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
 // ── Eliminar factura ──────────────────────────────────────────────────────────
 
 export async function deleteInvoice(id: string): Promise<ActionResult> {
+  const guard = await assertScope("invoices");
+  if (!guard.ok) return guard;
   const supabase = await createClient();
 
   // Obtener el path del PDF para borrarlo del storage
@@ -221,6 +227,8 @@ export async function deleteInvoice(id: string): Promise<ActionResult> {
 export async function getInvoicePdfUrl(
   storagePath: string
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const guard = await assertScope("invoices");
+  if (!guard.ok) return guard;
   const supabase = await createClient();
   const { data, error } = await supabase.storage
     .from("invoices")
@@ -247,6 +255,8 @@ const settingsSchema = z.object({
 export async function updateInvoiceSettings(
   input: InvoiceSettings
 ): Promise<ActionResult> {
+  const guard = await assertScope("invoiceSettings");
+  if (!guard.ok) return guard;
   const parsed = settingsSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -271,6 +281,8 @@ export async function updateInvoiceSettings(
 export async function regenerateInvoicePdf(
   invoiceId: string
 ): Promise<ActionResult> {
+  const guard = await assertScope("invoices");
+  if (!guard.ok) return guard;
   const supabase = await createClient();
 
   const { data: inv, error: fetchErr } = await supabase

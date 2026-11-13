@@ -1,5 +1,7 @@
 "use server";
 
+import { assertScope, requireScope } from "@/lib/auth/permissions";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidateTag } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
@@ -65,6 +67,7 @@ async function fetchAffectedProjects(supabase: Awaited<ReturnType<typeof createC
 }
 
 export async function previewBackfill(): Promise<BackfillPreview> {
+  await requireScope("maintenance");
   const supabase = await createClient();
   const { needsCobro, needsPagado } = await fetchAffectedProjects(supabase);
 
@@ -111,6 +114,8 @@ export async function previewBackfill(): Promise<BackfillPreview> {
 }
 
 export async function runBackfill(): Promise<{ ok: true; created: number } | { ok: false; error: string }> {
+  const guard = await assertScope("maintenance");
+  if (!guard.ok) return guard;
   const supabase = await createClient();
   const { needsCobro, needsPagado } = await fetchAffectedProjects(supabase);
 

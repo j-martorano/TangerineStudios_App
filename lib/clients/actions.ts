@@ -1,5 +1,7 @@
 ﻿"use server";
 
+import { assertScope } from "@/lib/auth/permissions";
+
 import { z } from "zod";
 import { todayAR } from "@/lib/argentina-date";
 import { revalidatePath, revalidateTag } from "next/cache";
@@ -139,6 +141,8 @@ async function syncClientEditors(
 export async function createClient(
   input: ClientInput
 ): Promise<ClientCreateResult> {
+  const guard = await assertScope("clientCreate");
+  if (!guard.ok) return guard;
   const parsed = clientInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
@@ -185,6 +189,8 @@ export async function updateClient(
   id: string,
   input: ClientInput
 ): Promise<ClientActionResult> {
+  const guard = await assertScope("clientEdit");
+  if (!guard.ok) return guard;
   const parsed = clientInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
@@ -225,6 +231,8 @@ export async function updateClient(
 }
 
 export async function deleteClient(id: string): Promise<ClientActionResult> {
+  const guard = await assertScope("clientEdit");
+  if (!guard.ok) return guard;
   const supabase = await createSupabaseClient();
   const { error } = await supabase.from("clients").delete().eq("id", id);
 
@@ -273,6 +281,8 @@ export async function registerClientPayment(input: {
   paid_at: string;
   note?: string | null;
 }): Promise<ClientPaymentResult> {
+  const guard = await assertScope("clientPayments");
+  if (!guard.ok) return guard;
   const parsed = paymentSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
@@ -335,6 +345,8 @@ export async function registerClientMinutesDebit(input: {
   minutes: number;
   note?: string | null;
 }): Promise<ClientPaymentResult> {
+  const guard = await assertScope("clientPayments");
+  if (!guard.ok) return guard;
   const parsed = minutesDebitSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
@@ -370,6 +382,8 @@ export async function registerClientMinutesDebit(input: {
 export async function deleteClientPayment(
   id: string
 ): Promise<ClientPaymentResult> {
+  const guard = await assertScope("clientPayments");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
 
   const supabase = await createSupabaseClient();

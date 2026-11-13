@@ -1102,8 +1102,9 @@ export type Database = {
     }
     Functions: {
       claim_invoice_number: { Args: never; Returns: number }
-      has_data_access: { Args: never; Returns: boolean }
+      has_any_tab: { Args: { tabs: string[] }; Returns: boolean }
       slugify: { Args: { input: string }; Returns: string }
+      tabs_for: { Args: { mode: string; tbl: string }; Returns: string[] }
       unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {

@@ -2,10 +2,10 @@
 -- Usuarios, permisos por pestaña y Bóveda de credenciales.
 --
 -- 1. profiles: rol (admin | member) + pestañas visibles de cada usuario.
--- 2. has_data_access(): "¿este usuario puede tocar datos del negocio?".
---    Se agrega como policy RESTRICTIVE a todas las tablas con RLS, así un
---    usuario que solo tiene la Bóveda no puede leer proyectos/finanzas
---    pegándole directo a la API de Supabase con su sesión.
+-- 2. Permisos por tabla según pestaña: tabs_for(tabla, 'read'|'write') dice
+--    qué pestañas habilitan leer o escribir cada tabla. Se aplican como
+--    policies RESTRICTIVE, así nadie lee ni escribe por la API de Supabase
+--    (con su propia sesión) datos de una pestaña que no tiene.
 -- 3. Bóveda: credenciales cifradas (AES-256-GCM en el servidor, la DB solo ve
 --    texto cifrado), quién ve cada una, log de eventos y avisos.
 -- 4. Trigger: al rotar una contraseña se crea un aviso SOLO para los usuarios
@@ -64,11 +64,10 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 -- ---------------------------------------------------------------------------
--- 2. Acceso a datos del negocio
+-- 2. Permisos por tabla según pestaña
 -- ---------------------------------------------------------------------------
--- Pestañas que implican leer/escribir datos del negocio. "boveda" no está:
--- un usuario que solo ve la Bóveda no toca ninguna tabla del negocio.
-create or replace function public.has_data_access()
+-- ¿El usuario logueado es admin o tiene alguna de estas pestañas?
+create or replace function public.has_any_tab(tabs text[])
 returns boolean
 language sql
 stable
@@ -80,21 +79,71 @@ as $$
     from public.profiles p
     where p.id = auth.uid()
       and not p.disabled
-      and (
-        p.role = 'admin'
-        or p.allowed_tabs && array[
-          'dashboard', 'kanban', 'projects', 'clients', 'editors',
-          'finanzas', 'facturas', 'configuracion', 'mantenimiento'
-        ]::text[]
-      )
+      and (p.role = 'admin' or p.allowed_tabs && tabs)
   );
 $$;
 
--- Policy restrictiva en cada tabla con RLS (se suma con AND a las policies
--- existentes, que siguen igual).
+-- Qué pestañas habilitan leer ('read') o escribir ('write') cada tabla.
+-- Sale de lo que muestra y edita cada pantalla (incluye formularios que una
+-- pestaña abre aunque escriban en otra tabla: p. ej. crear un cliente desde
+-- el formulario de proyecto). Leer siempre incluye a quien puede escribir.
+-- Tabla que no está acá = solo admins.
+--
+-- ⚠️ Mantener en sincronía con lib/auth/scopes.ts (guards de las actions).
+create or replace function public.tabs_for(tbl text, mode text)
+returns text[]
+language sql
+immutable
+as $$
+  select case
+    when tbl in ('projects', 'project_editors', 'project_cobros',
+                 'project_editor_pagos', 'project_revisions') then
+      array['dashboard', 'kanban', 'projects', 'finanzas', 'facturas', 'mantenimiento']
+    when tbl = 'clients' then
+      case when mode = 'read'
+        then array['dashboard', 'kanban', 'projects', 'clients', 'editors', 'finanzas', 'facturas']
+        else array['dashboard', 'kanban', 'projects', 'clients', 'editors'] end
+    when tbl in ('client_editors', 'client_editor_payment_tiers') then
+      case when mode = 'read'
+        then array['dashboard', 'kanban', 'projects', 'clients', 'editors', 'finanzas']
+        else array['dashboard', 'kanban', 'projects', 'clients', 'editors'] end
+    when tbl in ('editors', 'editor_payment_tiers') then
+      case when mode = 'read'
+        then array['dashboard', 'kanban', 'projects', 'clients', 'editors', 'finanzas', 'facturas']
+        else array['dashboard', 'clients', 'editors'] end
+    when tbl = 'editor_payment_methods' then
+      array['dashboard', 'clients', 'editors']
+    when tbl = 'payment_methods' then
+      case when mode = 'read'
+        then array['dashboard', 'clients', 'editors', 'configuracion']
+        else array['editors', 'configuracion'] end
+    when tbl = 'client_payments' then
+      array['dashboard', 'kanban', 'projects', 'clients', 'finanzas']
+    when tbl in ('fixed_services', 'service_month_entries') then
+      case when mode = 'read'
+        then array['dashboard', 'finanzas', 'configuracion']
+        else array['finanzas', 'configuracion'] end
+    when tbl = 'monthly_settlements' then
+      array['finanzas']
+    when tbl in ('invoices', 'invoice_projects') then
+      array['kanban', 'facturas']
+    when tbl = 'invoice_settings' then
+      case when mode = 'read'
+        then array['kanban', 'facturas', 'configuracion']
+        else array['configuracion'] end
+    when tbl in ('project_templates', 'sub_clients') then
+      array['dashboard', 'kanban', 'projects', 'clients']
+    else '{}'::text[]
+  end;
+$$;
+
+-- Cuatro policies restrictivas por tabla (se suman con AND a las que ya
+-- existían, que siguen igual).
 do $$
 declare
   t record;
+  r text;
+  w text;
 begin
   for t in
     select tablename
@@ -103,22 +152,28 @@ begin
       and rowsecurity
       and tablename not in ('profiles', 'user_settings')
   loop
-    execute format(
-      'create policy "require_data_access" on public.%I as restrictive '
-      'for all to authenticated '
-      'using (public.has_data_access()) with check (public.has_data_access())',
-      t.tablename
-    );
+    r := format('public.has_any_tab(public.tabs_for(%L, ''read'') || public.tabs_for(%L, ''write''))',
+                t.tablename, t.tablename);
+    w := format('public.has_any_tab(public.tabs_for(%L, ''write''))', t.tablename);
+
+    execute format('create policy "tab_read" on public.%I as restrictive for select to authenticated using (%s)',
+                   t.tablename, r);
+    execute format('create policy "tab_insert" on public.%I as restrictive for insert to authenticated with check (%s)',
+                   t.tablename, w);
+    execute format('create policy "tab_update" on public.%I as restrictive for update to authenticated using (%s) with check (%s)',
+                   t.tablename, w, w);
+    execute format('create policy "tab_delete" on public.%I as restrictive for delete to authenticated using (%s)',
+                   t.tablename, w);
   end loop;
 end;
 $$;
 
 -- PDFs de facturas en Storage.
-create policy "invoices_require_data_access"
+create policy "invoices_by_tab"
   on storage.objects as restrictive
   for all to authenticated
-  using (bucket_id <> 'invoices' or public.has_data_access())
-  with check (bucket_id <> 'invoices' or public.has_data_access());
+  using (bucket_id <> 'invoices' or public.has_any_tab(array['kanban', 'facturas']))
+  with check (bucket_id <> 'invoices' or public.has_any_tab(array['kanban', 'facturas']));
 
 -- ---------------------------------------------------------------------------
 -- 3. Bóveda

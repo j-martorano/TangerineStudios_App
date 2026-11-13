@@ -1,5 +1,7 @@
 ﻿"use server";
 
+import { assertScope } from "@/lib/auth/permissions";
+
 import { z } from "zod";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
@@ -177,6 +179,8 @@ function buildEditorRows(
 export async function createProject(
   input: ProjectInput
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   const parsed = projectInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
@@ -242,6 +246,8 @@ export async function updateProject(
   id: string,
   input: ProjectInput
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   const parsed = projectInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
@@ -443,6 +449,8 @@ export async function changePhase(
   id: string,
   phase: ProjectPhase
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   const parsed = phaseEnum.safeParse(phase);
   if (!parsed.success) return { ok: false, error: "Fase inválida" };
 
@@ -485,6 +493,8 @@ export async function changeCobrado(
   id: string,
   cobrado: CobradoStatus
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   const parsed = cobradoEnum.safeParse(cobrado);
   if (!parsed.success) return { ok: false, error: "Estado de cobro inválido" };
 
@@ -533,6 +543,8 @@ export async function applyCobradoToggle(
   id: string,
   cobrado: string
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
   if (cobrado !== "si" && cobrado !== "no" && cobrado !== "parcial")
     return { ok: false, error: "Estado de cobro inválido" };
@@ -594,6 +606,8 @@ export async function applyPagadoToggle(
   id: string,
   pagado: string
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
   if (pagado !== "pago_total" && pagado !== "sin_pagar" && pagado !== "parcial")
     return { ok: false, error: "Estado de pago inválido" };
@@ -614,6 +628,8 @@ export async function changePagado(
   id: string,
   pagado: PagadoStatus
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   const parsed = pagadoEnum.safeParse(pagado);
   if (!parsed.success) return { ok: false, error: "Estado de pago inválido" };
 
@@ -732,6 +748,8 @@ async function recomputePagadoStatus(
 export async function registerCobro(
   input: CobroInput
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   const parsed = cobroInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
@@ -749,6 +767,8 @@ export async function registerCobro(
 }
 
 export async function deleteCobro(id: string): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
   const supabase = await createClient();
   const { data: cobro } = await supabase
@@ -781,6 +801,8 @@ export type EditorPagoInput = z.input<typeof editorPagoInputSchema>;
 export async function registerEditorPago(
   input: EditorPagoInput
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   const parsed = editorPagoInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
@@ -799,6 +821,8 @@ export async function registerEditorPago(
 }
 
 export async function deleteEditorPago(id: string): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
   const supabase = await createClient();
   const { data: pago } = await supabase
@@ -820,6 +844,8 @@ export async function deleteEditorPago(id: string): Promise<ActionResult> {
 // ====== Clonar proyecto ======
 
 export async function cloneProject(id: string, newTitle: string): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
   const trimmedTitle = newTitle.trim();
   if (!trimmedTitle) return { ok: false, error: "El título no puede estar vacío" };
@@ -903,6 +929,8 @@ export async function changeProjectDuration(
   id: string,
   minutes: number | null
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
   if (
     minutes !== null &&
@@ -926,6 +954,8 @@ export async function changeInvoiced(
   id: string,
   invoiced: InvoicedStatus
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   const parsed = invoicedEnum.safeParse(invoiced);
   if (!parsed.success)
     return { ok: false, error: "Estado de facturación inválido" };
@@ -950,6 +980,8 @@ export async function setProjectArchived(
   id: string,
   archived: boolean
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
 
   const supabase = await createClient();
@@ -978,6 +1010,8 @@ export async function setProjectArchived(
  * Solo disponible para proyectos que ya están archivados.
  */
 export async function deleteProject(id: string): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
 
   const supabase = await createClient();
@@ -1009,6 +1043,8 @@ export async function setProjectFinalized(
   id: string,
   finalized: boolean
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(id)) return { ok: false, error: "ID inválido" };
 
   const supabase = await createClient();
@@ -1087,6 +1123,8 @@ const reorderSchema = z.array(
 export async function reorderProjects(
   updates: ReorderUpdate[]
 ): Promise<ActionResult> {
+  const guard = await assertScope("projects");
+  if (!guard.ok) return guard;
   const parsed = reorderSchema.safeParse(updates);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
   if (parsed.data.length === 0) return { ok: true };

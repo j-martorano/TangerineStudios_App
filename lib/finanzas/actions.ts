@@ -1,5 +1,7 @@
 ﻿"use server";
 
+import { assertScope } from "@/lib/auth/permissions";
+
 import { z } from "zod";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -34,6 +36,8 @@ export async function createFixedService(input: {
   name: string;
   monthly_cost: number;
 }): Promise<FixedServiceResult> {
+  const guard = await assertScope("fixedServices");
+  if (!guard.ok) return guard;
   const parsed = fixedServiceSchema.safeParse({ ...input, active: true });
   if (!parsed.success) {
     return {
@@ -63,6 +67,8 @@ export async function updateFixedService(input: {
   monthly_cost: number;
   active: boolean;
 }): Promise<FixedServiceResult> {
+  const guard = await assertScope("fixedServices");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(input.id)) {
     return { ok: false, error: "ID inválido" };
   }
@@ -92,6 +98,8 @@ export async function updateFixedService(input: {
 export async function deleteFixedService(
   id: string
 ): Promise<FixedServiceResult> {
+  const guard = await assertScope("fixedServices");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(id)) {
     return { ok: false, error: "ID inválido" };
   }
@@ -121,6 +129,8 @@ export async function upsertServiceMonthEntry(input: {
   year_month: string;
   amount: number;
 }): Promise<ServiceMonthResult> {
+  const guard = await assertScope("fixedServices");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(input.service_id))
     return { ok: false, error: "ID de servicio inválido" };
   if (!yearMonthRegex.test(input.year_month))
@@ -148,6 +158,8 @@ export async function deleteServiceMonthEntry(input: {
   service_id: string;
   year_month: string;
 }): Promise<ServiceMonthResult> {
+  const guard = await assertScope("fixedServices");
+  if (!guard.ok) return guard;
   if (!uuidRegex.test(input.service_id))
     return { ok: false, error: "ID de servicio inválido" };
   if (!yearMonthRegex.test(input.year_month))
@@ -173,6 +185,8 @@ export async function deleteServiceMonthEntry(input: {
 export async function seedMonthEntries(
   yearMonth: string
 ): Promise<ServiceMonthResult> {
+  const guard = await assertScope("fixedServices");
+  if (!guard.ok) return guard;
   if (!yearMonthRegex.test(yearMonth))
     return { ok: false, error: "Mes inválido" };
 

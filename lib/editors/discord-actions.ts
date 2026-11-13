@@ -1,5 +1,7 @@
 "use server";
 
+import { assertScope } from "@/lib/auth/permissions";
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
@@ -7,6 +9,8 @@ type Result = { ok: true; token?: string } | { ok: false; error: string };
 
 /** Generates (or regenerates) a Discord link token for an editor. */
 export async function generateDiscordLinkToken(editorId: string): Promise<Result> {
+  const guard = await assertScope("editorEdit");
+  if (!guard.ok) return guard;
   if (!editorId) return { ok: false, error: "ID de editor inválido" };
 
   const supabase = await createClient();
@@ -31,6 +35,8 @@ export async function generateDiscordLinkToken(editorId: string): Promise<Result
 
 /** Removes a Discord link (discord_id + token) from an editor. */
 export async function revokeDiscordLink(editorId: string): Promise<Result> {
+  const guard = await assertScope("editorEdit");
+  if (!guard.ok) return guard;
   if (!editorId) return { ok: false, error: "ID de editor inválido" };
 
   const supabase = await createClient();

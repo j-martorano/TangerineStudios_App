@@ -1,5 +1,7 @@
 ﻿"use server";
 
+import { assertScope } from "@/lib/auth/permissions";
+
 import { z } from "zod";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
@@ -255,6 +257,8 @@ async function syncEditorPaymentTiers(
 export async function createEditor(
   input: EditorInput
 ): Promise<EditorCreateResult> {
+  const guard = await assertScope("editorCreate");
+  if (!guard.ok) return guard;
   const parsed = editorInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
@@ -305,6 +309,8 @@ export async function updateEditor(
   id: string,
   input: EditorInput
 ): Promise<EditorActionResult> {
+  const guard = await assertScope("editorEdit");
+  if (!guard.ok) return guard;
   const parsed = editorInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
@@ -351,6 +357,8 @@ export async function updateEditor(
 }
 
 export async function deleteEditor(id: string): Promise<EditorActionResult> {
+  const guard = await assertScope("editorEdit");
+  if (!guard.ok) return guard;
   const supabase = await createSupabaseClient();
   const { error } = await supabase.from("editors").delete().eq("id", id);
 
@@ -363,6 +371,8 @@ export async function toggleEditorDisabled(
   id: string,
   disabled: boolean
 ): Promise<EditorActionResult> {
+  const guard = await assertScope("editorEdit");
+  if (!guard.ok) return guard;
   const supabase = await createSupabaseClient();
   const { error } = await supabase
     .from("editors")

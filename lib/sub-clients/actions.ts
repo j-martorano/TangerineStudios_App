@@ -1,11 +1,14 @@
 "use server";
 
+import { requireScope } from "@/lib/auth/permissions";
+
 import { createClient } from "@/lib/supabase/server";
 
 export type SubClientItem = { id: string; name: string };
 
 /** Devuelve los sub-clientes de un cliente, ordenados por nombre. */
 export async function getSubClientsForClient(clientId: string): Promise<SubClientItem[]> {
+  await requireScope("projectForm");
   const supabase = await createClient();
   const { data } = await supabase
     .from("sub_clients")
@@ -23,6 +26,7 @@ export async function upsertSubClients(
   clientId: string,
   names: string[]
 ): Promise<void> {
+  await requireScope("projectForm");
   const unique = Array.from(new Set(names.filter(Boolean)));
   if (unique.length === 0) return;
   const supabase = await createClient();
