@@ -887,6 +887,39 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          allowed_tabs: string[]
+          created_at: string
+          disabled: boolean
+          display_name: string | null
+          email: string
+          id: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          allowed_tabs?: string[]
+          created_at?: string
+          disabled?: boolean
+          display_name?: string | null
+          email: string
+          id: string
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          allowed_tabs?: string[]
+          created_at?: string
+          disabled?: boolean
+          display_name?: string | null
+          email?: string
+          id?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           prefs: Json
@@ -905,12 +938,171 @@ export type Database = {
         }
         Relationships: []
       }
+      vault_access: {
+        Row: {
+          credential_id: string
+          granted_at: string
+          user_id: string
+        }
+        Insert: {
+          credential_id: string
+          granted_at?: string
+          user_id: string
+        }
+        Update: {
+          credential_id?: string
+          granted_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_access_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "vault_credentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_access_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vault_credentials: {
+        Row: {
+          change_password_url: string | null
+          created_at: string
+          id: string
+          kind: string
+          login_url: string | null
+          name: string
+          notes: string | null
+          rotated_at: string
+          secret_ciphertext: string
+          updated_at: string
+          username: string | null
+          version: number
+        }
+        Insert: {
+          change_password_url?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          login_url?: string | null
+          name: string
+          notes?: string | null
+          rotated_at?: string
+          secret_ciphertext: string
+          updated_at?: string
+          username?: string | null
+          version?: number
+        }
+        Update: {
+          change_password_url?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          login_url?: string | null
+          name?: string
+          notes?: string | null
+          rotated_at?: string
+          secret_ciphertext?: string
+          updated_at?: string
+          username?: string | null
+          version?: number
+        }
+        Relationships: []
+      }
+      vault_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          credential_id: string | null
+          event: string
+          id: string
+          target_user_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          credential_id?: string | null
+          event: string
+          id?: string
+          target_user_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          credential_id?: string | null
+          event?: string
+          id?: string
+          target_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_events_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "vault_credentials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vault_notifications: {
+        Row: {
+          created_at: string
+          credential_id: string
+          discord_sent_at: string | null
+          id: string
+          message: string
+          read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credential_id: string
+          discord_sent_at?: string | null
+          id?: string
+          message: string
+          read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credential_id?: string
+          discord_sent_at?: string | null
+          id?: string
+          message?: string
+          read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_notifications_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "vault_credentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       claim_invoice_number: { Args: never; Returns: number }
+      has_data_access: { Args: never; Returns: boolean }
       slugify: { Args: { input: string }; Returns: string }
       unaccent: { Args: { "": string }; Returns: string }
     }

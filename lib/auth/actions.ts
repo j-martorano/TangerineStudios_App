@@ -44,3 +44,20 @@ export async function signOut(): Promise<void> {
   await supabase.auth.signOut();
   redirect("/login");
 }
+
+const ownPasswordSchema = z
+  .string()
+  .min(8, "La contraseña tiene que tener al menos 8 caracteres")
+  .max(200);
+
+/** El usuario logueado cambia su propia contraseña (p. ej. la temporal). */
+export async function changeOwnPassword(password: string): Promise<AuthResult> {
+  const parsed = ownPasswordSchema.safeParse(password);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Contraseña inválida" };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password: parsed.data });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}

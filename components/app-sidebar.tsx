@@ -3,18 +3,23 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   ColumnsIcon,
+  KeySquareIcon,
   FilmIcon,
+  KeyRoundIcon,
   LayoutDashboardIcon,
   LogOutIcon,
   ReceiptIcon,
   SettingsIcon,
+  ShieldCheckIcon,
   TableIcon,
+  UserCogIcon,
   UsersIcon,
   WalletIcon,
+  WrenchIcon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -26,26 +31,64 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
 import { signOut } from "@/lib/auth/actions";
+import { TABS, type TabKey } from "@/lib/auth/tabs";
+import { ChangePasswordDialog } from "@/components/auth/change-password-dialog";
 
-const items: { href: string; label: string; icon: LucideIcon; exact: boolean }[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboardIcon, exact: true },
-  { href: "/kanban", label: "Kanban", icon: ColumnsIcon, exact: false },
-  { href: "/projects", label: "Spreadsheet", icon: TableIcon, exact: false },
-  { href: "/clients", label: "Clientes", icon: UsersIcon, exact: false },
-  { href: "/editors", label: "Editores", icon: FilmIcon, exact: false },
-  { href: "/finanzas", label: "Finanzas", icon: WalletIcon, exact: false },
-  { href: "/facturas", label: "Facturas", icon: ReceiptIcon, exact: false },
-  { href: "/configuracion", label: "Configuración", icon: SettingsIcon, exact: false },
-];
+const ICONS: Record<TabKey, LucideIcon> = {
+  dashboard: LayoutDashboardIcon,
+  kanban: ColumnsIcon,
+  projects: TableIcon,
+  clients: UsersIcon,
+  editors: FilmIcon,
+  finanzas: WalletIcon,
+  facturas: ReceiptIcon,
+  boveda: KeyRoundIcon,
+  configuracion: SettingsIcon,
+  mantenimiento: WrenchIcon,
+};
 
-export function AppSidebar() {
+type Props = {
+  /** Pestañas que el usuario puede ver (ya resueltas en el servidor). */
+  tabs: TabKey[];
+  isAdmin: boolean;
+  userLabel: string;
+  /** Avisos sin leer de la Bóveda (contraseñas rotadas). */
+  vaultUnread: number;
+};
+
+export function AppSidebar({ tabs, isAdmin, userLabel, vaultUnread }: Props) {
+  // Solo se renderizan las pestañas habilitadas: las demás no aparecen.
+  const items: {
+    href: string;
+    label: string;
+    exact: boolean;
+    icon: LucideIcon;
+    badge: number | null;
+  }[] = TABS.filter((t) => tabs.includes(t.key)).map((t) => ({
+    href: t.href,
+    label: t.label,
+    exact: t.exact,
+    icon: ICONS[t.key],
+    badge: t.key === "boveda" && vaultUnread > 0 ? vaultUnread : null,
+  }));
+  if (isAdmin) {
+    items.push({
+      href: "/usuarios",
+      label: "Usuarios",
+      exact: false,
+      icon: UserCogIcon,
+      badge: null,
+    });
+  }
   const pathname = usePathname();
   const [pending, startTransition] = useTransition();
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   function handleLogout() {
     startTransition(async () => {
@@ -100,6 +143,11 @@ export function AppSidebar() {
                       <item.icon className="shrink-0" />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
+                    {item.badge ? (
+                      <SidebarMenuBadge className="bg-[#FFAC37] text-black">
+                        {item.badge}
+                      </SidebarMenuBadge>
+                    ) : null}
                   </SidebarMenuItem>
                 );
               })}
@@ -109,6 +157,24 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
+          <SidebarMenuItem>
+            <div
+              className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden"
+              title={userLabel}
+            >
+              {isAdmin ? <ShieldCheckIcon className="size-3.5 shrink-0 text-[#FFAC37]" /> : null}
+              <span className="truncate">{userLabel}</span>
+            </div>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() => setPasswordOpen(true)}
+              tooltip="Cambiar mi contraseña"
+            >
+              <KeySquareIcon />
+              <span>Cambiar mi contraseña</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={handleLogout}
@@ -121,6 +187,7 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+      <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
     </Sidebar>
   );
 }

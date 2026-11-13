@@ -32,6 +32,8 @@ import {
 import { NewProjectButton } from "@/components/projects/new-project-button";
 import { NewClientButton } from "@/components/clients/new-client-button";
 import { AmountsToggle, Money } from "@/components/ui/amount";
+import { getViewer, homeFor } from "@/lib/auth/permissions";
+import { redirect } from "next/navigation";
 
 
 type TaskType = "factura" | "cobro" | "pago";
@@ -55,6 +57,12 @@ export default async function DashboardPage({
 }: {
   searchParams: SearchParams;
 }) {
+  // "/" es la página de entrada: si el usuario no tiene el Dashboard lo
+  // mandamos a su primera pestaña en vez de mostrarle un 404.
+  const viewer = await getViewer();
+  if (!viewer) redirect("/sin-acceso");
+  if (!viewer.tabs.includes("dashboard")) redirect(homeFor(viewer) ?? "/sin-acceso");
+
   const params = await searchParams;
   const selectedMonth = isValidMonthKey(params.month)
     ? (params.month as string)
