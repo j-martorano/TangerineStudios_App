@@ -1,11 +1,13 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { assertAdmin, assertTab } from "@/lib/auth/permissions";
 import { createBotClient } from "@/lib/supabase/bot";
 import { decryptSecret, encryptSecret } from "./crypto";
+import { logVaultEvents, syncVaultAccess } from "./events";
 import { CREDENTIAL_KINDS } from "./presets";
 
 export type VaultResult<T = undefined> =
@@ -19,20 +21,6 @@ function revalidateVault() {
   revalidatePath("/usuarios");
   // El badge del sidebar vive en el layout.
   revalidatePath("/", "layout");
-}
-
-async function logEvent(
-  event: "created" | "updated" | "rotated" | "viewed" | "access_granted" | "access_revoked",
-  credentialId: string,
-  actorId: string,
-  targetUserId: string | null = null
-) {
-  await createBotClient().from("vault_events").insert({
-    event,
-    credential_id: credentialId,
-    actor_id: actorId,
-    target_user_id: targetUserId,
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -63,19 +51,21 @@ export async function revealSecret(
 
   const { data: cred } = await sb
     .from("vault_credentials")
-    .select("secret_ciphertext")
+    .select("name, secret_ciphertext")
     .eq("id", credentialId)
     .maybeSingle();
   if (!cred) return { ok: false, error: "La credencial no existe" };
 
   let secret: string;
   try {
-    secret = decryptSecret(cred.secret_ciphertext);
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "No se pudo descifrar" };
+    secret = decryptSecret(cred.secret_ciphertext, credentialId);
+  } catch {
+    return { ok: false, error: "No se pudo descifrar la contraseña" };
   }
 
-  await logEvent("viewed", credentialId, guard.viewer.id);
+  await logVaultEvents([
+    { event: "viewed", credentialId, credentialName: cred.name, actorId: guard.viewer.id },
+  ]);
   return { ok: true, data: { secret } };
 }
 
@@ -83,11 +73,12 @@ export async function revealSecret(
 export async function markVaultNotificationsRead(): Promise<VaultResult> {
   const guard = await assertTab("boveda");
   if (!guard.ok) return guard;
-  await createBotClient()
+  const { error } = await createBotClient()
     .from("vault_notifications")
     .update({ read_at: new Date().toISOString() })
     .eq("user_id", guard.viewer.id)
     .is("read_at", null);
+  if (error) return { ok: false, error: error.message };
   revalidateVault();
   return { ok: true };
 }
@@ -115,76 +106,91 @@ const metadataSchema = z.object({
 
 export type CredentialInput = z.input<typeof metadataSchema>;
 
-const createSchema = metadataSchema.extend({
-  password: z.string().min(1, "Falta la contraseña").max(500),
-});
+const passwordSchema = z
+  .string()
+  .min(1, "Falta la contraseña")
+  .max(500, "La contraseña es demasiado larga");
 
-/** Sincroniza quién ve una credencial y registra altas/bajas. */
-async function syncAccess(credentialId: string, userIds: string[], actorId: string) {
-  const sb = createBotClient();
-  const { data: current } = await sb
-    .from("vault_access")
-    .select("user_id")
-    .eq("credential_id", credentialId);
-  const before = new Set((current ?? []).map((a) => a.user_id));
-  const after = new Set(userIds);
+const createSchema = metadataSchema.extend({ password: passwordSchema });
 
-  const toAdd = [...after].filter((id) => !before.has(id));
-  const toRemove = [...before].filter((id) => !after.has(id));
-
-  if (toAdd.length > 0) {
-    await sb
-      .from("vault_access")
-      .insert(toAdd.map((user_id) => ({ credential_id: credentialId, user_id })));
-  }
-  if (toRemove.length > 0) {
-    await sb
-      .from("vault_access")
-      .delete()
-      .eq("credential_id", credentialId)
-      .in("user_id", toRemove);
-  }
-  for (const id of toAdd) await logEvent("access_granted", credentialId, actorId, id);
-  for (const id of toRemove) await logEvent("access_revoked", credentialId, actorId, id);
+/** Sincroniza quién ve una credencial y registra altas y bajas. */
+async function syncAccess(
+  credentialId: string,
+  credentialName: string,
+  userIds: string[],
+  actorId: string
+): Promise<{ ok: true; removed: string[] } | { ok: false; error: string }> {
+  const res = await syncVaultAccess({ credentialId }, userIds);
+  if (!res.ok) return res;
+  await logVaultEvents([
+    ...res.change.added.map((id) => ({
+      event: "access_granted" as const,
+      credentialId,
+      credentialName,
+      actorId,
+      targetUserId: id,
+    })),
+    ...res.change.removed.map((id) => ({
+      event: "access_revoked" as const,
+      credentialId,
+      credentialName,
+      actorId,
+      targetUserId: id,
+    })),
+  ]);
+  return { ok: true, removed: res.change.removed };
 }
 
-export async function createCredential(input: CredentialInput & { password: string }): Promise<VaultResult> {
+export async function createCredential(
+  input: CredentialInput & { password: string }
+): Promise<VaultResult> {
   const guard = await assertAdmin();
   if (!guard.ok) return guard;
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   const d = parsed.data;
 
+  // El id se genera acá porque el cifrado lo usa (ver lib/vault/crypto.ts).
+  const id = randomUUID();
   let ciphertext: string;
   try {
-    ciphertext = encryptSecret(d.password);
+    ciphertext = encryptSecret(d.password, id);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "No se pudo cifrar" };
   }
 
-  const { data: created, error } = await createBotClient()
-    .from("vault_credentials")
-    .insert({
-      name: d.name,
-      kind: d.kind,
-      username: d.username || null,
-      login_url: d.loginUrl,
-      change_password_url: d.changePasswordUrl,
-      notes: d.notes || null,
-      secret_ciphertext: ciphertext,
-    })
-    .select("id")
-    .single();
-  if (error || !created) return { ok: false, error: error?.message ?? "No se pudo crear" };
+  const { error } = await createBotClient().from("vault_credentials").insert({
+    id,
+    name: d.name,
+    kind: d.kind,
+    username: d.username || null,
+    login_url: d.loginUrl,
+    change_password_url: d.changePasswordUrl,
+    notes: d.notes || null,
+    secret_ciphertext: ciphertext,
+  });
+  if (error) return { ok: false, error: error.message };
 
-  await logEvent("created", created.id, guard.viewer.id);
-  await syncAccess(created.id, d.userIds, guard.viewer.id);
+  await logVaultEvents([
+    { event: "created", credentialId: id, credentialName: d.name, actorId: guard.viewer.id },
+  ]);
+  const access = await syncAccess(id, d.name, d.userIds, guard.viewer.id);
   revalidateVault();
+  if (!access.ok) {
+    return { ok: false, error: `La credencial se creó, pero no se pudo guardar quién la ve: ${access.error}` };
+  }
   return { ok: true };
 }
 
-/** Edita los datos de una credencial y quién la ve. No toca la contraseña. */
-export async function updateCredential(id: string, input: CredentialInput): Promise<VaultResult> {
+/**
+ * Edita los datos de una credencial y quién la ve. No toca la contraseña.
+ * Devuelve los nombres de quienes perdieron el acceso: ya la conocían, así
+ * que la pantalla propone rotarla.
+ */
+export async function updateCredential(
+  id: string,
+  input: CredentialInput
+): Promise<VaultResult<{ revokedNames: string[] }>> {
   const guard = await assertAdmin();
   if (!guard.ok) return guard;
   if (!uuid.safeParse(id).success) return { ok: false, error: "ID inválido" };
@@ -192,7 +198,8 @@ export async function updateCredential(id: string, input: CredentialInput): Prom
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   const d = parsed.data;
 
-  const { error } = await createBotClient()
+  const sb = createBotClient();
+  const { error } = await sb
     .from("vault_credentials")
     .update({
       name: d.name,
@@ -206,18 +213,41 @@ export async function updateCredential(id: string, input: CredentialInput): Prom
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
 
-  await logEvent("updated", id, guard.viewer.id);
-  await syncAccess(id, d.userIds, guard.viewer.id);
+  await logVaultEvents([
+    { event: "updated", credentialId: id, credentialName: d.name, actorId: guard.viewer.id },
+  ]);
+  const access = await syncAccess(id, d.name, d.userIds, guard.viewer.id);
   revalidateVault();
-  return { ok: true };
+  if (!access.ok) {
+    return { ok: false, error: `Los datos se guardaron, pero no quién la ve: ${access.error}` };
+  }
+
+  let revokedNames: string[] = [];
+  if (access.removed.length > 0) {
+    const { data: people } = await sb
+      .from("profiles")
+      .select("email, display_name")
+      .in("id", access.removed);
+    revokedNames = (people ?? []).map((p) => p.display_name || p.email);
+  }
+  return { ok: true, data: { revokedNames } };
 }
 
 export async function deleteCredential(id: string): Promise<VaultResult> {
   const guard = await assertAdmin();
   if (!guard.ok) return guard;
   if (!uuid.safeParse(id).success) return { ok: false, error: "ID inválido" };
-  const { error } = await createBotClient().from("vault_credentials").delete().eq("id", id);
+
+  const sb = createBotClient();
+  const { data: cred } = await sb.from("vault_credentials").select("name").eq("id", id).maybeSingle();
+  if (!cred) return { ok: false, error: "La credencial no existe" };
+
+  const { error } = await sb.from("vault_credentials").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+  // El historial queda (credential_id pasa a null y se conserva el nombre).
+  await logVaultEvents([
+    { event: "deleted", credentialId: null, credentialName: cred.name, actorId: guard.viewer.id },
+  ]);
   revalidateVault();
   return { ok: true };
 }
@@ -225,7 +255,7 @@ export async function deleteCredential(id: string): Promise<VaultResult> {
 /**
  * Guarda la contraseña nueva después de que Joaco la cambió en el servicio.
  * Sube `version`, y el trigger `vault_notify_rotation` de la base crea un
- * aviso solo para quienes tienen acceso a esta credencial.
+ * aviso para quienes tienen acceso a esta credencial y pueden abrir la Bóveda.
  * Devuelve los nombres de las personas avisadas.
  */
 export async function rotateCredential(
@@ -235,27 +265,30 @@ export async function rotateCredential(
   const guard = await assertAdmin();
   if (!guard.ok) return guard;
   if (!uuid.safeParse(id).success) return { ok: false, error: "ID inválido" };
-  if (!newPassword || newPassword.length < 8) {
+  const pw = passwordSchema.safeParse(newPassword);
+  if (!pw.success) return { ok: false, error: pw.error.issues[0]?.message ?? "Contraseña inválida" };
+  if (newPassword.length < 8) {
     return { ok: false, error: "La contraseña nueva tiene que tener al menos 8 caracteres" };
   }
 
   const sb = createBotClient();
   const { data: cred } = await sb
     .from("vault_credentials")
-    .select("version")
+    .select("name, version")
     .eq("id", id)
     .maybeSingle();
   if (!cred) return { ok: false, error: "La credencial no existe" };
 
   let ciphertext: string;
   try {
-    ciphertext = encryptSecret(newPassword);
+    ciphertext = encryptSecret(newPassword, id);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "No se pudo cifrar" };
   }
 
   // Quiénes van a recibir el aviso: la misma regla que el trigger
-  // vault_notify_rotation (acceso a esta credencial y usuario habilitado).
+  // vault_notify_rotation (acceso a esta credencial, habilitado, y admin o
+  // con la pestaña Bóveda).
   const { data: access } = await sb
     .from("vault_access")
     .select("user_id")
@@ -265,14 +298,18 @@ export async function rotateCredential(
   if (accessIds.length > 0) {
     const { data: people } = await sb
       .from("profiles")
-      .select("email, display_name")
+      .select("email, display_name, role, allowed_tabs")
       .in("id", accessIds)
       .eq("disabled", false);
-    notified = (people ?? []).map((p) => p.display_name || p.email);
+    notified = (people ?? [])
+      .filter((p) => p.role === "admin" || (p.allowed_tabs ?? []).includes("boveda"))
+      .map((p) => p.display_name || p.email);
   }
 
+  // `.eq("version", ...)`: si otro admin rotó al mismo tiempo, no pisar su
+  // contraseña sin avisar.
   const now = new Date().toISOString();
-  const { error } = await sb
+  const { data: updated, error } = await sb
     .from("vault_credentials")
     .update({
       secret_ciphertext: ciphertext,
@@ -280,10 +317,20 @@ export async function rotateCredential(
       rotated_at: now,
       updated_at: now,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("version", cred.version)
+    .select("id");
   if (error) return { ok: false, error: error.message };
+  if (!updated || updated.length === 0) {
+    return {
+      ok: false,
+      error: "Alguien cambió esta contraseña recién. Recargá la página antes de rotarla de nuevo.",
+    };
+  }
 
-  await logEvent("rotated", id, guard.viewer.id);
+  await logVaultEvents([
+    { event: "rotated", credentialId: id, credentialName: cred.name, actorId: guard.viewer.id },
+  ]);
 
   revalidateVault();
   return { ok: true, data: { notified } };

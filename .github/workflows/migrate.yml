@@ -16,7 +16,9 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Versión fija: "latest" ya es la v3 y estos pasos no se probaron con
+          # ella. La 2.101.0 es la que aplicó todas las migraciones en local.
+          version: 2.101.0
 
       - name: Sync migration history
         # La DB fue creada manualmente, entonces la tabla de tracking está vacía.

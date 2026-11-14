@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import {
   KeyRoundIcon,
   PencilIcon,
@@ -41,8 +40,8 @@ import {
   enableUser,
   resetUserPassword,
   updateUserPermissions,
-  type KnownCredential,
 } from "@/lib/users/actions";
+import type { KnownCredential } from "@/lib/vault/events";
 import type { AppUser } from "@/lib/users/queries";
 import { TABS } from "@/lib/auth/tabs";
 
@@ -94,6 +93,7 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
         return;
       }
       setCreateOpen(false);
+      if (res.data.warning) toast.warning(res.data.warning, { duration: 15000 });
       setResult({ kind: "temp", email: v.email, password: res.data.tempPassword, isNew: true });
     });
   }
@@ -112,6 +112,13 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
       }
       toast.success("Permisos guardados");
       setEditing(null);
+      if (res.data.lostCredentials.length > 0) {
+        setResult({
+          kind: "rotate",
+          name: user.displayName ?? user.email,
+          credentials: res.data.lostCredentials,
+        });
+      }
     });
   }
 
@@ -145,6 +152,7 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
         return;
       }
       toast.success(action === "disable" ? "Usuario deshabilitado" : "Usuario borrado");
+      if (res.data.warning) toast.warning(res.data.warning, { duration: 15000 });
       if (res.data.knownCredentials.length > 0) {
         setResult({
           kind: "rotate",
@@ -402,22 +410,25 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
                 <DialogDescription>
                   Ya no puede verlas en la app, pero las contraseñas que vio las
                   sigue sabiendo. Cambialas para cerrarle el acceso de verdad.
+                  Cada una se abre en otra pestaña; esta lista queda acá hasta
+                  que la cierres.
                 </DialogDescription>
               </DialogHeader>
               <div className="flex flex-col gap-2">
                 {result.credentials.map((c) => (
-                  <Link
+                  <a
                     key={c.id}
                     href={`/boveda?rotar=${c.id}`}
-                    onClick={() => setResult(null)}
+                    target="_blank"
+                    rel="noopener"
                     className="flex items-center justify-between rounded-lg border border-white/[0.08] px-3 py-2 text-sm hover:bg-white/[0.04]"
                   >
                     <span className="flex items-center gap-2">
                       <KeyRoundIcon className="size-4 text-[#FFAC37]" />
                       {c.name}
                     </span>
-                    <span className="text-xs text-[#FFAC37]">Rotar ahora →</span>
-                  </Link>
+                    <span className="text-xs text-[#FFAC37]">Rotar ahora ↗</span>
+                  </a>
                 ))}
               </div>
             </>

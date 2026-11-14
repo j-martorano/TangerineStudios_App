@@ -39,9 +39,13 @@ export type VaultNotification = {
 export type VaultEventRow = {
   id: string;
   credentialId: string | null;
+  /** nombre al momento del evento (sirve si la credencial ya no existe) */
+  credentialName: string | null;
   event: string;
   actorId: string | null;
+  actorEmail: string | null;
   targetUserId: string | null;
+  targetEmail: string | null;
   createdAt: string;
 };
 
@@ -121,17 +125,29 @@ export async function countUnreadVaultNotifications(userId: string): Promise<num
   return count ?? 0;
 }
 
+/** Todos los avisos sin leer, más los últimos leídos. */
 export async function fetchVaultNotifications(
   userId: string,
-  limit = 20
+  readLimit = 10
 ): Promise<VaultNotification[]> {
-  const { data } = await createBotClient()
-    .from("vault_notifications")
-    .select("id, credential_id, message, created_at, read_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  return (data ?? []).map((n) => ({
+  const sb = createBotClient();
+  const columns = "id, credential_id, message, created_at, read_at";
+  const [{ data: unread }, { data: read }] = await Promise.all([
+    sb
+      .from("vault_notifications")
+      .select(columns)
+      .eq("user_id", userId)
+      .is("read_at", null)
+      .order("created_at", { ascending: false }),
+    sb
+      .from("vault_notifications")
+      .select(columns)
+      .eq("user_id", userId)
+      .not("read_at", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(readLimit),
+  ]);
+  return [...(unread ?? []), ...(read ?? [])].map((n) => ({
     id: n.id,
     credentialId: n.credential_id,
     message: n.message,
@@ -144,15 +160,20 @@ export async function fetchVaultNotifications(
 export async function fetchVaultEvents(limit = 40): Promise<VaultEventRow[]> {
   const { data } = await createBotClient()
     .from("vault_events")
-    .select("id, credential_id, event, actor_id, target_user_id, created_at")
+    .select(
+      "id, credential_id, credential_name, event, actor_id, actor_email, target_user_id, target_email, created_at"
+    )
     .order("created_at", { ascending: false })
     .limit(limit);
   return (data ?? []).map((e) => ({
     id: e.id,
     credentialId: e.credential_id,
+    credentialName: e.credential_name,
     event: e.event,
     actorId: e.actor_id,
+    actorEmail: e.actor_email,
     targetUserId: e.target_user_id,
+    targetEmail: e.target_email,
     createdAt: e.created_at,
   }));
 }

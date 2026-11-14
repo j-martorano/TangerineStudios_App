@@ -2,8 +2,9 @@
 -- Usuarios, permisos por pestaña y Bóveda de credenciales.
 --
 -- 1. profiles: rol (admin | member) + pestañas visibles de cada usuario.
--- 2. Permisos por tabla según pestaña: tabs_for(tabla, 'read'|'write') dice
---    qué pestañas habilitan leer o escribir cada tabla. Se aplican como
+-- 2. Permisos por tabla según pestaña: tabs_for(tabla, 'read'|'insert'|'write')
+--    dice qué pestañas habilitan leer, crear o editar/borrar cada tabla
+--    (apply_tab_policies las aplica a una tabla). Se aplican como
 --    policies RESTRICTIVE, así nadie lee ni escribe por la API de Supabase
 --    (con su propia sesión) datos de una pestaña que no tiene.
 -- 3. Bóveda: credenciales cifradas (AES-256-GCM en el servidor, la DB solo ve
@@ -83,10 +84,14 @@ as $$
   );
 $$;
 
--- Qué pestañas habilitan leer ('read') o escribir ('write') cada tabla.
+-- Qué pestañas habilitan cada operación sobre cada tabla:
+--   'read'   → leer
+--   'insert' → crear filas (si no se especifica, es igual a 'write')
+--   'write'  → editar y borrar
 -- Sale de lo que muestra y edita cada pantalla (incluye formularios que una
 -- pestaña abre aunque escriban en otra tabla: p. ej. crear un cliente desde
--- el formulario de proyecto). Leer siempre incluye a quien puede escribir.
+-- el formulario de proyecto, que NO habilita editar ni borrar clientes).
+-- Las policies suman: leer = read ∪ insert ∪ write; crear = insert ∪ write.
 -- Tabla que no está acá = solo admins.
 --
 -- ⚠️ Mantener en sincronía con lib/auth/scopes.ts (guards de las actions).
@@ -96,23 +101,32 @@ language sql
 immutable
 as $$
   select case
-    when tbl in ('projects', 'project_editors', 'project_cobros',
-                 'project_editor_pagos', 'project_revisions') then
+    when tbl in ('projects', 'project_editors', 'project_revisions') then
+      case when mode = 'read'
+        then array['dashboard', 'kanban', 'projects', 'finanzas', 'facturas', 'mantenimiento']
+        else array['dashboard', 'kanban', 'projects', 'finanzas', 'facturas'] end
+    -- Mantenimiento (backfill) crea cobros y pagos que faltan.
+    when tbl in ('project_cobros', 'project_editor_pagos') then
       array['dashboard', 'kanban', 'projects', 'finanzas', 'facturas', 'mantenimiento']
     when tbl = 'clients' then
-      case when mode = 'read'
-        then array['dashboard', 'kanban', 'projects', 'clients', 'editors', 'finanzas', 'facturas']
-        else array['dashboard', 'kanban', 'projects', 'clients', 'editors'] end
+      case mode
+        when 'read'   then array['dashboard', 'kanban', 'projects', 'clients', 'editors', 'finanzas', 'facturas', 'mantenimiento']
+        when 'insert' then array['dashboard', 'kanban', 'projects', 'clients', 'editors']
+        else array['clients'] end
     when tbl in ('client_editors', 'client_editor_payment_tiers') then
-      case when mode = 'read'
-        then array['dashboard', 'kanban', 'projects', 'clients', 'editors', 'finanzas']
-        else array['dashboard', 'kanban', 'projects', 'clients', 'editors'] end
+      case mode
+        when 'read'   then array['dashboard', 'kanban', 'projects', 'clients', 'editors', 'finanzas']
+        when 'insert' then array['dashboard', 'kanban', 'projects', 'clients', 'editors']
+        else array['clients', 'editors'] end
     when tbl in ('editors', 'editor_payment_tiers') then
-      case when mode = 'read'
-        then array['dashboard', 'kanban', 'projects', 'clients', 'editors', 'finanzas', 'facturas']
-        else array['dashboard', 'clients', 'editors'] end
+      case mode
+        when 'read'   then array['dashboard', 'kanban', 'projects', 'clients', 'editors', 'finanzas', 'facturas', 'mantenimiento']
+        when 'insert' then array['dashboard', 'clients', 'editors']
+        else array['editors'] end
     when tbl = 'editor_payment_methods' then
-      array['dashboard', 'clients', 'editors']
+      case mode
+        when 'write' then array['editors']
+        else array['dashboard', 'clients', 'editors'] end
     when tbl = 'payment_methods' then
       case when mode = 'read'
         then array['dashboard', 'clients', 'editors', 'configuracion']
@@ -137,13 +151,42 @@ as $$
   end;
 $$;
 
--- Cuatro policies restrictivas por tabla (se suman con AND a las que ya
--- existían, que siguen igual).
+-- Crea (o recrea) las cuatro policies restrictivas de una tabla. Se suman con
+-- AND a las policies que ya tenga la tabla, que siguen igual.
+--
+-- ⚠️ Toda tabla nueva de public con RLS tiene que llamar a esta función en su
+-- migración (`select public.apply_tab_policies('mi_tabla');`). Sin eso, sus
+-- policies permisivas valen para cualquier usuario logueado, aunque no tenga
+-- ninguna pestaña.
+create or replace function public.apply_tab_policies(tbl text)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  r text := format(
+    'public.has_any_tab(public.tabs_for(%1$L, ''read'') || public.tabs_for(%1$L, ''insert'') || public.tabs_for(%1$L, ''write''))',
+    tbl);
+  i text := format(
+    'public.has_any_tab(public.tabs_for(%1$L, ''insert'') || public.tabs_for(%1$L, ''write''))', tbl);
+  w text := format('public.has_any_tab(public.tabs_for(%1$L, ''write''))', tbl);
+begin
+  execute format('drop policy if exists "tab_read" on public.%I', tbl);
+  execute format('drop policy if exists "tab_insert" on public.%I', tbl);
+  execute format('drop policy if exists "tab_update" on public.%I', tbl);
+  execute format('drop policy if exists "tab_delete" on public.%I', tbl);
+  execute format('create policy "tab_read" on public.%I as restrictive for select to authenticated using (%s)', tbl, r);
+  execute format('create policy "tab_insert" on public.%I as restrictive for insert to authenticated with check (%s)', tbl, i);
+  execute format('create policy "tab_update" on public.%I as restrictive for update to authenticated using (%s) with check (%s)', tbl, w, w);
+  execute format('create policy "tab_delete" on public.%I as restrictive for delete to authenticated using (%s)', tbl, w);
+end;
+$$;
+
+revoke execute on function public.apply_tab_policies(text) from public, anon, authenticated;
+
 do $$
 declare
   t record;
-  r text;
-  w text;
 begin
   for t in
     select tablename
@@ -152,21 +195,51 @@ begin
       and rowsecurity
       and tablename not in ('profiles', 'user_settings')
   loop
-    r := format('public.has_any_tab(public.tabs_for(%L, ''read'') || public.tabs_for(%L, ''write''))',
-                t.tablename, t.tablename);
-    w := format('public.has_any_tab(public.tabs_for(%L, ''write''))', t.tablename);
-
-    execute format('create policy "tab_read" on public.%I as restrictive for select to authenticated using (%s)',
-                   t.tablename, r);
-    execute format('create policy "tab_insert" on public.%I as restrictive for insert to authenticated with check (%s)',
-                   t.tablename, w);
-    execute format('create policy "tab_update" on public.%I as restrictive for update to authenticated using (%s) with check (%s)',
-                   t.tablename, w, w);
-    execute format('create policy "tab_delete" on public.%I as restrictive for delete to authenticated using (%s)',
-                   t.tablename, w);
+    perform public.apply_tab_policies(t.tablename);
   end loop;
 end;
 $$;
+
+-- project_revisions tenía una policy pensada para el service role pero creada
+-- para todos los roles ("to public" con using true): cualquiera con la anon
+-- key (que es pública) podía leer y escribir revisiones. El service role no
+-- necesita policies (salta RLS), y la app solo escribe revisiones desde el
+-- bot. La reemplazamos por una para usuarios logueados, filtrada por pestaña
+-- con las policies de arriba.
+drop policy if exists "service role full access" on public.project_revisions;
+create policy "auth all project_revisions" on public.project_revisions
+  for all to authenticated using (true) with check (true);
+
+-- invoices no tenía policy de UPDATE, así que regenerar el PDF no podía
+-- guardar pdf_storage_path. Queda filtrada por pestaña (kanban/facturas).
+create policy "auth update invoices" on public.invoices
+  for update to authenticated using (true) with check (true);
+
+-- claim_invoice_number es security definer (salta RLS) y la podía llamar
+-- cualquiera, incluso sin sesión, quemando números de factura. Ahora exige
+-- la pestaña de kanban o facturas.
+create or replace function public.claim_invoice_number()
+returns int
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  n int;
+begin
+  if not public.has_any_tab(array['kanban', 'facturas']) then
+    raise exception 'No tenés permiso para facturar' using errcode = '42501';
+  end if;
+  update public.invoice_settings
+  set next_number = next_number + 1
+  where id = 1
+  returning next_number - 1 into n;
+  return n;
+end;
+$$;
+
+revoke execute on function public.claim_invoice_number() from public, anon;
+grant execute on function public.claim_invoice_number() to authenticated;
 
 -- PDFs de facturas en Storage.
 create policy "invoices_by_tab"
@@ -205,15 +278,21 @@ create table public.vault_access (
   primary key (credential_id, user_id)
 );
 
+-- Historial. Guarda una copia del nombre de la credencial y del email de las
+-- personas, para que el registro siga legible después de borrar una
+-- credencial o un usuario (que es justo cuando más se necesita).
 create table public.vault_events (
-  id             uuid primary key default gen_random_uuid(),
-  credential_id  uuid references public.vault_credentials(id) on delete cascade,
-  event          text not null
-                   check (event in ('created', 'updated', 'rotated', 'viewed',
-                                    'access_granted', 'access_revoked')),
-  actor_id       uuid references auth.users(id) on delete set null,
-  target_user_id uuid references auth.users(id) on delete set null,
-  created_at     timestamptz not null default now()
+  id              uuid primary key default gen_random_uuid(),
+  credential_id   uuid references public.vault_credentials(id) on delete set null,
+  credential_name text,
+  event           text not null
+                    check (event in ('created', 'updated', 'rotated', 'viewed',
+                                     'access_granted', 'access_revoked', 'deleted')),
+  actor_id        uuid references auth.users(id) on delete set null,
+  actor_email     text,
+  target_user_id  uuid references auth.users(id) on delete set null,
+  target_email    text,
+  created_at      timestamptz not null default now()
 );
 
 create index vault_events_credential_idx
@@ -243,7 +322,10 @@ alter table public.vault_notifications enable row level security;
 -- 4. Trigger de rotación
 -- ---------------------------------------------------------------------------
 -- Cuando sube `version` (= se rotó la contraseña), avisa a cada usuario con
--- acceso a ESA credencial y que no esté deshabilitado. El resto no recibe nada.
+-- acceso a ESA credencial, que esté habilitado y que pueda abrir la Bóveda
+-- (admin o con la pestaña). El resto no recibe nada.
+-- ⚠️ lib/vault/actions.ts (rotateCredential) calcula la misma lista para
+-- mostrar a quién se avisó: mantener las dos reglas iguales.
 create or replace function public.vault_notify_rotation()
 returns trigger
 language plpgsql
@@ -258,7 +340,8 @@ begin
     from public.vault_access a
     join public.profiles p on p.id = a.user_id
     where a.credential_id = new.id
-      and not p.disabled;
+      and not p.disabled
+      and (p.role = 'admin' or 'boveda' = any (p.allowed_tabs));
   end if;
   return new;
 end;

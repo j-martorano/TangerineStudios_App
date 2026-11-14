@@ -29,11 +29,26 @@ export const getViewer = cache(async (): Promise<ViewerProfile | null> => {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: profile } = await createBotClient()
+  const { data: profile, error } = await createBotClient()
     .from("profiles")
     .select("id, email, display_name, role, allowed_tabs, disabled")
     .eq("id", user.id)
     .maybeSingle();
+
+  // La tabla todavía no existe: el código nuevo llegó a producción antes que
+  // la migración (o la migración falló). Hasta que exista, todo usuario
+  // logueado sigue con acceso total, como antes de este sistema, en vez de
+  // quedar todos afuera sin poder arreglarlo desde la app.
+  if (error && (error.code === "PGRST205" || error.code === "42P01")) {
+    console.error("[auth] falta la tabla profiles: ¿se aplicó la migración de usuarios?");
+    return {
+      id: user.id,
+      email: user.email ?? "",
+      displayName: null,
+      role: "admin",
+      tabs: effectiveTabs("admin", []),
+    };
+  }
 
   if (!profile || profile.disabled) return null;
 

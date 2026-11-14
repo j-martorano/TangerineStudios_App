@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { RefreshCwIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,7 +26,13 @@ import {
 } from "@/lib/vault/presets";
 import type { CredentialWithAccess } from "@/lib/vault/queries";
 
-export type VaultUser = { id: string; name: string; hasVaultTab: boolean };
+export type VaultUser = {
+  id: string;
+  name: string;
+  /** admin o con la pestaña Bóveda: puede abrirla y recibe los avisos */
+  hasVaultTab: boolean;
+  disabled: boolean;
+};
 
 type Props = {
   open: boolean;
@@ -58,6 +65,7 @@ function FormBody({
 }) {
   const isNew = credential == null;
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
   const [kind, setKind] = useState<CredentialKind>(credential?.kind ?? "frameio");
   const [name, setName] = useState(credential?.name ?? KIND_LABEL.frameio);
   const [username, setUsername] = useState(credential?.username ?? "");
@@ -95,15 +103,34 @@ function FormBody({
       userIds,
     };
     startTransition(async () => {
-      const res = isNew
-        ? await createCredential({ ...base, password })
-        : await updateCredential(credential.id, base);
+      if (isNew) {
+        const res = await createCredential({ ...base, password });
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        toast.success("Credencial guardada");
+        onClose();
+        return;
+      }
+      const res = await updateCredential(credential.id, base);
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
-      toast.success(isNew ? "Credencial guardada" : "Cambios guardados");
       onClose();
+      const revoked = res.data.revokedNames;
+      if (revoked.length === 0) {
+        toast.success("Cambios guardados");
+        return;
+      }
+      // Quien perdió el acceso ya conocía la contraseña: proponer rotarla.
+      const id = credential.id;
+      toast.warning(`${revoked.join(", ")} ya no ve${revoked.length > 1 ? "n" : ""} ${name}`, {
+        description: "Pero conoce la contraseña actual. Rotala para cerrarle el acceso.",
+        duration: 20000,
+        action: { label: "Rotar ahora", onClick: () => router.push(`/boveda?rotar=${id}`) },
+      });
     });
   }
 

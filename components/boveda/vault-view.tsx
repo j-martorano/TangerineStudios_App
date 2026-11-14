@@ -76,6 +76,7 @@ const EVENT_LABEL: Record<string, string> = {
   viewed: "vio",
   access_granted: "dio acceso a",
   access_revoked: "quitó acceso a",
+  deleted: "borró",
 };
 
 /** Cuánto tiempo queda visible una contraseña revelada. */
@@ -102,8 +103,10 @@ export function VaultView({
   const [editing, setEditing] = useState<CredentialWithAccess | null>(null);
   const [deleting, setDeleting] = useState<CredentialSummary | null>(null);
 
-  const nameOf = (id: string | null) =>
-    id ? users.find((u) => u.id === id)?.name ?? "alguien" : "alguien";
+  // Incluye deshabilitados: el historial tiene que decir quién fue.
+  const nameOf = (id: string | null, fallback?: string | null) =>
+    (id ? users.find((u) => u.id === id)?.name : null) ?? fallback ?? "alguien";
+  const activeUsers = users.filter((u) => !u.disabled);
 
   // Limpia ?rotar= de la URL para que un refresh no reabra la guía.
   useEffect(() => {
@@ -162,6 +165,13 @@ export function VaultView({
   const unread = notifications.filter((n) => !n.readAt);
   const audienceOf = (c: CredentialSummary & { userIds?: string[] }) =>
     (c.userIds ?? []).map((id) => nameOf(id));
+  // A quién le llega el aviso al rotar: la misma regla que el trigger
+  // vault_notify_rotation (habilitado y con la pestaña Bóveda o admin).
+  const notifiedOf = (c: CredentialSummary & { userIds?: string[] }) =>
+    (c.userIds ?? [])
+      .map((id) => activeUsers.find((u) => u.id === id))
+      .filter((u): u is VaultUser => u != null && u.hasVaultTab)
+      .map((u) => u.name);
 
   return (
     <>
@@ -357,14 +367,14 @@ export function VaultView({
                     {DATETIME.format(new Date(e.createdAt))}
                   </span>
                   <span>
-                    <span className="font-medium">{nameOf(e.actorId)}</span>{" "}
+                    <span className="font-medium">{nameOf(e.actorId, e.actorEmail)}</span>{" "}
                     {EVENT_LABEL[e.event] ?? e.event}{" "}
                     {e.targetUserId ? (
                       <>
-                        <span className="font-medium">{nameOf(e.targetUserId)}</span> en{" "}
+                        <span className="font-medium">{nameOf(e.targetUserId, e.targetEmail)}</span> en{" "}
                       </>
                     ) : null}
-                    <span className="font-medium">{cred?.name ?? "una credencial borrada"}</span>
+                    <span className="font-medium">{cred?.name ?? e.credentialName ?? "una credencial borrada"}</span>
                   </span>
                 </li>
               );
@@ -375,8 +385,12 @@ export function VaultView({
 
       <RotationWizard
         credential={rotating}
-        audience={rotating ? audienceOf(rotating) : []}
-        onClose={() => setRotating(null)}
+        audience={rotating ? notifiedOf(rotating) : []}
+        onClose={() => {
+          // La contraseña vieja no tiene que quedar a la vista.
+          if (rotating) hide(rotating.id);
+          setRotating(null);
+        }}
       />
 
       {isAdmin ? (
@@ -384,7 +398,7 @@ export function VaultView({
           open={formOpen}
           onClose={() => setFormOpen(false)}
           credential={editing}
-          users={users}
+          users={activeUsers}
         />
       ) : null}
 

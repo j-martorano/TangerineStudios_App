@@ -9,6 +9,9 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
  * Generar una clave:  node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
  *
  * Formato guardado: "v1:<iv base64>:<tag base64>:<cifrado base64>".
+ *
+ * El id de la credencial entra como "associated data": el texto cifrado de
+ * una credencial no se puede copiar a otra y leerse con los permisos de esa.
  */
 
 const PREFIX = "v1";
@@ -36,21 +39,31 @@ export function isVaultConfigured(): boolean {
   }
 }
 
-export function encryptSecret(plain: string): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", getKey(), iv);
+const IV_BYTES = 12;
+const TAG_BYTES = 16;
+
+export function encryptSecret(plain: string, credentialId: string): string {
+  const iv = randomBytes(IV_BYTES);
+  const cipher = createCipheriv("aes-256-gcm", getKey(), iv, { authTagLength: TAG_BYTES });
+  cipher.setAAD(Buffer.from(credentialId, "utf8"));
   const encrypted = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
   return [PREFIX, iv.toString("base64"), tag.toString("base64"), encrypted.toString("base64")].join(":");
 }
 
-export function decryptSecret(stored: string): string {
+export function decryptSecret(stored: string, credentialId: string): string {
   const [prefix, ivB64, tagB64, dataB64] = stored.split(":");
   if (prefix !== PREFIX || !ivB64 || !tagB64 || dataB64 == null) {
     throw new Error("Formato de contraseña cifrada desconocido");
   }
-  const decipher = createDecipheriv("aes-256-gcm", getKey(), Buffer.from(ivB64, "base64"));
-  decipher.setAuthTag(Buffer.from(tagB64, "base64"));
+  const iv = Buffer.from(ivB64, "base64");
+  const tag = Buffer.from(tagB64, "base64");
+  if (iv.length !== IV_BYTES || tag.length !== TAG_BYTES) {
+    throw new Error("Formato de contraseña cifrada desconocido");
+  }
+  const decipher = createDecipheriv("aes-256-gcm", getKey(), iv, { authTagLength: TAG_BYTES });
+  decipher.setAAD(Buffer.from(credentialId, "utf8"));
+  decipher.setAuthTag(tag);
   return Buffer.concat([
     decipher.update(Buffer.from(dataB64, "base64")),
     decipher.final(),

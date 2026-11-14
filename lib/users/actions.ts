@@ -6,6 +6,12 @@ import { z } from "zod";
 import { assertAdmin } from "@/lib/auth/permissions";
 import { TAB_KEYS, type TabKey } from "@/lib/auth/tabs";
 import { createBotClient } from "@/lib/supabase/bot";
+import {
+  knownCredentialsFor,
+  logVaultEvents,
+  syncVaultAccess,
+  type KnownCredential,
+} from "@/lib/vault/events";
 import { generatePassword } from "@/lib/vault/password";
 
 /**
@@ -18,6 +24,10 @@ import { generatePassword } from "@/lib/vault/password";
 export type UserResult<T = undefined> =
   | ({ ok: true } & (T extends undefined ? object : { data: T }))
   | { ok: false; error: string };
+
+// Ojo: no re-exportar tipos acá ("export type { X }"): en un archivo
+// "use server" Next lo trata como un valor y el módulo no carga. El tipo
+// KnownCredential se importa desde lib/vault/events.ts.
 
 const uuid = z.string().uuid("ID inválido");
 
@@ -40,9 +50,6 @@ const createSchema = permissionsSchema.extend({
 
 export type CreateUserInput = z.input<typeof createSchema>;
 
-/** Una credencial que la persona conocía (para sugerir rotarla). */
-export type KnownCredential = { id: string; name: string };
-
 const BAN_FOREVER = "876000h"; // ~100 años
 
 function revalidateUsers() {
@@ -51,65 +58,40 @@ function revalidateUsers() {
   revalidatePath("/", "layout");
 }
 
-async function logVault(
-  event: "access_granted" | "access_revoked",
-  credentialId: string,
-  actorId: string,
-  targetUserId: string
-) {
-  await createBotClient().from("vault_events").insert({
-    event,
-    credential_id: credentialId,
-    actor_id: actorId,
-    target_user_id: targetUserId,
-  });
+/** Nombre de cada credencial, para el historial. */
+async function credentialNames(ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const { data } = await createBotClient().from("vault_credentials").select("id, name").in("id", ids);
+  return new Map((data ?? []).map((c) => [c.id, c.name]));
 }
 
-/** Reemplaza las credenciales visibles de un usuario. */
-async function syncUserCredentials(userId: string, credentialIds: string[], actorId: string) {
-  const sb = createBotClient();
-  const { data: current } = await sb
-    .from("vault_access")
-    .select("credential_id")
-    .eq("user_id", userId);
-  const before = new Set((current ?? []).map((a) => a.credential_id));
-  const after = new Set(credentialIds);
-  const toAdd = [...after].filter((id) => !before.has(id));
-  const toRemove = [...before].filter((id) => !after.has(id));
-
-  if (toAdd.length > 0) {
-    await sb
-      .from("vault_access")
-      .insert(toAdd.map((credential_id) => ({ credential_id, user_id: userId })));
-  }
-  if (toRemove.length > 0) {
-    await sb
-      .from("vault_access")
-      .delete()
-      .eq("user_id", userId)
-      .in("credential_id", toRemove);
-  }
-  for (const id of toAdd) await logVault("access_granted", id, actorId, userId);
-  for (const id of toRemove) await logVault("access_revoked", id, actorId, userId);
-}
-
-/** Saca todas las credenciales de un usuario y devuelve cuáles tenía. */
-async function revokeAllCredentials(userId: string, actorId: string): Promise<KnownCredential[]> {
-  const sb = createBotClient();
-  const { data: access } = await sb
-    .from("vault_access")
-    .select("credential_id, vault_credentials(name)")
-    .eq("user_id", userId);
-  const known: KnownCredential[] = (access ?? []).map((a) => ({
-    id: a.credential_id,
-    name:
-      (a.vault_credentials as unknown as { name: string } | null)?.name ?? "Credencial",
-  }));
-  if (known.length > 0) {
-    await sb.from("vault_access").delete().eq("user_id", userId);
-    for (const c of known) await logVault("access_revoked", c.id, actorId, userId);
-  }
-  return known;
+/** Reemplaza las credenciales visibles de un usuario y lo deja registrado. */
+async function syncUserCredentials(
+  userId: string,
+  credentialIds: string[],
+  actorId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await syncVaultAccess({ userId }, credentialIds);
+  if (!res.ok) return res;
+  const { added, removed } = res.change;
+  const names = await credentialNames([...added, ...removed]);
+  await logVaultEvents([
+    ...added.map((id) => ({
+      event: "access_granted" as const,
+      credentialId: id,
+      credentialName: names.get(id) ?? null,
+      actorId,
+      targetUserId: userId,
+    })),
+    ...removed.map((id) => ({
+      event: "access_revoked" as const,
+      credentialId: id,
+      credentialName: names.get(id) ?? null,
+      actorId,
+      targetUserId: userId,
+    })),
+  ]);
+  return { ok: true };
 }
 
 async function countActiveAdmins(): Promise<number> {
@@ -129,7 +111,7 @@ async function countActiveAdmins(): Promise<number> {
  */
 export async function createUser(
   input: CreateUserInput
-): Promise<UserResult<{ tempPassword: string }>> {
+): Promise<UserResult<{ tempPassword: string; warning: string | null }>> {
   const guard = await assertAdmin();
   if (!guard.ok) return guard;
   const parsed = createSchema.safeParse(input);
@@ -161,18 +143,34 @@ export async function createUser(
     allowed_tabs: d.tabs,
     updated_at: new Date().toISOString(),
   });
-  if (profileError) return { ok: false, error: profileError.message };
+  if (profileError) {
+    // Sin perfil la cuenta no sirve; se borra para poder reintentar.
+    await sb.auth.admin.deleteUser(created.user.id);
+    return { ok: false, error: `No se pudo crear el usuario: ${profileError.message}` };
+  }
 
-  await syncUserCredentials(created.user.id, d.credentialIds, guard.viewer.id);
+  const access = await syncUserCredentials(created.user.id, d.credentialIds, guard.viewer.id);
   revalidateUsers();
-  return { ok: true, data: { tempPassword } };
+  return {
+    ok: true,
+    data: {
+      tempPassword,
+      warning: access.ok
+        ? null
+        : `No se pudieron asignar las credenciales (${access.error}). Asignalas desde «Permisos».`,
+    },
+  };
 }
 
-/** Cambia nombre, rol, pestañas y credenciales visibles de un usuario. */
+/**
+ * Cambia nombre, rol, pestañas y credenciales visibles de un usuario.
+ * Devuelve las credenciales que conocía y ya no puede ver (le sacaste el
+ * acceso, la pestaña Bóveda o el rol de admin), para proponer rotarlas.
+ */
 export async function updateUserPermissions(
   userId: string,
   input: PermissionsInput
-): Promise<UserResult> {
+): Promise<UserResult<{ lostCredentials: KnownCredential[] }>> {
   const guard = await assertAdmin();
   if (!guard.ok) return guard;
   if (!uuid.safeParse(userId).success) return { ok: false, error: "ID inválido" };
@@ -197,6 +195,9 @@ export async function updateUserPermissions(
     }
   }
 
+  // Lo que conocía antes del cambio.
+  const knownBefore = await knownCredentialsFor(userId);
+
   const { error } = await sb
     .from("profiles")
     .update({
@@ -208,44 +209,88 @@ export async function updateUserPermissions(
     .eq("id", userId);
   if (error) return { ok: false, error: error.message };
 
-  await syncUserCredentials(userId, d.credentialIds, guard.viewer.id);
+  const access = await syncUserCredentials(userId, d.credentialIds, guard.viewer.id);
   revalidateUsers();
-  return { ok: true };
+  if (!access.ok) {
+    return { ok: false, error: `Las pestañas se guardaron, pero no las credenciales: ${access.error}` };
+  }
+
+  // Lo que puede ver después: admin ve todo; si no, solo con la pestaña Bóveda
+  // y las credenciales tildadas.
+  const canSee = (id: string) =>
+    d.role === "admin" || (d.tabs.includes("boveda") && d.credentialIds.includes(id));
+  const lostCredentials = target.disabled ? [] : knownBefore.filter((c) => !canSee(c.id));
+  return { ok: true, data: { lostCredentials } };
+}
+
+/** Saca todas las credenciales de un usuario y lo deja registrado. */
+async function revokeAllAccess(userId: string, actorId: string): Promise<void> {
+  const res = await syncVaultAccess({ userId }, []);
+  if (!res.ok || res.change.removed.length === 0) return;
+  const names = await credentialNames(res.change.removed);
+  await logVaultEvents(
+    res.change.removed.map((id) => ({
+      event: "access_revoked" as const,
+      credentialId: id,
+      credentialName: names.get(id) ?? null,
+      actorId,
+      targetUserId: userId,
+    }))
+  );
 }
 
 /**
- * Saca a una persona: bloquea la cuenta (no puede volver a entrar), le quita
- * todas las credenciales de la Bóveda y devuelve cuáles conocía, para que la
- * pantalla le proponga a Joaco rotarlas.
+ * Saca a una persona: la app la deja afuera desde el próximo click, se le
+ * bloquea el login, pierde todas las credenciales de la Bóveda, y se devuelve
+ * lo que conocía (lo que tenía habilitado y lo que vio alguna vez) para que la
+ * pantalla le proponga a Joaco rotarlo.
  */
 export async function disableUser(
   userId: string
-): Promise<UserResult<{ knownCredentials: KnownCredential[] }>> {
+): Promise<UserResult<{ knownCredentials: KnownCredential[]; warning: string | null }>> {
   const guard = await assertAdmin();
   if (!guard.ok) return guard;
   if (!uuid.safeParse(userId).success) return { ok: false, error: "ID inválido" };
   if (userId === guard.viewer.id) return { ok: false, error: "No podés deshabilitarte a vos mismo" };
 
   const sb = createBotClient();
-  const { data: target } = await sb.from("profiles").select("role").eq("id", userId).maybeSingle();
+  const { data: target } = await sb
+    .from("profiles")
+    .select("role, disabled")
+    .eq("id", userId)
+    .maybeSingle();
   if (!target) return { ok: false, error: "El usuario no existe" };
-  if (target.role === "admin" && (await countActiveAdmins()) <= 1) {
+  if (target.role === "admin" && !target.disabled && (await countActiveAdmins()) <= 1) {
     return { ok: false, error: "Tiene que quedar al menos un admin" };
   }
 
-  const { error: banError } = await sb.auth.admin.updateUserById(userId, {
-    ban_duration: BAN_FOREVER,
-  });
-  if (banError) return { ok: false, error: banError.message };
+  const knownCredentials = await knownCredentialsFor(userId);
 
-  await sb
+  // Primero el flag: es lo que corta el acceso en la app y en la base al
+  // instante (la sesión que ya tiene abierta sigue siendo válida para
+  // Supabase hasta que vence, pero getViewer y has_any_tab la rechazan).
+  const { error: profileError } = await sb
     .from("profiles")
     .update({ disabled: true, updated_at: new Date().toISOString() })
     .eq("id", userId);
+  if (profileError) return { ok: false, error: profileError.message };
 
-  const knownCredentials = await revokeAllCredentials(userId, guard.viewer.id);
+  // Después el bloqueo del login, para que no pueda renovar la sesión.
+  const { error: banError } = await sb.auth.admin.updateUserById(userId, {
+    ban_duration: BAN_FOREVER,
+  });
+
+  await revokeAllAccess(userId, guard.viewer.id);
   revalidateUsers();
-  return { ok: true, data: { knownCredentials } };
+  return {
+    ok: true,
+    data: {
+      knownCredentials,
+      warning: banError
+        ? `Ya no puede usar la app, pero no se pudo bloquear su login (${banError.message}). Probá «Sacar» de nuevo.`
+        : null,
+    },
+  };
 }
 
 /** Vuelve a habilitar una cuenta (sin credenciales: se dan de nuevo a mano). */
@@ -259,10 +304,11 @@ export async function enableUser(userId: string): Promise<UserResult> {
     ban_duration: "none",
   });
   if (banError) return { ok: false, error: banError.message };
-  await sb
+  const { error } = await sb
     .from("profiles")
     .update({ disabled: false, updated_at: new Date().toISOString() })
     .eq("id", userId);
+  if (error) return { ok: false, error: error.message };
   revalidateUsers();
   return { ok: true };
 }
@@ -286,7 +332,7 @@ export async function resetUserPassword(
 /** Borra la cuenta. Devuelve las credenciales que conocía para rotarlas. */
 export async function deleteUser(
   userId: string
-): Promise<UserResult<{ knownCredentials: KnownCredential[] }>> {
+): Promise<UserResult<{ knownCredentials: KnownCredential[]; warning: string | null }>> {
   const guard = await assertAdmin();
   if (!guard.ok) return guard;
   if (!uuid.safeParse(userId).success) return { ok: false, error: "ID inválido" };
@@ -298,9 +344,16 @@ export async function deleteUser(
     return { ok: false, error: "Tiene que quedar al menos un admin" };
   }
 
-  const knownCredentials = await revokeAllCredentials(userId, guard.viewer.id);
+  // Antes de borrar: lo que conocía, y el registro de bajas (con su email,
+  // que queda en el historial aunque la cuenta ya no exista).
+  const knownCredentials = await knownCredentialsFor(userId);
+  await revokeAllAccess(userId, guard.viewer.id);
+
   const { error } = await sb.auth.admin.deleteUser(userId);
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    revalidateUsers();
+    return { ok: false, error: `Se le sacaron las credenciales, pero no se pudo borrar la cuenta: ${error.message}` };
+  }
   revalidateUsers();
-  return { ok: true, data: { knownCredentials } };
+  return { ok: true, data: { knownCredentials, warning: null } };
 }

@@ -1018,27 +1018,36 @@ export type Database = {
       }
       vault_events: {
         Row: {
+          actor_email: string | null
           actor_id: string | null
           created_at: string
           credential_id: string | null
+          credential_name: string | null
           event: string
           id: string
+          target_email: string | null
           target_user_id: string | null
         }
         Insert: {
+          actor_email?: string | null
           actor_id?: string | null
           created_at?: string
           credential_id?: string | null
+          credential_name?: string | null
           event: string
           id?: string
+          target_email?: string | null
           target_user_id?: string | null
         }
         Update: {
+          actor_email?: string | null
           actor_id?: string | null
           created_at?: string
           credential_id?: string | null
+          credential_name?: string | null
           event?: string
           id?: string
+          target_email?: string | null
           target_user_id?: string | null
         }
         Relationships: [
@@ -1101,6 +1110,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_tab_policies: { Args: { tbl: string }; Returns: undefined }
       claim_invoice_number: { Args: never; Returns: number }
       has_any_tab: { Args: { tabs: string[] }; Returns: boolean }
       slugify: { Args: { input: string }; Returns: string }

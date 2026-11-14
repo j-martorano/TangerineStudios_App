@@ -7,7 +7,9 @@ import type { TabKey } from "./tabs";
  * no se vea, así que cada action chequea su scope con `assertAnyTab()`.
  * Las mismas reglas están en la base (función SQL `tabs_for` en la migración
  * 20261113000000_usuarios_permisos_boveda.sql) para quien le pegue directo a
- * la API de Supabase. ⚠️ Si cambiás algo acá, cambialo allá también.
+ * la API de Supabase. Allá "crear" ('insert') está separado de "editar y
+ * borrar" ('write'): p. ej. clientCreate es el 'insert' de clients y
+ * clientEdit su 'write'. ⚠️ Si cambiás algo acá, cambialo allá también.
  */
 export const SCOPES = {
   /** Proyectos, cobros y pagos de proyectos (kanban, spreadsheet, dashboard, finanzas, facturas). */

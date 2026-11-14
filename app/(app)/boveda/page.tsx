@@ -32,13 +32,12 @@ export default async function BovedaPage({ searchParams }: { searchParams: Searc
         configured={isVaultConfigured()}
         credentials={credentials}
         notifications={notifications}
-        users={users
-          .filter((u) => !u.disabled)
-          .map((u) => ({
-            id: u.id,
-            name: u.displayName ?? u.email,
-            hasVaultTab: u.tabs.includes("boveda"),
-          }))}
+        users={users.map((u) => ({
+          id: u.id,
+          name: u.displayName ?? u.email,
+          hasVaultTab: u.tabs.includes("boveda"),
+          disabled: u.disabled,
+        }))}
         events={events}
         rotateId={params.rotar ?? null}
       />
