@@ -166,27 +166,26 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
   return (
     <>
       <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-5xl font-bold uppercase tracking-tight">Usuarios</h1>
+        <div className="flex items-baseline gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight">Usuarios</h1>
           <p className="text-sm text-muted-foreground">
-            Quién entra a la app, qué pestañas ve y qué contraseñas de la Bóveda
-            tiene. Solo los admins ven esta página.
+            {users.length} usuario{users.length === 1 ? "" : "s"}
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
-          <PlusIcon />
+          <PlusIcon className="size-4" />
           Nuevo usuario
         </Button>
       </header>
 
-      <div className="flex flex-col gap-2">
+      <div className="divide-y divide-border/50 rounded-xl border bg-card">
         {users.map((u) => {
           const isSelf = u.id === currentUserId;
           const creds = credsOf(u.id);
           return (
             <div
               key={u.id}
-              className={`flex flex-col gap-3 rounded-xl border border-white/[0.08] bg-[#1a1a1a] p-4 md:flex-row md:items-center ${
+              className={`flex flex-col gap-3 p-4 md:flex-row md:items-center ${
                 u.disabled ? "opacity-50" : ""
               }`}
             >
@@ -194,13 +193,13 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold">{u.displayName ?? u.email}</span>
                   {u.role === "admin" ? (
-                    <Badge className="gap-1 bg-[#FFAC37] text-black">
+                    <Badge className="gap-1">
                       <ShieldCheckIcon className="size-3" />
                       Admin
                     </Badge>
                   ) : null}
                   {isSelf ? <Badge variant="outline">Vos</Badge> : null}
-                  {u.disabled ? <Badge className="bg-[#FF3737] text-white">Deshabilitado</Badge> : null}
+                  {u.disabled ? <Badge variant="destructive">Deshabilitado</Badge> : null}
                 </div>
                 {u.displayName ? (
                   <span className="text-xs text-muted-foreground">{u.email}</span>
@@ -220,7 +219,7 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
                 </div>
                 {creds.length > 0 ? (
                   <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                    <KeyRoundIcon className="size-3 text-[#FFAC37]" />
+                    <KeyRoundIcon className="size-3 text-primary" />
                     {creds.map((c) => c.name).join(" · ")}
                   </div>
                 ) : null}
@@ -361,7 +360,7 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
             <AlertDialogAction
               disabled={pending}
               onClick={handleConfirm}
-              className="bg-[#FF3737] text-white hover:bg-[#FF3737]/85"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/85"
             >
               {confirm?.action === "delete" ? "Borrar" : "Sacar"}
             </AlertDialogAction>
@@ -421,13 +420,13 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
                     href={`/boveda?rotar=${c.id}`}
                     target="_blank"
                     rel="noopener"
-                    className="flex items-center justify-between rounded-lg border border-white/[0.08] px-3 py-2 text-sm hover:bg-white/[0.04]"
+                    className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm hover:bg-muted/50"
                   >
                     <span className="flex items-center gap-2">
-                      <KeyRoundIcon className="size-4 text-[#FFAC37]" />
+                      <KeyRoundIcon className="size-4 text-primary" />
                       {c.name}
                     </span>
-                    <span className="text-xs text-[#FFAC37]">Rotar ahora ↗</span>
+                    <span className="text-xs text-primary">Rotar ahora ↗</span>
                   </a>
                 ))}
               </div>

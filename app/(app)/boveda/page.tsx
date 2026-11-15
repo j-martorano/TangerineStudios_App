@@ -26,7 +26,7 @@ export default async function BovedaPage({ searchParams }: { searchParams: Searc
   ]);
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-5">
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-5">
       <VaultView
         isAdmin={isAdmin}
         configured={isVaultConfigured()}

@@ -175,13 +175,13 @@ export function VaultView({
 
   return (
     <>
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-5xl font-bold uppercase tracking-tight">Bóveda</h1>
+      <header className="flex flex-wrap items-baseline justify-between gap-3">
+        <div className="flex items-baseline gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight">Bóveda</h1>
           <p className="text-sm text-muted-foreground">
-            {isAdmin
-              ? "Las contraseñas compartidas. Elegís quién ve cada una y las rotás cuando sale alguien."
-              : "Las contraseñas compartidas que tenés habilitadas."}
+            {credentials.length} contraseña{credentials.length === 1 ? "" : "s"}
+            {isAdmin ? " compartida" : " habilitada"}
+            {credentials.length === 1 ? "" : "s"}
           </p>
         </div>
         {isAdmin ? (
@@ -192,23 +192,23 @@ export function VaultView({
             }}
             disabled={!configured}
           >
-            <PlusIcon />
+            <PlusIcon className="size-4" />
             Nueva credencial
           </Button>
         ) : null}
       </header>
 
       {!configured ? (
-        <div className="rounded-xl border border-[#FF3737]/40 bg-[#FF3737]/10 p-4 text-sm">
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
           Falta configurar la clave de cifrado (<code>VAULT_ENCRYPTION_KEY</code>) en
           Vercel. Sin ella la Bóveda no puede guardar ni mostrar contraseñas.
         </div>
       ) : null}
 
       {unread.length > 0 ? (
-        <div className="flex flex-col gap-2 rounded-xl border border-[#FFAC37]/40 bg-[#FFAC37]/10 p-4">
+        <div className="flex flex-col gap-2 rounded-xl border border-primary/40 bg-primary/10 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold">
-            <BellIcon className="size-4 text-[#FFAC37]" />
+            <BellIcon className="size-4 text-primary" />
             Novedades
           </div>
           <ul className="flex flex-col gap-1 text-sm">
@@ -228,10 +228,13 @@ export function VaultView({
       ) : null}
 
       {credentials.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-white/[0.12] p-10 text-center text-sm text-muted-foreground">
-          {isAdmin
-            ? "No hay credenciales cargadas. Empezá con «Nueva credencial»."
-            : "No tenés ninguna contraseña habilitada. Si necesitás una, pedísela a Joaco."}
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border/50 bg-muted/20 py-16 text-center">
+          <KeyRoundIcon className="size-8 text-muted-foreground/30" />
+          <p className="text-sm text-muted-foreground">
+            {isAdmin
+              ? "No hay credenciales cargadas. Empezá con «Nueva credencial»."
+              : "No tenés ninguna contraseña habilitada. Si necesitás una, pedísela a Joaco."}
+          </p>
         </div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
@@ -241,12 +244,12 @@ export function VaultView({
             return (
               <article
                 key={c.id}
-                className="flex flex-col gap-3 rounded-xl border border-white/[0.08] bg-[#1a1a1a] p-4"
+                className="flex flex-col gap-3 rounded-xl border bg-card p-4"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex flex-col gap-0.5">
-                    <h2 className="flex items-center gap-2 text-lg font-semibold">
-                      <KeyRoundIcon className="size-4 text-[#FFAC37]" />
+                    <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+                      <KeyRoundIcon className="size-4 text-primary" />
                       {c.name}
                     </h2>
                     <span className="text-xs text-muted-foreground">
@@ -276,7 +279,7 @@ export function VaultView({
                 {secret ? (
                   <SecretValue value={secret} />
                 ) : (
-                  <div className="rounded-md border border-white/[0.08] bg-black/40 px-3 py-2 font-mono text-sm tracking-widest text-muted-foreground">
+                  <div className="rounded-md border bg-muted/40 px-3 py-2 font-mono text-sm tracking-widest text-muted-foreground">
                     ••••••••••••
                   </div>
                 )}
@@ -297,7 +300,6 @@ export function VaultView({
                         size="sm"
                         onClick={() => setRotating(c)}
                         disabled={pending || !configured}
-                        className="bg-[#FFAC37] text-black hover:bg-[#FFAC37]/85"
                       >
                         <RotateCwIcon />
                         Rotar contraseña
@@ -334,7 +336,7 @@ export function VaultView({
                 ) : null}
 
                 {isAdmin ? (
-                  <div className="flex flex-wrap items-center gap-1 border-t border-white/[0.06] pt-2 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-1 border-t border-border/50 pt-2 text-xs text-muted-foreground">
                     <UsersIcon className="size-3" />
                     {audience.length === 0 ? (
                       "Solo admins"
@@ -358,7 +360,7 @@ export function VaultView({
           <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Actividad reciente
           </h2>
-          <ul className="flex flex-col divide-y divide-white/[0.05] rounded-xl border border-white/[0.08] text-sm">
+          <ul className="flex flex-col divide-y divide-border/50 rounded-xl border bg-card text-sm">
             {events.map((e) => {
               const cred = credentials.find((c) => c.id === e.credentialId);
               return (
@@ -415,7 +417,7 @@ export function VaultView({
             <AlertDialogAction
               onClick={confirmDelete}
               disabled={pending}
-              className="bg-[#FF3737] text-white hover:bg-[#FF3737]/85"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/85"
             >
               Borrar
             </AlertDialogAction>

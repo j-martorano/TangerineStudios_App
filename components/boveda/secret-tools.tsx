@@ -54,7 +54,7 @@ export function SecretValue({
 }) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <code className="min-w-0 flex-1 break-all rounded-md border border-white/[0.08] bg-black/40 px-3 py-2 font-mono text-sm tracking-wide">
+      <code className="min-w-0 flex-1 break-all rounded-md border bg-muted/40 px-3 py-2 font-mono text-sm tracking-wide">
         {value}
       </code>
       <CopyButton value={value} />

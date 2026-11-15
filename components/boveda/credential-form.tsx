@@ -268,13 +268,13 @@ function FormBody({
                 <label key={u.id} className="flex cursor-pointer items-center gap-2 text-sm">
                   <input
                     type="checkbox"
-                    className="accent-[#FFAC37]"
+                    className="accent-primary"
                     checked={userIds.includes(u.id)}
                     onChange={() => toggleUser(u.id)}
                   />
                   {u.name}
                   {!u.hasVaultTab && userIds.includes(u.id) ? (
-                    <span className="text-xs text-[#FFAC37]">
+                    <span className="text-xs text-primary">
                       (no tiene la pestaña Bóveda: dásela en Usuarios)
                     </span>
                   ) : null}

@@ -116,7 +116,7 @@ function WizardBody({
             La contraseña nueva ya está en la Bóveda.
           </DialogDescription>
         </DialogHeader>
-        <div className="rounded-lg border border-white/[0.08] p-3 text-sm">
+        <div className="rounded-lg border p-3 text-sm">
           {notified.length > 0 ? (
             <>
               <p className="mb-1 text-muted-foreground">Se avisó en la Bóveda a:</p>
@@ -196,7 +196,7 @@ function WizardBody({
             <label className="flex cursor-pointer items-start gap-2">
               <input
                 type="checkbox"
-                className="mt-1 accent-[#FFAC37]"
+                className="mt-1 accent-primary"
                 checked={done.has(i)}
                 onChange={() => toggleStep(i)}
               />
@@ -223,11 +223,11 @@ function WizardBody({
           </li>
         ))}
 
-        <li className="flex flex-col gap-3 rounded-lg border border-[#FFAC37]/30 bg-[#FFAC37]/5 p-3">
+        <li className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
           <label className="flex cursor-pointer items-start gap-2">
             <input
               type="checkbox"
-              className="mt-1 accent-[#FFAC37]"
+              className="mt-1 accent-primary"
               checked={confirmed}
               onChange={(e) => setConfirmed(e.target.checked)}
             />

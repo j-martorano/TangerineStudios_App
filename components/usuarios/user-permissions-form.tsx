@@ -110,19 +110,19 @@ export function UserPermissionsForm({
               key={role}
               className={`flex cursor-pointer flex-col gap-0.5 rounded-lg border p-3 text-sm transition-colors ${
                 value.role === role
-                  ? "border-[#FFAC37]/60 bg-[#FFAC37]/10"
-                  : "border-white/[0.08] hover:bg-white/[0.03]"
+                  ? "border-primary/60 bg-primary/10"
+                  : "border-border hover:bg-muted/40"
               }`}
             >
               <span className="flex items-center gap-2 font-medium">
                 <input
                   type="radio"
                   name="role"
-                  className="accent-[#FFAC37]"
+                  className="accent-primary"
                   checked={value.role === role}
                   onChange={() => setValue({ ...value, role })}
                 />
-                {role === "admin" ? <ShieldCheckIcon className="size-3.5 text-[#FFAC37]" /> : null}
+                {role === "admin" ? <ShieldCheckIcon className="size-3.5 text-primary" /> : null}
                 {label}
               </span>
               <span className="pl-5 text-xs text-muted-foreground">{desc}</span>
@@ -150,12 +150,12 @@ export function UserPermissionsForm({
               <label
                 key={tab.key}
                 className={`flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm ${
-                  checked ? "border-white/[0.15] bg-white/[0.04]" : "border-white/[0.06]"
+                  checked ? "border-foreground/25 bg-muted/40" : "border-border/60"
                 } ${isAdmin ? "opacity-60" : ""}`}
               >
                 <input
                   type="checkbox"
-                  className="mt-1 accent-[#FFAC37]"
+                  className="mt-1 accent-primary"
                   checked={checked}
                   onChange={() => toggleTab(tab.key)}
                 />
@@ -188,13 +188,13 @@ export function UserPermissionsForm({
                   key={c.id}
                   className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-sm ${
                     checked
-                      ? "border-[#FFAC37]/60 bg-[#FFAC37]/10"
-                      : "border-white/[0.08]"
+                      ? "border-primary/60 bg-primary/10"
+                      : "border-border"
                   }`}
                 >
                   <input
                     type="checkbox"
-                    className="accent-[#FFAC37]"
+                    className="accent-primary"
                     checked={checked}
                     onChange={() => toggleCredential(c.id)}
                   />
