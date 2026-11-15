@@ -23,6 +23,16 @@ export const TABS = [
 
 export type TabKey = (typeof TABS)[number]["key"];
 
+/**
+ * Pestañas que no se muestran en el menú ni se pueden otorgar: solo admins,
+ * entrando por la URL. "mantenimiento" (/admin) es una herramienta de una
+ * sola vez que no tiene sentido tener a la vista.
+ */
+export const HIDDEN_TABS: ReadonlySet<TabKey> = new Set<TabKey>(["mantenimiento"]);
+
+/** Las pestañas que aparecen en el menú y en el formulario de permisos. */
+export const VISIBLE_TABS = TABS.filter((t) => !HIDDEN_TABS.has(t.key));
+
 export const TAB_KEYS: readonly TabKey[] = TABS.map((t) => t.key);
 
 /**
@@ -63,8 +73,8 @@ export type ViewerProfile = {
   tabs: TabKey[];
 };
 
-/** Pestañas efectivas: un admin ve todas. */
+/** Pestañas efectivas: un admin ve todas; un usuario nunca ve las ocultas. */
 export function effectiveTabs(role: Role, allowed: readonly string[]): TabKey[] {
   if (role === "admin") return [...TAB_KEYS];
-  return TAB_KEYS.filter((k) => allowed.includes(k));
+  return TAB_KEYS.filter((k) => allowed.includes(k) && !HIDDEN_TABS.has(k));
 }

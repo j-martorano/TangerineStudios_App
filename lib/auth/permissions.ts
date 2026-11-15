@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createBotClient } from "@/lib/supabase/bot";
 import {
-  TABS,
+  VISIBLE_TABS,
   effectiveTabs,
   type Role,
   type TabKey,
@@ -64,7 +64,7 @@ export const getViewer = cache(async (): Promise<ViewerProfile | null> => {
 
 /** Primera pestaña que el usuario puede ver, para mandarlo ahí. */
 export function homeFor(viewer: ViewerProfile): string | null {
-  const first = TABS.find((t) => viewer.tabs.includes(t.key));
+  const first = VISIBLE_TABS.find((t) => viewer.tabs.includes(t.key));
   return first?.href ?? null;
 }
 

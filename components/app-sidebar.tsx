@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/sidebar";
 
 import { signOut } from "@/lib/auth/actions";
-import { TABS, type TabKey } from "@/lib/auth/tabs";
+import { VISIBLE_TABS, type TabKey } from "@/lib/auth/tabs";
 import { ChangePasswordDialog } from "@/components/auth/change-password-dialog";
 
 const ICONS: Record<TabKey, LucideIcon> = {
@@ -70,7 +70,7 @@ export function AppSidebar({ tabs, isAdmin, userLabel, vaultUnread }: Props) {
     exact: boolean;
     icon: LucideIcon;
     badge: number | null;
-  }[] = TABS.filter((t) => tabs.includes(t.key)).map((t) => ({
+  }[] = VISIBLE_TABS.filter((t) => tabs.includes(t.key)).map((t) => ({
     href: t.href,
     label: t.label,
     exact: t.exact,

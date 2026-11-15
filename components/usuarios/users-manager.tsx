@@ -43,7 +43,7 @@ import {
 } from "@/lib/users/actions";
 import type { KnownCredential } from "@/lib/vault/events";
 import type { AppUser } from "@/lib/users/queries";
-import { TABS } from "@/lib/auth/tabs";
+import { VISIBLE_TABS } from "@/lib/auth/tabs";
 
 import { UserPermissionsForm, type PermissionsValue } from "./user-permissions-form";
 
@@ -210,7 +210,7 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
                   ) : u.tabs.length === 0 ? (
                     <span className="text-xs text-[#FF3737]">Sin pestañas: no ve nada</span>
                   ) : (
-                    TABS.filter((t) => u.tabs.includes(t.key)).map((t) => (
+                    VISIBLE_TABS.filter((t) => u.tabs.includes(t.key)).map((t) => (
                       <Badge key={t.key} variant="secondary" className="font-normal">
                         {t.label}
                       </Badge>

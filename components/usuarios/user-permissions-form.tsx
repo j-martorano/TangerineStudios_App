@@ -6,7 +6,7 @@ import { ShieldCheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TABS, TAB_DESCRIPTIONS, type Role, type TabKey } from "@/lib/auth/tabs";
+import { VISIBLE_TABS, TAB_DESCRIPTIONS, type Role, type TabKey } from "@/lib/auth/tabs";
 
 export type PermissionsValue = {
   email: string;
@@ -144,7 +144,7 @@ export function UserPermissionsForm({
           <p className="text-xs text-muted-foreground">Un admin ve todas.</p>
         ) : null}
         <div className="grid gap-1.5 sm:grid-cols-2">
-          {TABS.map((tab) => {
+          {VISIBLE_TABS.map((tab) => {
             const checked = isAdmin || value.tabs.includes(tab.key);
             return (
               <label
