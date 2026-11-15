@@ -52,6 +52,7 @@ export const EDITORS_COLUMNS = [
   "payment_methods",
   "docs",
   "projects",
+  "account",
   "actions",
 ] as const;
 export type EditorsColumnId = (typeof EDITORS_COLUMNS)[number];
@@ -64,6 +65,7 @@ export const EDITORS_COLUMN_LABEL: Record<EditorsColumnId, string> = {
   payment_methods: "Métodos de pago",
   docs: "Docs",
   projects: "Proyectos",
+  account: "Cuenta",
   actions: "Acciones",
 };
 
@@ -166,10 +168,7 @@ export const DEFAULT_PREFS: UserPrefs = {
  * Inserta las nuevas columnas en la posición relativa correcta del default;
  * si no se puede inferir la posición, las agrega al final (antes de "actions").
  */
-function ensureDefaultColumns(
-  saved: ProjectsColumnId[],
-  defaults: ProjectsColumnId[]
-): ProjectsColumnId[] {
+function ensureDefaultColumns<T extends string>(saved: T[], defaults: T[]): T[] {
   const missing = defaults.filter((c) => !saved.includes(c));
   if (missing.length === 0) return saved;
   const result = [...saved];
@@ -183,7 +182,7 @@ function ensureDefaultColumns(
       result.splice(result.indexOf(insertBefore), 0, col);
     } else {
       // Fallback: agrega antes de "actions" si existe, si no al final.
-      const actionsIdx = result.indexOf("actions");
+      const actionsIdx = result.indexOf("actions" as T);
       result.splice(actionsIdx >= 0 ? actionsIdx : result.length, 0, col);
     }
   }
@@ -199,8 +198,14 @@ export function mergePrefs(partial: Partial<UserPrefs> | null): UserPrefs {
         partial.columns?.projects ?? DEFAULT_PREFS.columns.projects,
         DEFAULT_PREFS.columns.projects
       ),
-      editors: partial.columns?.editors ?? DEFAULT_PREFS.columns.editors,
-      clients: partial.columns?.clients ?? DEFAULT_PREFS.columns.clients,
+      editors: ensureDefaultColumns(
+        partial.columns?.editors ?? DEFAULT_PREFS.columns.editors,
+        DEFAULT_PREFS.columns.editors
+      ),
+      clients: ensureDefaultColumns(
+        partial.columns?.clients ?? DEFAULT_PREFS.columns.clients,
+        DEFAULT_PREFS.columns.clients
+      ),
     },
     finanzas: {
       tabs: partial.finanzas?.tabs ?? DEFAULT_PREFS.finanzas.tabs,

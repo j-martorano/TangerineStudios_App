@@ -2,9 +2,12 @@
 import { NewEditorButton } from "@/components/editors/new-editor-button";
 import { DataPagination } from "@/components/data-pagination";
 import { DataSearch } from "@/components/data-search";
+import { getAppUrl } from "@/lib/app-url";
+import { getViewer } from "@/lib/auth/permissions";
 import { fetchClients, fetchEditorsList } from "@/lib/projects/queries";
 import { fetchPaymentMethods } from "@/lib/payment-methods/queries";
 import { fetchUserPrefs } from "@/lib/settings/queries";
+import { fetchAllCredentials } from "@/lib/vault/queries";
 
 
 type SearchParams = Promise<{ q?: string; page?: string }>;
@@ -18,14 +21,18 @@ export default async function EditorsPage({
   const query = params.q?.trim() || undefined;
   const page = Math.max(1, Number(params.page) || 1);
 
-  const prefs = await fetchUserPrefs();
+  const [prefs, viewer] = await Promise.all([fetchUserPrefs(), getViewer()]);
   const perPage = prefs.limits.editors_per_page;
+  const isAdmin = viewer?.role === "admin";
 
-  const [{ editors, total }, availableClients, paymentMethodsCatalog] =
+  const [{ editors, total }, availableClients, paymentMethodsCatalog, credentials, appUrl] =
     await Promise.all([
       fetchEditorsList({ query, page, perPage }),
       fetchClients(),
       fetchPaymentMethods(),
+      // Para «Crear usuario» desde la fila: solo un admin puede.
+      isAdmin ? fetchAllCredentials() : Promise.resolve([]),
+      getAppUrl(),
     ]);
 
   return (
@@ -53,6 +60,9 @@ export default async function EditorsPage({
           availableClients={availableClients}
           paymentMethodsCatalog={paymentMethodsCatalog}
           visibleColumns={prefs.columns.editors}
+          isAdmin={isAdmin}
+          credentials={credentials.map((c) => ({ id: c.id, name: c.name }))}
+          appUrl={appUrl}
         />
       </div>
 

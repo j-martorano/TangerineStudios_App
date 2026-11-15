@@ -304,6 +304,7 @@ export type Database = {
           name: string
           payment_type: Database["public"]["Enums"]["editor_payment_model"]
           rate: number | null
+          user_id: string | null
         }
         Insert: {
           contact_links?: Json
@@ -317,6 +318,7 @@ export type Database = {
           name: string
           payment_type?: Database["public"]["Enums"]["editor_payment_model"]
           rate?: number | null
+          user_id?: string | null
         }
         Update: {
           contact_links?: Json
@@ -330,8 +332,17 @@ export type Database = {
           name?: string
           payment_type?: Database["public"]["Enums"]["editor_payment_model"]
           rate?: number | null
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "editors_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fixed_services: {
         Row: {

@@ -1,4 +1,4 @@
-import { ExternalLinkIcon } from "lucide-react";
+import { ExternalLinkIcon, UserCheckIcon } from "lucide-react";
 
 import {
   Table,
@@ -14,6 +14,7 @@ import { DeleteEditorButton } from "./delete-editor-button";
 import { ToggleDisabledButton } from "./toggle-disabled-button";
 import { PaymentMethodChips } from "./payment-method-chips";
 import { DiscordLinkCell } from "./discord-link-cell";
+import { CreateAccountButton } from "./create-account-button";
 import type { EditorWithCount } from "@/lib/projects/queries";
 import type { ClientMini, ContactLink } from "@/lib/projects/types";
 import type { PaymentMethod } from "@/lib/payment-methods/queries";
@@ -24,6 +25,11 @@ type Props = {
   availableClients: ClientMini[];
   paymentMethodsCatalog: PaymentMethod[];
   visibleColumns: EditorsColumnId[];
+  /** Solo un admin puede crear cuentas desde acá. */
+  isAdmin: boolean;
+  /** Credenciales de la Bóveda para el formulario de cuenta nueva. */
+  credentials: { id: string; name: string }[];
+  appUrl: string;
 };
 
 export function EditorsTable({
@@ -31,6 +37,9 @@ export function EditorsTable({
   availableClients,
   paymentMethodsCatalog,
   visibleColumns,
+  isAdmin,
+  credentials,
+  appUrl,
 }: Props) {
   if (editors.length === 0) {
     return (
@@ -57,6 +66,7 @@ export function EditorsTable({
           {visible.has("projects") && (
             <TableHead className="text-right">Proyectos</TableHead>
           )}
+          {visible.has("account") && <TableHead>Cuenta</TableHead>}
           {visible.has("actions") && (
             <TableHead className="w-24 text-right">Acciones</TableHead>
           )}
@@ -138,6 +148,31 @@ export function EditorsTable({
             {visible.has("projects") && (
               <TableCell className="text-right tabular-nums">
                 {e.project_count}
+              </TableCell>
+            )}
+            {visible.has("account") && (
+              <TableCell>
+                {e.account ? (
+                  <span
+                    title={e.account.email}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs ring-1 ${
+                      e.account.disabled
+                        ? "bg-amber-500/10 text-amber-500 ring-amber-500/20"
+                        : "bg-green-500/10 text-green-500 ring-green-500/20"
+                    }`}
+                  >
+                    <UserCheckIcon className="size-3" />
+                    {e.account.disabled ? "Cuenta deshabilitada" : "Tiene cuenta"}
+                  </span>
+                ) : isAdmin && !e.disabled_at ? (
+                  <CreateAccountButton
+                    editor={{ id: e.id, name: e.name, contact_links: e.contact_links }}
+                    credentials={credentials}
+                    appUrl={appUrl}
+                  />
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
               </TableCell>
             )}
             {visible.has("actions") && (

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import {
+  FilmIcon,
   KeyRoundIcon,
   PencilIcon,
   PlusIcon,
@@ -32,7 +33,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { SecretValue } from "@/components/boveda/secret-tools";
 import {
   createUser,
   deleteUser,
@@ -42,10 +42,11 @@ import {
   updateUserPermissions,
 } from "@/lib/users/actions";
 import type { KnownCredential } from "@/lib/vault/events";
-import type { AppUser } from "@/lib/users/queries";
+import type { AppUser, EditorChoice } from "@/lib/users/queries";
 import { QuickBadges } from "@/components/quick-badges";
 import { TAB_DESCRIPTIONS, VISIBLE_TABS, isTabKey } from "@/lib/auth/tabs";
 
+import { TempPasswordDialog, type TempPassword } from "./temp-password-dialog";
 import { UserPermissionsForm, type PermissionsValue } from "./user-permissions-form";
 
 type Credential = { id: string; name: string; userIds: string[] };
@@ -53,6 +54,7 @@ type Credential = { id: string; name: string; userIds: string[] };
 type Props = {
   users: AppUser[];
   credentials: Credential[];
+  editors: EditorChoice[];
   currentUserId: string;
   appUrl: string;
 };
@@ -65,17 +67,17 @@ const DATE = new Intl.DateTimeFormat("es-AR", {
   timeZone: "America/Argentina/Buenos_Aires",
 });
 
-type Pending =
-  | { kind: "temp"; email: string; password: string; isNew: boolean }
-  | { kind: "rotate"; name: string; credentials: KnownCredential[] }
-  | null;
+type Pending = { kind: "rotate"; name: string; credentials: KnownCredential[] } | null;
 
-export function UsersManager({ users, credentials, currentUserId, appUrl }: Props) {
+export function UsersManager({ users, credentials, editors, currentUserId, appUrl }: Props) {
   const [pending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<AppUser | null>(null);
   const [confirm, setConfirm] = useState<{ user: AppUser; action: "disable" | "delete" } | null>(null);
+  // Al sacar a un editor: también deshabilitar su ficha de /editors.
+  const [alsoEditor, setAlsoEditor] = useState(true);
   const [result, setResult] = useState<Pending>(null);
+  const [temp, setTemp] = useState<TempPassword | null>(null);
 
   const credsOf = (userId: string) =>
     credentials.filter((c) => c.userIds.includes(userId));
@@ -88,6 +90,7 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
         role: v.role,
         tabs: v.tabs,
         credentialIds: v.credentialIds,
+        editorId: v.editorId,
       });
       if (!res.ok) {
         toast.error(res.error);
@@ -95,7 +98,7 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
       }
       setCreateOpen(false);
       if (res.data.warning) toast.warning(res.data.warning, { duration: 15000 });
-      setResult({ kind: "temp", email: v.email, password: res.data.tempPassword, isNew: true });
+      setTemp({ email: v.email, password: res.data.tempPassword, isNew: true });
     });
   }
 
@@ -106,6 +109,7 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
         role: v.role,
         tabs: v.tabs,
         credentialIds: v.credentialIds,
+        editorId: v.editorId,
       });
       if (!res.ok) {
         toast.error(res.error);
@@ -164,7 +168,7 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
         toast.error(res.error);
         return;
       }
-      setResult({ kind: "temp", email: user.email, password: res.data.tempPassword, isNew: false });
+      setTemp({ email: user.email, password: res.data.tempPassword, isNew: false });
     });
   }
 
@@ -180,7 +184,10 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
     if (!confirm) return;
     const { user, action } = confirm;
     startTransition(async () => {
-      const res = action === "disable" ? await disableUser(user.id) : await deleteUser(user.id);
+      const res =
+        action === "disable"
+          ? await disableUser(user.id, { disableEditor: alsoEditor && user.editor != null })
+          : await deleteUser(user.id);
       setConfirm(null);
       if (!res.ok) {
         toast.error(res.error);
@@ -234,6 +241,17 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
                     </Badge>
                   ) : null}
                   {isSelf ? <Badge variant="outline">Vos</Badge> : null}
+                  {u.editor ? (
+                    <Badge
+                      variant="outline"
+                      className="gap-1 font-normal text-muted-foreground"
+                      title="Ficha vinculada en Editores"
+                    >
+                      <FilmIcon className="size-3" />
+                      {u.editor.name}
+                      {u.editor.disabledAt ? " (deshabilitado)" : ""}
+                    </Badge>
+                  ) : null}
                   {u.disabled ? <Badge variant="destructive">Deshabilitado</Badge> : null}
                 </div>
                 {u.displayName ? (
@@ -337,7 +355,10 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
                       variant="ghost"
                       size="sm"
                       disabled={pending}
-                      onClick={() => setConfirm({ user: u, action: "disable" })}
+                      onClick={() => {
+                        setAlsoEditor(true);
+                        setConfirm({ user: u, action: "disable" });
+                      }}
                       className="text-[#FF3737]"
                     >
                       <UserXIcon />
@@ -375,8 +396,16 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
           </DialogHeader>
           <UserPermissionsForm
             mode="create"
-            initial={{ email: "", displayName: "", role: "member", tabs: ["boveda"], credentialIds: [] }}
+            initial={{
+              email: "",
+              displayName: "",
+              role: "member",
+              tabs: ["boveda"],
+              credentialIds: [],
+              editorId: null,
+            }}
             credentials={credentials}
+            editors={editors}
             pending={pending}
             submitLabel="Crear usuario"
             onSubmit={handleCreate}
@@ -404,8 +433,11 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
                 role: editing.role,
                 tabs: editing.role === "admin" ? [] : editing.tabs,
                 credentialIds: credsOf(editing.id).map((c) => c.id),
+                editorId: editing.editor?.id ?? null,
               }}
               credentials={credentials}
+              editors={editors}
+              userId={editing.id}
               pending={pending}
               submitLabel="Guardar permisos"
               onSubmit={(v) => handleUpdate(editing, v)}
@@ -430,6 +462,23 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
               que conocía hay que rotarlas: te las listo al terminar.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {confirm?.action === "disable" && confirm.user.editor && !confirm.user.editor.disabledAt ? (
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1 accent-primary"
+                checked={alsoEditor}
+                onChange={(e) => setAlsoEditor(e.target.checked)}
+              />
+              <span className="flex flex-col">
+                <span>También deshabilitar su ficha de editor ({confirm.user.editor.name})</span>
+                <span className="text-xs text-muted-foreground">
+                  Deja de aparecer en las listas para asignar proyectos. Lo que ya
+                  tiene asignado no se toca.
+                </span>
+              </span>
+            </label>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
@@ -443,41 +492,13 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Resultado: contraseña temporal o credenciales a rotar */}
+      {/* Contraseña temporal (cuenta nueva o reseteada) */}
+      <TempPasswordDialog result={temp} appUrl={appUrl} onClose={() => setTemp(null)} />
+
+      {/* Credenciales a rotar */}
       <Dialog open={result != null} onOpenChange={(o) => !o && setResult(null)}>
         <DialogContent className="sm:max-w-lg lg:max-w-lg xl:max-w-lg">
-          {result?.kind === "temp" ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>
-                  {result.isNew ? "Usuario creado" : "Contraseña temporal nueva"}
-                </DialogTitle>
-                <DialogDescription>
-                  Pasale estos datos a la persona. La contraseña no se vuelve a
-                  mostrar. Cuando entre, la puede cambiar desde «Cambiar mi
-                  contraseña», abajo en el menú.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex flex-col gap-3 text-sm">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">Link</span>
-                  <SecretValue value={appUrl} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">Email</span>
-                  <SecretValue value={result.email} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">Contraseña temporal</span>
-                  <SecretValue value={result.password} />
-                </div>
-                <SecretValue
-                  className="mt-2"
-                  value={`Entrá a ${appUrl} con ${result.email} y la contraseña ${result.password}. Después cambiala desde "Cambiar mi contraseña".`}
-                />
-              </div>
-            </>
-          ) : result?.kind === "rotate" ? (
+          {result?.kind === "rotate" ? (
             <>
               <DialogHeader>
                 <DialogTitle>Rotá lo que conocía {result.name}</DialogTitle>

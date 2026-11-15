@@ -6,7 +6,15 @@ import { ShieldCheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { VISIBLE_TABS, TAB_DESCRIPTIONS, type Role, type TabKey } from "@/lib/auth/tabs";
+import type { EditorChoice } from "@/lib/users/queries";
 
 export type PermissionsValue = {
   email: string;
@@ -14,12 +22,22 @@ export type PermissionsValue = {
   role: Role;
   tabs: TabKey[];
   credentialIds: string[];
+  /** Ficha de /editors vinculada (null: no es editor). */
+  editorId: string | null;
 };
+
+const NO_EDITOR = "none";
 
 type Props = {
   mode: "create" | "edit";
   initial: PermissionsValue;
   credentials: { id: string; name: string }[];
+  /** Editores para «Es el editor…». Sin esta prop, el campo no se muestra. */
+  editors?: EditorChoice[];
+  /** Cuenta que se está editando: su propio editor sigue siendo elegible. */
+  userId?: string | null;
+  /** El vínculo viene dado (se crea desde la ficha del editor): se muestra, no se elige. */
+  lockEditor?: boolean;
   /** Editando el propio usuario: no se puede cambiar el rol. */
   isSelf?: boolean;
   pending: boolean;
@@ -31,6 +49,9 @@ export function UserPermissionsForm({
   mode,
   initial,
   credentials,
+  editors,
+  userId = null,
+  lockEditor = false,
   isSelf = false,
   pending,
   submitLabel,
@@ -38,6 +59,16 @@ export function UserPermissionsForm({
 }: Props) {
   const [value, setValue] = useState<PermissionsValue>(initial);
   const isAdmin = value.role === "admin";
+
+  // Elegibles: sin cuenta y habilitados, más el que ya tiene esta cuenta.
+  const editorOptions = (editors ?? []).filter(
+    (e) =>
+      e.id === value.editorId ||
+      (userId != null && e.userId === userId) ||
+      (e.userId == null && e.disabledAt == null)
+  );
+  const editorName = (id: string | null) =>
+    (editors ?? []).find((e) => e.id === id)?.name ?? "";
 
   function toggleTab(key: TabKey) {
     setValue((v) => {
@@ -94,6 +125,43 @@ export function UserPermissionsForm({
           />
         </div>
       </div>
+
+      {editors ? (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="user-editor">Es el editor</Label>
+          {lockEditor ? (
+            <p className="text-sm">{editorName(value.editorId)}</p>
+          ) : (
+            <Select
+              value={value.editorId ?? NO_EDITOR}
+              onValueChange={(v) =>
+                setValue({ ...value, editorId: !v || v === NO_EDITOR ? null : v })
+              }
+              disabled={pending}
+            >
+              <SelectTrigger id="user-editor" className="w-full">
+                <SelectValue>
+                  {(v: string | null) =>
+                    v && v !== NO_EDITOR ? editorName(v) : "Ninguno (no es editor)"
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_EDITOR}>Ninguno (no es editor)</SelectItem>
+                {editorOptions.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Une la cuenta con su ficha de Editores. Solo aparecen los editores
+            que todavía no tienen cuenta.
+          </p>
+        </div>
+      ) : null}
 
       <fieldset className="flex flex-col gap-2" disabled={pending || isSelf}>
         <legend className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">

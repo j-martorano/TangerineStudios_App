@@ -311,6 +311,14 @@ export const fetchEditors = unstable_cache(
   { tags: [CACHE_TAGS.editors] }
 );
 
+/** Cuenta de la app vinculada a un editor (ver editors.user_id). */
+export type EditorAccount = {
+  id: string;
+  email: string;
+  displayName: string | null;
+  disabled: boolean;
+};
+
 export type EditorWithCount = EditorRow & {
   project_count: number;
   clients: ClientMini[];
@@ -318,10 +326,11 @@ export type EditorWithCount = EditorRow & {
   payment_methods: EditorPaymentMethod[];
   tiers: PaymentTier[];
   discord_link_token: string | null;
+  account: EditorAccount | null;
 };
 
 const EDITOR_FULL_SELECT =
-  "id, name, contact_links, discord_id, discord_link_token, docs_url, payment_type, rate, flat_amount, disabled_at, created_at, project_editors(count), client_editors(payment_type, rate, flat_amount, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct)), editor_payment_methods(method_id, info, method:payment_methods(id, name, icon, color)), editor_payment_tiers(min_minutes, max_minutes, amount)";
+  "id, name, contact_links, discord_id, discord_link_token, docs_url, payment_type, rate, flat_amount, disabled_at, created_at, user_id, account:profiles(id, email, display_name, disabled), project_editors(count), client_editors(payment_type, rate, flat_amount, client:clients(id, name, color, payment_type, agreed_price, retainer_discount_pct)), editor_payment_methods(method_id, info, method:payment_methods(id, name, icon, color)), editor_payment_tiers(min_minutes, max_minutes, amount)";
 
 function mapEditor(
   e: {
@@ -336,6 +345,13 @@ function mapEditor(
     rate: number | null;
     flat_amount: number | null;
     created_at: string;
+    user_id?: string | null;
+    account?: {
+      id: string;
+      email: string;
+      display_name: string | null;
+      disabled: boolean;
+    } | null;
     project_editors?: { count: number }[] | null;
     client_editors?:
       | {
@@ -387,6 +403,15 @@ function mapEditor(
     rate: e.rate,
     flat_amount: e.flat_amount,
     created_at: e.created_at,
+    user_id: e.user_id ?? null,
+    account: e.account
+      ? {
+          id: e.account.id,
+          email: e.account.email,
+          displayName: e.account.display_name,
+          disabled: e.account.disabled,
+        }
+      : null,
     project_count: e.project_editors?.[0]?.count ?? 0,
     clients: client_pairs.map((p) => p.client),
     client_pairs,

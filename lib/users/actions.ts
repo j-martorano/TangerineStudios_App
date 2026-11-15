@@ -1,10 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 
 import { assertAdmin } from "@/lib/auth/permissions";
 import { TAB_KEYS, type TabKey } from "@/lib/auth/tabs";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { createBotClient } from "@/lib/supabase/bot";
 import {
   knownCredentialsFor,
@@ -29,7 +30,11 @@ export type UserResult<T = undefined> =
 // "use server" Next lo trata como un valor y el módulo no carga. El tipo
 // KnownCredential se importa desde lib/vault/events.ts.
 
-const uuid = z.string().uuid("ID inválido");
+// Formato 8-4-4-4-12 sin exigir versión RFC: los ids del seed y de datos
+// importados a mano (p. ej. editores) no siempre son UUID v4.
+const uuid = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, "ID inválido");
 
 const tabsSchema = z
   .array(z.string())
@@ -40,6 +45,11 @@ const permissionsSchema = z.object({
   role: z.enum(["admin", "member"]),
   tabs: tabsSchema,
   credentialIds: z.array(uuid).default([]),
+  /**
+   * Ficha de /editors de esta cuenta. `null` desvincula; si no viene, no se
+   * toca (las acciones rápidas de la fila no lo mandan).
+   */
+  editorId: uuid.nullable().optional(),
 });
 
 export type PermissionsInput = z.input<typeof permissionsSchema>;
@@ -91,6 +101,44 @@ async function syncUserCredentials(
       targetUserId: userId,
     })),
   ]);
+  return { ok: true };
+}
+
+/** La lista de editores se cachea: cualquier cambio de vínculo la invalida. */
+function revalidateEditors() {
+  revalidateTag(CACHE_TAGS.editors, {});
+  revalidatePath("/editors");
+}
+
+/**
+ * Vincula la cuenta con su ficha de editor, o la desvincula con `null`. Un
+ * editor tiene una sola cuenta y una cuenta un solo editor: si el editor ya es
+ * de otra persona, error; si la cuenta tenía otro editor, se suelta.
+ */
+async function linkEditor(
+  userId: string,
+  editorId: string | null
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = createBotClient();
+  if (editorId) {
+    const { data: editor } = await sb
+      .from("editors")
+      .select("id, name, user_id")
+      .eq("id", editorId)
+      .maybeSingle();
+    if (!editor) return { ok: false, error: "Ese editor no existe" };
+    if (editor.user_id && editor.user_id !== userId) {
+      return { ok: false, error: `${editor.name} ya tiene su propia cuenta` };
+    }
+  }
+  const clear = sb.from("editors").update({ user_id: null }).eq("user_id", userId);
+  const { error: clearError } = await (editorId ? clear.neq("id", editorId) : clear);
+  if (clearError) return { ok: false, error: clearError.message };
+  if (editorId) {
+    const { error } = await sb.from("editors").update({ user_id: userId }).eq("id", editorId);
+    if (error) return { ok: false, error: error.message };
+  }
+  revalidateEditors();
   return { ok: true };
 }
 
@@ -149,16 +197,19 @@ export async function createUser(
     return { ok: false, error: `No se pudo crear el usuario: ${profileError.message}` };
   }
 
+  const warnings: string[] = [];
+  if (d.editorId) {
+    const link = await linkEditor(created.user.id, d.editorId);
+    if (!link.ok) warnings.push(`No se pudo vincular con el editor (${link.error}). Hacelo desde «Permisos».`);
+  }
   const access = await syncUserCredentials(created.user.id, d.credentialIds, guard.viewer.id);
+  if (!access.ok) {
+    warnings.push(`No se pudieron asignar las credenciales (${access.error}). Asignalas desde «Permisos».`);
+  }
   revalidateUsers();
   return {
     ok: true,
-    data: {
-      tempPassword,
-      warning: access.ok
-        ? null
-        : `No se pudieron asignar las credenciales (${access.error}). Asignalas desde «Permisos».`,
-    },
+    data: { tempPassword, warning: warnings.length > 0 ? warnings.join(" ") : null },
   };
 }
 
@@ -214,6 +265,12 @@ export async function updateUserPermissions(
   if (!access.ok) {
     return { ok: false, error: `Las pestañas se guardaron, pero no las credenciales: ${access.error}` };
   }
+  if (d.editorId !== undefined) {
+    const link = await linkEditor(userId, d.editorId);
+    if (!link.ok) {
+      return { ok: false, error: `Los permisos se guardaron, pero no el vínculo con el editor: ${link.error}` };
+    }
+  }
 
   // Lo que puede ver después: admin ve todo; si no, solo con la pestaña Bóveda
   // y las credenciales tildadas.
@@ -246,7 +303,8 @@ async function revokeAllAccess(userId: string, actorId: string): Promise<void> {
  * pantalla le proponga a Joaco rotarlo.
  */
 export async function disableUser(
-  userId: string
+  userId: string,
+  opts: { disableEditor?: boolean } = {}
 ): Promise<UserResult<{ knownCredentials: KnownCredential[]; warning: string | null }>> {
   const guard = await assertAdmin();
   if (!guard.ok) return guard;
@@ -281,15 +339,30 @@ export async function disableUser(
   });
 
   await revokeAllAccess(userId, guard.viewer.id);
+
+  // Si es un editor, opcionalmente su ficha también deja de ofrecerse en las
+  // listas (igual que «Deshabilitar» en /editors). Sus proyectos no se tocan.
+  let editorWarning: string | null = null;
+  if (opts.disableEditor === true) {
+    const { error } = await sb
+      .from("editors")
+      .update({ disabled_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .is("disabled_at", null);
+    if (error) editorWarning = `No se pudo deshabilitar su ficha de editor (${error.message}).`;
+    revalidateEditors();
+  }
+
   revalidateUsers();
+  const warnings = [
+    banError
+      ? `Ya no puede usar la app, pero no se pudo bloquear su login (${banError.message}). Probá «Sacar» de nuevo.`
+      : null,
+    editorWarning,
+  ].filter((w): w is string => w != null);
   return {
     ok: true,
-    data: {
-      knownCredentials,
-      warning: banError
-        ? `Ya no puede usar la app, pero no se pudo bloquear su login (${banError.message}). Probá «Sacar» de nuevo.`
-        : null,
-    },
+    data: { knownCredentials, warning: warnings.length > 0 ? warnings.join(" ") : null },
   };
 }
 
