@@ -76,7 +76,7 @@ export function QuickBadges({
   }
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-1", className)}>
+    <div className={cn("flex select-none flex-wrap items-center gap-1", className)}>
       {shown.length === 0 && emptyLabel ? emptyLabel : null}
       {shown.map((o) => (
         <Badge key={o.id} variant="secondary" className="gap-1 pr-1 font-normal">
