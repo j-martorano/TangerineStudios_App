@@ -237,7 +237,7 @@ export function VaultView({
           </p>
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
           {credentials.map((c) => {
             const secret = revealed[c.id];
             const audience = audienceOf(c);
