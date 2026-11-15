@@ -23,7 +23,7 @@ export default async function ConfiguracionPage() {
     ]);
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 p-4 md:p-5">
+    <main className="flex w-full flex-col gap-10 p-4 md:p-5">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">
           Configuración

@@ -30,17 +30,13 @@ export default async function FacturasPage() {
     );
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-5">
-      <header className="flex items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">Facturas</h1>
-            <AmountsToggle />
-          </div>
+    <main className="flex w-full flex-col gap-6 p-4 md:p-5">
+      <header className="flex flex-wrap items-baseline justify-between gap-3">
+        <div className="flex items-baseline gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight">Facturas</h1>
+          <AmountsToggle className="self-center" />
           <p className="text-sm text-muted-foreground">
-            {invoices.length === 0
-              ? "No hay facturas generadas aún."
-              : `${invoices.length} factura${invoices.length === 1 ? "" : "s"} en total.`}
+            {invoices.length} factura{invoices.length === 1 ? "" : "s"}
           </p>
         </div>
         <NewInvoiceButton projects={projects} clients={clients} />
