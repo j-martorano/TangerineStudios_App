@@ -44,7 +44,7 @@ import {
 import type { KnownCredential } from "@/lib/vault/events";
 import type { AppUser, EditorChoice } from "@/lib/users/queries";
 import { QuickBadges } from "@/components/quick-badges";
-import { TAB_DESCRIPTIONS, VISIBLE_TABS, isTabKey } from "@/lib/auth/tabs";
+import { VISIBLE_TABS, isTabKey } from "@/lib/auth/tabs";
 
 import { TempPasswordDialog, type TempPassword } from "./temp-password-dialog";
 import { UserPermissionsForm, type PermissionsValue } from "./user-permissions-form";
@@ -273,11 +273,7 @@ export function UsersManager({ users, credentials, editors, currentUserId, appUr
                   ) : (
                     <QuickBadges
                       selected={VISIBLE_TABS.filter((t) => u.tabs.includes(t.key)).map((t) => t.key)}
-                      options={VISIBLE_TABS.map((t) => ({
-                        id: t.key,
-                        label: t.label,
-                        hint: TAB_DESCRIPTIONS[t.key],
-                      }))}
+                      options={VISIBLE_TABS.map((t) => ({ id: t.key, label: t.label }))}
                       onChange={(next) => quickUpdate(u, { tabs: next })}
                       addLabel="Pestaña"
                       emptyLabel={

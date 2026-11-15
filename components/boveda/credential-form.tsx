@@ -15,6 +15,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createCredential, updateCredential } from "@/lib/vault/actions";
 import { generatePassword } from "@/lib/vault/password";
@@ -149,19 +156,26 @@ function FormBody({
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="cred-kind">Servicio</Label>
-            <select
-              id="cred-kind"
+            <Select
               value={kind}
-              onChange={(e) => changeKind(e.target.value as CredentialKind)}
-              className="h-8 rounded-lg border border-input bg-input/30 px-2 text-sm"
+              onValueChange={(v) => {
+                if (v) changeKind(v as CredentialKind);
+              }}
               disabled={pending}
             >
-              {CREDENTIAL_KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {KIND_LABEL[k]}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="cred-kind" className="w-full">
+                <SelectValue>
+                  {(v: string | null) => (v ? KIND_LABEL[v as CredentialKind] : "")}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {CREDENTIAL_KINDS.map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {KIND_LABEL[k]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="cred-name">Nombre</Label>
