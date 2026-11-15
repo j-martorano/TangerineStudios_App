@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   BellIcon,
+  CheckIcon,
+  CopyIcon,
   EyeIcon,
   EyeOffIcon,
   ExternalLinkIcon,
@@ -16,7 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
+import { QuickBadges } from "@/components/quick-badges";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -32,6 +34,7 @@ import {
   deleteCredential,
   markVaultNotificationsRead,
   revealSecret,
+  updateCredentialAccess,
 } from "@/lib/vault/actions";
 import { KIND_LABEL } from "@/lib/vault/presets";
 import type {
@@ -94,6 +97,7 @@ export function VaultView({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [revealed, setRevealed] = useState<Record<string, string>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   // ?rotar=<id> (viene de «Sacar» en Usuarios) abre la guía directamente.
   const [rotating, setRotating] = useState<CredentialSummary | null>(() =>
@@ -118,6 +122,12 @@ export function VaultView({
     return () => Object.values(t).forEach(clearTimeout);
   }, []);
 
+  function show(id: string, secret: string) {
+    setRevealed((r) => ({ ...r, [id]: secret }));
+    clearTimeout(timers.current[id]);
+    timers.current[id] = setTimeout(() => hide(id), REVEAL_MS);
+  }
+
   function reveal(id: string) {
     if (revealed[id]) {
       hide(id);
@@ -129,9 +139,54 @@ export function VaultView({
         toast.error(res.error);
         return;
       }
-      setRevealed((r) => ({ ...r, [id]: res.data.secret }));
-      clearTimeout(timers.current[id]);
-      timers.current[id] = setTimeout(() => hide(id), REVEAL_MS);
+      show(id, res.data.secret);
+    });
+  }
+
+  /** Copia la contraseña sin mostrarla. Queda registrado igual que verla. */
+  function copySecret(c: CredentialSummary) {
+    startTransition(async () => {
+      let secret = revealed[c.id];
+      if (!secret) {
+        const res = await revealSecret(c.id);
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        secret = res.data.secret;
+      }
+      try {
+        await navigator.clipboard.writeText(secret);
+        setCopiedId(c.id);
+        setTimeout(() => setCopiedId((cur) => (cur === c.id ? null : cur)), 1500);
+      } catch {
+        // Sin permiso de portapapeles: se muestra para copiarla a mano.
+        show(c.id, secret);
+        toast.error("No se pudo copiar. Te la muestro para que la copies a mano.");
+      }
+    });
+  }
+
+  /** Acción rápida: cambia quién ve una credencial desde los badges de la card. */
+  function changeAccess(c: CredentialSummary, next: string[]): Promise<boolean> {
+    return new Promise((resolve) => {
+      startTransition(async () => {
+        const res = await updateCredentialAccess(c.id, next);
+        if (!res.ok) {
+          toast.error(res.error);
+          resolve(false);
+          return;
+        }
+        resolve(true);
+        const revoked = res.data.revokedNames;
+        if (revoked.length > 0) {
+          toast.warning(`${revoked.join(", ")} ya no ve${revoked.length > 1 ? "n" : ""} ${c.name}`, {
+            description: "Pero conoce la contraseña actual. Rotala para cerrarle el acceso.",
+            duration: 15000,
+            action: { label: "Rotar ahora", onClick: () => setRotating(c) },
+          });
+        }
+      });
     });
   }
 
@@ -163,8 +218,14 @@ export function VaultView({
   }
 
   const unread = notifications.filter((n) => !n.readAt);
-  const audienceOf = (c: CredentialSummary & { userIds?: string[] }) =>
-    (c.userIds ?? []).map((id) => nameOf(id));
+  // A quién se le puede dar acceso desde la card. Quien no tiene la pestaña
+  // Bóveda puede quedar marcado (p. ej. para cuando se la den) pero no la ve.
+  const accessOptions = activeUsers.map((u) => ({
+    id: u.id,
+    label: u.name,
+    hint: u.hasVaultTab ? undefined : "No tiene la pestaña Bóveda: no la va a ver",
+    warning: u.hasVaultTab ? undefined : "No tiene la pestaña Bóveda: dásela en Usuarios",
+  }));
   // A quién le llega el aviso al rotar: la misma regla que el trigger
   // vault_notify_rotation (habilitado y con la pestaña Bóveda o admin).
   const notifiedOf = (c: CredentialSummary & { userIds?: string[] }) =>
@@ -240,7 +301,6 @@ export function VaultView({
         <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
           {credentials.map((c) => {
             const secret = revealed[c.id];
-            const audience = audienceOf(c);
             return (
               <article
                 key={c.id}
@@ -279,8 +339,22 @@ export function VaultView({
                 {secret ? (
                   <SecretValue value={secret} />
                 ) : (
-                  <div className="rounded-md border bg-muted/40 px-3 py-2 font-mono text-sm tracking-widest text-muted-foreground">
-                    ••••••••••••
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1 rounded-md border bg-muted/40 px-3 py-2 font-mono text-sm tracking-widest text-muted-foreground">
+                      ••••••••••••
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copySecret(c)}
+                      disabled={pending || !configured}
+                      aria-label="Copiar contraseña"
+                      title="Copiar la contraseña sin mostrarla"
+                    >
+                      {copiedId === c.id ? <CheckIcon className="text-[#37FF62]" /> : <CopyIcon />}
+                      {copiedId === c.id ? "Copiada" : "Copiar"}
+                    </Button>
                   </div>
                 )}
 
@@ -336,17 +410,16 @@ export function VaultView({
                 ) : null}
 
                 {isAdmin ? (
-                  <div className="flex flex-wrap items-center gap-1 border-t border-border/50 pt-2 text-xs text-muted-foreground">
-                    <UsersIcon className="size-3" />
-                    {audience.length === 0 ? (
-                      "Solo admins"
-                    ) : (
-                      audience.map((n) => (
-                        <Badge key={n} variant="secondary" className="font-normal">
-                          {n}
-                        </Badge>
-                      ))
-                    )}
+                  <div className="flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2 text-xs text-muted-foreground">
+                    <UsersIcon className="size-3 shrink-0" />
+                    <QuickBadges
+                      selected={c.userIds ?? []}
+                      options={accessOptions}
+                      onChange={(next) => changeAccess(c, next)}
+                      addLabel="Dar acceso"
+                      emptyLabel={<span>Solo admins</span>}
+                      disabled={pending}
+                    />
                   </div>
                 ) : null}
               </article>

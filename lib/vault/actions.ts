@@ -222,15 +222,44 @@ export async function updateCredential(
     return { ok: false, error: `Los datos se guardaron, pero no quién la ve: ${access.error}` };
   }
 
-  let revokedNames: string[] = [];
-  if (access.removed.length > 0) {
-    const { data: people } = await sb
-      .from("profiles")
-      .select("email, display_name")
-      .in("id", access.removed);
-    revokedNames = (people ?? []).map((p) => p.display_name || p.email);
-  }
-  return { ok: true, data: { revokedNames } };
+  return { ok: true, data: { revokedNames: await namesOf(access.removed) } };
+}
+
+/**
+ * Cambia solo quién ve una credencial (acción rápida desde los badges de la
+ * card). Como updateCredential, devuelve los nombres de quienes la perdieron.
+ */
+export async function updateCredentialAccess(
+  id: string,
+  userIds: string[]
+): Promise<VaultResult<{ revokedNames: string[] }>> {
+  const guard = await assertAdmin();
+  if (!guard.ok) return guard;
+  if (!uuid.safeParse(id).success) return { ok: false, error: "ID inválido" };
+  const parsed = z.array(uuid).safeParse(userIds);
+  if (!parsed.success) return { ok: false, error: "ID inválido" };
+
+  const { data: cred } = await createBotClient()
+    .from("vault_credentials")
+    .select("name")
+    .eq("id", id)
+    .maybeSingle();
+  if (!cred) return { ok: false, error: "La credencial no existe" };
+
+  const access = await syncAccess(id, cred.name, parsed.data, guard.viewer.id);
+  revalidateVault();
+  if (!access.ok) return access;
+  return { ok: true, data: { revokedNames: await namesOf(access.removed) } };
+}
+
+/** Nombres (o emails) de usuarios, para el aviso de «rotala». */
+async function namesOf(userIds: string[]): Promise<string[]> {
+  if (userIds.length === 0) return [];
+  const { data } = await createBotClient()
+    .from("profiles")
+    .select("email, display_name")
+    .in("id", userIds);
+  return (data ?? []).map((p) => p.display_name || p.email);
 }
 
 export async function deleteCredential(id: string): Promise<VaultResult> {

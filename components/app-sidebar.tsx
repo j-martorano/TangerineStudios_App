@@ -78,7 +78,9 @@ export function AppSidebar({ tabs, isAdmin, userLabel, vaultUnread }: Props) {
     badge: t.key === "boveda" && vaultUnread > 0 ? vaultUnread : null,
   }));
   if (isAdmin) {
-    items.push({
+    // Usuarios va justo arriba de la Bóveda; Configuración queda siempre última.
+    const at = items.findIndex((i) => i.href === "/boveda" || i.href === "/configuracion");
+    items.splice(at === -1 ? items.length : at, 0, {
       href: "/usuarios",
       label: "Usuarios",
       exact: false,

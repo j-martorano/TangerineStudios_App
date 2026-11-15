@@ -43,7 +43,8 @@ import {
 } from "@/lib/users/actions";
 import type { KnownCredential } from "@/lib/vault/events";
 import type { AppUser } from "@/lib/users/queries";
-import { VISIBLE_TABS } from "@/lib/auth/tabs";
+import { QuickBadges } from "@/components/quick-badges";
+import { TAB_DESCRIPTIONS, VISIBLE_TABS, isTabKey } from "@/lib/auth/tabs";
 
 import { UserPermissionsForm, type PermissionsValue } from "./user-permissions-form";
 
@@ -119,6 +120,40 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
           credentials: res.data.lostCredentials,
         });
       }
+    });
+  }
+
+  /**
+   * Acción rápida desde los badges de la fila: manda los permisos completos
+   * con el cambio aplicado. Si la persona pierde contraseñas que conocía,
+   * aparece la misma lista para rotar que en el formulario.
+   */
+  function quickUpdate(
+    user: AppUser,
+    patch: { tabs?: string[]; credentialIds?: string[] }
+  ): Promise<boolean> {
+    return new Promise((resolve) => {
+      startTransition(async () => {
+        const res = await updateUserPermissions(user.id, {
+          displayName: user.displayName,
+          role: user.role,
+          tabs: (patch.tabs ?? user.tabs).filter(isTabKey),
+          credentialIds: patch.credentialIds ?? credsOf(user.id).map((c) => c.id),
+        });
+        if (!res.ok) {
+          toast.error(res.error);
+          resolve(false);
+          return;
+        }
+        resolve(true);
+        if (res.data.lostCredentials.length > 0) {
+          setResult({
+            kind: "rotate",
+            name: user.displayName ?? user.email,
+            credentials: res.data.lostCredentials,
+          });
+        }
+      });
     });
   }
 
@@ -204,23 +239,63 @@ export function UsersManager({ users, credentials, currentUserId, appUrl }: Prop
                 {u.displayName ? (
                   <span className="text-xs text-muted-foreground">{u.email}</span>
                 ) : null}
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap items-center gap-1">
                   {u.role === "admin" ? (
                     <span className="text-xs text-muted-foreground">Todas las pestañas</span>
-                  ) : u.tabs.length === 0 ? (
-                    <span className="text-xs text-[#FF3737]">Sin pestañas: no ve nada</span>
+                  ) : u.disabled ? (
+                    u.tabs.length === 0 ? (
+                      <span className="text-xs text-[#FF3737]">Sin pestañas: no ve nada</span>
+                    ) : (
+                      VISIBLE_TABS.filter((t) => u.tabs.includes(t.key)).map((t) => (
+                        <Badge key={t.key} variant="secondary" className="font-normal">
+                          {t.label}
+                        </Badge>
+                      ))
+                    )
                   ) : (
-                    VISIBLE_TABS.filter((t) => u.tabs.includes(t.key)).map((t) => (
-                      <Badge key={t.key} variant="secondary" className="font-normal">
-                        {t.label}
-                      </Badge>
-                    ))
+                    <QuickBadges
+                      selected={VISIBLE_TABS.filter((t) => u.tabs.includes(t.key)).map((t) => t.key)}
+                      options={VISIBLE_TABS.map((t) => ({
+                        id: t.key,
+                        label: t.label,
+                        hint: TAB_DESCRIPTIONS[t.key],
+                      }))}
+                      onChange={(next) => quickUpdate(u, { tabs: next })}
+                      addLabel="Pestaña"
+                      emptyLabel={
+                        <span className="text-xs text-[#FF3737]">Sin pestañas: no ve nada</span>
+                      }
+                      disabled={pending}
+                    />
                   )}
                 </div>
-                {creds.length > 0 ? (
-                  <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                    <KeyRoundIcon className="size-3 text-primary" />
-                    {creds.map((c) => c.name).join(" · ")}
+                {u.disabled ? (
+                  creds.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                      <KeyRoundIcon className="size-3 text-primary" />
+                      {creds.map((c) => c.name).join(" · ")}
+                    </div>
+                  ) : null
+                ) : credentials.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                    <KeyRoundIcon className="size-3 shrink-0 text-primary" />
+                    <QuickBadges
+                      selected={creds.map((c) => c.id)}
+                      options={credentials.map((c) => ({
+                        id: c.id,
+                        label: c.name,
+                        hint:
+                          u.role === "admin"
+                            ? "Un admin ya la ve: marcarla solo le manda los avisos al rotarla"
+                            : undefined,
+                      }))}
+                      onChange={(next) => quickUpdate(u, { credentialIds: next })}
+                      addLabel="Contraseña"
+                      disabled={pending}
+                    />
+                    {u.role !== "admin" && creds.length > 0 && !u.tabs.includes("boveda") ? (
+                      <span className="text-primary">Sin la pestaña Bóveda no las ve</span>
+                    ) : null}
                   </div>
                 ) : null}
                 <span className="text-[11px] text-muted-foreground/70">
