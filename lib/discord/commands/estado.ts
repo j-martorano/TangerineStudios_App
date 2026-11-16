@@ -2,7 +2,7 @@
  * /estado [proyecto]
  *
  * Shows detailed info about a specific project.
- * Editors can only view their own projects; Joaco can view any.
+ * Editors can only view their own projects; the admin can view any.
  *
  * The `proyecto` option uses Discord autocomplete — Discord calls this
  * same handler with type=4 (AUTOCOMPLETE) to populate the dropdown.
@@ -23,14 +23,14 @@ export async function autocompleteEstado(
   if (!user) return autocomplete([]);
 
   const supabase = createBotClient();
-  const isJoaco = user.id === process.env.DISCORD_JOACO_ID;
+  const isAdmin = user.id === process.env.DISCORD_JOACO_ID;
   const focused = getFocusedOption(interaction);
   const search = (focused?.value ? String(focused.value) : "").toLowerCase();
 
   type Row = { id: string; title: string; client_name: string | null; phase: string };
   let rows: Row[] = [];
 
-  if (isJoaco) {
+  if (isAdmin) {
     const { data } = await supabase
       .from("projects")
       .select("id, title, client_name, phase")
@@ -84,11 +84,11 @@ export async function handleEstado(
   if (!projectId) return replyError("Tenés que seleccionar un proyecto.");
 
   const supabase = createBotClient();
-  const isJoaco = user.id === process.env.DISCORD_JOACO_ID;
+  const isAdmin = user.id === process.env.DISCORD_JOACO_ID;
 
   // Resolve editor
   let editorId: string | null = null;
-  if (!isJoaco) {
+  if (!isAdmin) {
     const { data: editor } = await supabase
       .from("editors")
       .select("id")
@@ -115,7 +115,7 @@ export async function handleEstado(
   }
 
   // Permission check for editors
-  if (!isJoaco) {
+  if (!isAdmin) {
     const { data: assignment } = await supabase
       .from("project_editors")
       .select("editor_id")

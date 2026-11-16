@@ -4,7 +4,7 @@
  * Submits a project for review:
  * - Moves project to "en_revision"
  * - Saves the review URL as a new revision in project_revisions
- * - Notifies the internal channel (Joaco) with the revision URL
+ * - Notifies the internal channel (admin) with the revision URL
  * - Notifies the client's Discord channel of the phase change
  */
 
@@ -27,12 +27,12 @@ export async function autocompleteTerminar(
 
   const search = (focused.value ? String(focused.value) : "").toLowerCase();
   const supabase = createBotClient();
-  const isJoaco = user.id === process.env.DISCORD_JOACO_ID;
+  const isAdmin = user.id === process.env.DISCORD_JOACO_ID;
 
   type Row = { id: string; title: string; client_name: string | null; phase: string };
   let rows: Row[] = [];
 
-  if (isJoaco) {
+  if (isAdmin) {
     const { data } = await supabase
       .from("projects")
       .select("id, title, client_name, phase")
@@ -95,13 +95,13 @@ export async function handleTerminar(
   if (!url) return replyError("Tenés que ingresar el link de revisión.");
 
   const supabase = createBotClient();
-  const isJoaco = user.id === process.env.DISCORD_JOACO_ID;
+  const isAdmin = user.id === process.env.DISCORD_JOACO_ID;
 
   // ── Resolve editor ──────────────────────────────────────────────────────
   let editorId: string | null = null;
-  let editorName = "Joaco";
+  let editorName = user.global_name ?? user.username;
 
-  if (!isJoaco) {
+  if (!isAdmin) {
     const { data: editor } = await supabase
       .from("editors")
       .select("id, name")
@@ -126,7 +126,7 @@ export async function handleTerminar(
   if (project.archived) return replyError("Ese proyecto está archivado.");
 
   // ── Permission check for editors ────────────────────────────────────────
-  if (!isJoaco) {
+  if (!isAdmin) {
     const { data: assignment } = await supabase
       .from("project_editors")
       .select("editor_id")
@@ -184,7 +184,7 @@ export async function handleTerminar(
   const client = project.client as { id: string; name: string; discord_channel_id: string | null } | null;
   const clientName = client?.name ?? project.client_name ?? undefined;
 
-  // ── Notify internal channel (Joaco) ────────────────────────────────────
+  // ── Notify internal channel (admin) ────────────────────────────────────
   await notifyRevisionSubmitted({
     projectTitle: project.title,
     projectId,
@@ -209,6 +209,6 @@ export async function handleTerminar(
   // ── Reply to editor ─────────────────────────────────────────────────────
   const clientLabel = clientName ? ` *(${clientName})*` : "";
   return reply(
-    `✅ **${project.title}**${clientLabel}\nRevisión ${revisionNumber} enviada — Joaco será notificado.`
+    `✅ **${project.title}**${clientLabel}\nRevisión ${revisionNumber} enviada — el estudio ya fue avisado.`
   );
 }

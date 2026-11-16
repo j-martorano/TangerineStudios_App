@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { changeOwnPassword } from "@/lib/auth/actions";
 
-/** Para que cada usuario cambie la contraseña temporal que le dio Joaco. */
+/** Para que cada usuario cambie la contraseña temporal que le dio el admin. */
 export function ChangePasswordDialog({
   open,
   onOpenChange,

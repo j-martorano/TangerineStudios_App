@@ -1,10 +1,10 @@
 /**
  * Guías de rotación por tipo de servicio: links directos y pasos que la app le
- * muestra a Joaco cuando aprieta "Rotar contraseña".
+ * muestra al admin cuando aprieta "Rotar contraseña".
  *
  * Los links de Google y Adobe son las páginas oficiales de cada cuenta. Para
  * Frame.io no hay una URL directa estable de "cambiar contraseña", así que se
- * abre la app y se indica el camino; si Joaco encuentra el link exacto lo
+ * abre la app y se indica el camino; si el admin encuentra el link exacto lo
  * puede guardar en la credencial ("Link para cambiar la contraseña") y la guía
  * lo usa en vez del genérico.
  */

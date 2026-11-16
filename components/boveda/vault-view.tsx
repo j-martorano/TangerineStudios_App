@@ -294,7 +294,7 @@ export function VaultView({
           <p className="text-sm text-muted-foreground">
             {isAdmin
               ? "No hay credenciales cargadas. Empezá con «Nueva credencial»."
-              : "No tenés ninguna contraseña habilitada. Si necesitás una, pedísela a Joaco."}
+              : "No tenés ninguna contraseña habilitada. Si necesitás una, pedísela a un administrador."}
           </p>
         </div>
       ) : (

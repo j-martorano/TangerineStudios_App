@@ -1,6 +1,6 @@
 /**
  * Catálogo de pestañas de la app. Es la fuente única para:
- *   - qué pestañas puede otorgar Joaco en /usuarios,
+ *   - qué pestañas puede otorgar el admin en /usuarios,
  *   - qué ítems muestra el sidebar,
  *   - qué ruta protege cada guard (`requireTab`).
  *
@@ -36,7 +36,7 @@ export const VISIBLE_TABS = TABS.filter((t) => !HIDDEN_TABS.has(t.key));
 export const TAB_KEYS: readonly TabKey[] = TABS.map((t) => t.key);
 
 /**
- * Qué ve y qué puede tocar quien tiene cada pestaña. Lo lee Joaco al dar
+ * Qué ve y qué puede tocar quien tiene cada pestaña. Lo lee el admin al dar
  * permisos, así que menciona lo que se "arrastra" (p. ej. el formulario de
  * proyecto deja crear clientes). Coincide con lib/auth/scopes.ts y con la
  * función SQL tabs_for.

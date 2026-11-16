@@ -2,7 +2,7 @@
  * /proyectos
  *
  * Lists active projects for the calling editor.
- * Joaco sees all projects; editors see only their assigned ones.
+ * The admin sees all projects; editors see only their assigned ones.
  */
 
 import type { DiscordInteraction } from "../types";
@@ -18,13 +18,13 @@ export async function handleProyectos(
   if (!user) return replyError("No se pudo identificar tu usuario de Discord.");
 
   const supabase = createBotClient();
-  const isJoaco = user.id === process.env.DISCORD_JOACO_ID;
+  const isAdmin = user.id === process.env.DISCORD_JOACO_ID;
 
   // ── Resolve editor ──────────────────────────────────────────────────────
   let editorId: string | null = null;
-  let displayName = "Joaco";
+  let displayName = user.global_name ?? user.username;
 
-  if (!isJoaco) {
+  if (!isAdmin) {
     const { data: editor } = await supabase
       .from("editors")
       .select("id, name")
@@ -33,7 +33,7 @@ export async function handleProyectos(
 
     if (!editor) {
       return replyError(
-        "No estás vinculado al bot.\nPedile a Joaco tu código de vinculación y usá `/vincular [código]`."
+        "No estás vinculado al bot.\nPedile a un administrador tu código de vinculación y usá `/vincular [código]`."
       );
     }
     editorId = editor.id;
@@ -50,7 +50,7 @@ export async function handleProyectos(
 
   let projects: ProjectRow[] = [];
 
-  if (isJoaco) {
+  if (isAdmin) {
     const { data } = await supabase
       .from("projects")
       .select("id, title, phase, client_name")
@@ -72,7 +72,7 @@ export async function handleProyectos(
   }
 
   if (projects.length === 0) {
-    const msg = isJoaco
+    const msg = isAdmin
       ? "No hay proyectos activos."
       : "No tenés proyectos asignados actualmente.";
     return reply(`📭 ${msg}`);
@@ -100,7 +100,7 @@ export async function handleProyectos(
     }
   }
 
-  const header = isJoaco
+  const header = isAdmin
     ? `📋 **Proyectos activos** (${projects.length})\n`
     : `📋 **Proyectos de ${displayName}** (${projects.length})\n`;
 

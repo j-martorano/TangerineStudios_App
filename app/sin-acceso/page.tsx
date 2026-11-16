@@ -31,7 +31,7 @@ export default async function SinAccesoPage() {
         <div className="flex flex-col gap-2">
           <h1 className="text-xl font-semibold">Todavía no tenés acceso</h1>
           <p className="text-sm text-muted-foreground">
-            Tu cuenta no tiene ninguna sección habilitada. Pedile a Joaco que te
+            Tu cuenta no tiene ninguna sección habilitada. Pedile a un administrador que te
             dé acceso.
           </p>
         </div>

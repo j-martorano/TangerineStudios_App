@@ -282,7 +282,7 @@ export async function deleteCredential(id: string): Promise<VaultResult> {
 }
 
 /**
- * Guarda la contraseña nueva después de que Joaco la cambió en el servicio.
+ * Guarda la contraseña nueva después de que el admin la cambió en el servicio.
  * Sube `version`, y el trigger `vault_notify_rotation` de la base crea un
  * aviso para quienes tienen acceso a esta credencial y pueden abrir la Bóveda.
  * Devuelve los nombres de las personas avisadas.

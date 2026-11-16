@@ -3,8 +3,8 @@
  *
  * Moves a project to a new phase.
  * - Editors can only move their own projects.
- * - Joaco can move any project.
- * - After moving, notifies Joaco's channel.
+ * - The admin can move any project.
+ * - After moving, notifies the internal channel.
  *
  * `proyecto` uses Discord autocomplete (type=4 interactions).
  * `fase` uses static choices defined in the command registration.
@@ -17,7 +17,7 @@ import { PHASE_EMOJI, PHASE_LABEL, notifyProjectMoved } from "../notify";
 import { createBotClient } from "@/lib/supabase/bot";
 import { nowISOArgentina } from "@/lib/argentina-date";
 
-// Phases editors can move TO (excludes por_asignar — that's Joaco's job)
+// Phases editors can move TO (excludes por_asignar — that's the admin's job)
 const MOVEABLE_PHASES = ["editando", "en_revision", "terminado"] as const;
 type MoveablePhase = (typeof MOVEABLE_PHASES)[number];
 
@@ -30,7 +30,7 @@ export async function autocompleteMover(
   if (!user) return autocomplete([]);
 
   const supabase = createBotClient();
-  const isJoaco = user.id === process.env.DISCORD_JOACO_ID;
+  const isAdmin = user.id === process.env.DISCORD_JOACO_ID;
   const focused = getFocusedOption(interaction);
 
   // Only autocomplete the "proyecto" option, not "fase"
@@ -41,7 +41,7 @@ export async function autocompleteMover(
   type Row = { id: string; title: string; client_name: string | null; phase: string };
   let rows: Row[] = [];
 
-  if (isJoaco) {
+  if (isAdmin) {
     const { data } = await supabase
       .from("projects")
       .select("id, title, client_name, phase")
@@ -106,13 +106,13 @@ export async function handleMover(
   }
 
   const supabase = createBotClient();
-  const isJoaco = user.id === process.env.DISCORD_JOACO_ID;
+  const isAdmin = user.id === process.env.DISCORD_JOACO_ID;
 
   // ── Resolve editor ──────────────────────────────────────────────────────
   let editorId: string | null = null;
-  let editorName = "Joaco";
+  let editorName = user.global_name ?? user.username;
 
-  if (!isJoaco) {
+  if (!isAdmin) {
     const { data: editor } = await supabase
       .from("editors")
       .select("id, name")
@@ -141,7 +141,7 @@ export async function handleMover(
   }
 
   // ── Permission check for editors ────────────────────────────────────────
-  if (!isJoaco) {
+  if (!isAdmin) {
     const { data: assignment } = await supabase
       .from("project_editors")
       .select("editor_id")
@@ -186,7 +186,7 @@ export async function handleMover(
   const fromLabel = `${PHASE_EMOJI[project.phase] ?? "?"} ${PHASE_LABEL[project.phase] ?? project.phase}`;
   const toLabel   = `${PHASE_EMOJI[newPhase]      ?? "?"} ${PHASE_LABEL[newPhase]      ?? newPhase}`;
 
-  // ── Notify Joaco ──────────────────────────────────────────────────────────
+  // ── Notify admin ──────────────────────────────────────────────────────────
   // Direct fetch (proven reliable in serverless). The higher-level
   // notifyProjectMoved() helper had a silent failure in production.
   const notifyChannelId = process.env.DISCORD_NOTIFY_CHANNEL_ID;

@@ -37,7 +37,7 @@ create policy "profiles_select_own"
   using (id = auth.uid());
 
 -- Los usuarios que ya existen hoy tenían acceso total: quedan como admin para
--- que nadie pierda acceso con este deploy. Joaco después baja de rol a quien
+-- que nadie pierda acceso con este deploy. El admin después baja de rol a quien
 -- corresponda desde /usuarios.
 insert into public.profiles (id, email, role)
 select id, coalesce(email, ''), 'admin'

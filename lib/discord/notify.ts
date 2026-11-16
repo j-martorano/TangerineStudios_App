@@ -64,7 +64,7 @@ export async function notifyChannel(opts: NotifyOptions): Promise<void> {
 
 // ── Specific notifications ─────────────────────────────────────────────────
 
-/** Notifies Joaco when an editor moves a project via the bot. */
+/** Notifies the admin when an editor moves a project via the bot. */
 export async function notifyProjectMoved(opts: {
   projectTitle: string;
   projectId: string;
@@ -89,7 +89,7 @@ export async function notifyProjectMoved(opts: {
   });
 }
 
-/** Notifies Joaco when a new editor links their Discord account. */
+/** Notifies the admin when a new editor links their Discord account. */
 export async function notifyEditorLinked(opts: {
   editorName: string;
   discordUsername: string;

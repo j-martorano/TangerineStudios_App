@@ -10,7 +10,7 @@ export type PaymentMethod = {
   color: string;
 };
 
-/** Método de un editor concreto, con la info que guardó Joaco para él. */
+/** Método de un editor concreto, con la info que guardó el admin para él. */
 export type EditorPaymentMethod = {
   method_id: string;
   name: string;

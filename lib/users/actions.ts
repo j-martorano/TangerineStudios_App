@@ -155,7 +155,7 @@ async function countActiveAdmins(): Promise<number> {
 
 /**
  * Crea la cuenta con una contraseña temporal generada. La contraseña se
- * devuelve UNA vez para que Joaco se la pase a la persona; no queda guardada.
+ * devuelve UNA vez para que el admin se la pase a la persona; no queda guardada.
  */
 export async function createUser(
   input: CreateUserInput
@@ -300,7 +300,7 @@ async function revokeAllAccess(userId: string, actorId: string): Promise<void> {
  * Saca a una persona: la app la deja afuera desde el próximo click, se le
  * bloquea el login, pierde todas las credenciales de la Bóveda, y se devuelve
  * lo que conocía (lo que tenía habilitado y lo que vio alguna vez) para que la
- * pantalla le proponga a Joaco rotarlo.
+ * pantalla le proponga al admin rotarlo.
  */
 export async function disableUser(
   userId: string,

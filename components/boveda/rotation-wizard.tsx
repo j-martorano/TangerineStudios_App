@@ -32,7 +32,7 @@ type Props = {
  *   1. muestra la contraseña actual (los servicios la piden para cambiarla),
  *   2. genera la nueva,
  *   3. lista los pasos con links directos al servicio,
- *   4. recién cuando Joaco confirma que la cambió, la guarda. Si cierra antes,
+ *   4. recién cuando el admin confirma que la cambió, la guarda. Si cierra antes,
  *      no cambia nada y la vieja sigue siendo la válida.
  */
 export function RotationWizard({ credential, audience, onClose }: Props) {

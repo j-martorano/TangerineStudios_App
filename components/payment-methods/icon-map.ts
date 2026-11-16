@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 /**
- * Catálogo de íconos disponibles para métodos de pago. Si Joaco crea un
+ * Catálogo de íconos disponibles para métodos de pago. Si el admin crea un
  * método con uno de estos keys, lo mostramos. Si elige ninguno, hacemos
  * heurística por nombre como fallback.
  */
@@ -88,7 +88,7 @@ export function iconForKey(
 }
 
 /**
- * Paleta predefinida para los chips de métodos de pago. Joaco elige uno y
+ * Paleta predefinida para los chips de métodos de pago. El admin elige uno y
  * el chip se pinta con su color (tint suave de fondo).
  */
 export const PAYMENT_METHOD_COLORS: readonly string[] = [
