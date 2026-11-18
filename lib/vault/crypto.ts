@@ -31,12 +31,21 @@ function getKey(): Buffer {
 }
 
 export function isVaultConfigured(): boolean {
-  try {
-    getKey();
-    return true;
-  } catch {
-    return false;
-  }
+  return vaultKeyProblem() === null;
+}
+
+export type VaultKeyProblem = { kind: "missing" } | { kind: "invalid"; bytes: number };
+
+/**
+ * Por qué no se puede usar la clave, o null si está bien. Es para el aviso
+ * de /boveda: distingue "la variable no llegó a este deploy" de "está pero
+ * el valor no es una clave de 32 bytes", que se arreglan distinto.
+ */
+export function vaultKeyProblem(): VaultKeyProblem | null {
+  const raw = process.env.VAULT_ENCRYPTION_KEY;
+  if (!raw || raw.trim() === "") return { kind: "missing" };
+  const bytes = Buffer.from(raw, "base64").length;
+  return bytes === 32 ? null : { kind: "invalid", bytes };
 }
 
 const IV_BYTES = 12;

@@ -51,6 +51,8 @@ import { CopyButton, SecretValue } from "./secret-tools";
 type Props = {
   isAdmin: boolean;
   configured: boolean;
+  /** Detalle del problema con la clave cuando configured es false */
+  configNote: string | null;
   credentials: (CredentialSummary & { userIds?: string[] })[];
   notifications: VaultNotification[];
   users: VaultUser[];
@@ -88,6 +90,7 @@ const REVEAL_MS = 30_000;
 export function VaultView({
   isAdmin,
   configured,
+  configNote,
   credentials,
   notifications,
   users,
@@ -261,8 +264,12 @@ export function VaultView({
 
       {!configured ? (
         <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
-          Falta configurar la clave de cifrado (<code>VAULT_ENCRYPTION_KEY</code>) en
-          Vercel. Sin ella la Bóveda no puede guardar ni mostrar contraseñas.
+          <p className="font-medium">
+            Falta la clave de cifrado: la Bóveda no puede guardar ni mostrar contraseñas.
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            {configNote ?? "Configurá VAULT_ENCRYPTION_KEY en Vercel y hacé un Redeploy."}
+          </p>
         </div>
       ) : null}
 
