@@ -83,7 +83,7 @@ export default async function OutreachPage({ searchParams }: { searchParams: Sea
         </div>
       ) : null}
 
-      <OutreachTable messages={yearMessages} platforms={config.platforms} />
+      <OutreachTable messages={yearMessages} platforms={config.platforms} resources={config.resources} />
     </main>
   );
 }

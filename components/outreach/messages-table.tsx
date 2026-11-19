@@ -6,10 +6,10 @@ import { toast } from "sonner";
 
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { currentMonthKeyAR } from "@/lib/argentina-date";
-import type { OutreachMessage, OutreachPlatform } from "@/lib/outreach/types";
+import type { OutreachMessage, OutreachPlatform, OutreachResource } from "@/lib/outreach/types";
 
 import { MessageDialog } from "./message-dialog";
-import { PlatformChip, ResourceChip } from "./platform-icon";
+import { PlatformChip, ResourceChip, currentIconFor } from "./platform-icon";
 import { QuickStatusBadge } from "./status-badge";
 
 /**
@@ -51,9 +51,11 @@ const ROW_BG_ODD = "#232323";
 type Props = {
   messages: OutreachMessage[];
   platforms: OutreachPlatform[];
+  /** Páginas y samples actuales, para mostrar sus íconos de hoy. */
+  resources: OutreachResource[];
 };
 
-export function OutreachTable({ messages, platforms }: Props) {
+export function OutreachTable({ messages, platforms, resources }: Props) {
   const [editing, setEditing] = useState<OutreachMessage | null>(null);
   const currentMK = currentMonthKeyAR();
 
@@ -120,6 +122,7 @@ export function OutreachTable({ messages, platforms }: Props) {
                     key={m.id}
                     message={m}
                     platform={m.platformId ? (platformById.get(m.platformId) ?? null) : null}
+                    resources={resources}
                     bg={idx % 2 === 0 ? ROW_BG_EVEN : ROW_BG_ODD}
                     onOpen={() => setEditing(m)}
                   />
@@ -133,6 +136,7 @@ export function OutreachTable({ messages, platforms }: Props) {
       <MessageDialog
         message={editing}
         platforms={platforms}
+        resources={resources}
         open={editing != null}
         onClose={() => setEditing(null)}
       />
@@ -143,11 +147,13 @@ export function OutreachTable({ messages, platforms }: Props) {
 function MessageRow({
   message: m,
   platform,
+  resources,
   bg,
   onOpen,
 }: {
   message: OutreachMessage;
   platform: OutreachPlatform | null;
+  resources: OutreachResource[];
   bg: string;
   onOpen: () => void;
 }) {
@@ -204,7 +210,7 @@ function MessageRow({
         {m.resources.length > 0 ? (
           <div className="flex flex-wrap gap-1">
             {m.resources.map((r, i) => (
-              <ResourceChip key={i} kind={r.kind} name={r.name} iconUrl={r.iconUrl} />
+              <ResourceChip key={i} kind={r.kind} name={r.name} iconUrl={currentIconFor(r, resources)} />
             ))}
           </div>
         ) : (

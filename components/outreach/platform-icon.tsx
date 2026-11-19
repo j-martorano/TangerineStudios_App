@@ -119,6 +119,19 @@ export function ResourceIcon({
   return <GlobeIcon className={cn("size-4 shrink-0 text-[#FFAC37]", className)} aria-hidden />;
 }
 
+/**
+ * Ícono para un recurso tal como quedó guardado en un mensaje: si la página o
+ * el sample todavía existe (mismo link), se usa su ícono actual, así los
+ * mensajes viejos también muestran los íconos que se configuraron después.
+ * Si se borró, queda la copia que guardó el mensaje.
+ */
+export function currentIconFor(
+  snapshot: { url: string; iconUrl: string | null },
+  resources: readonly { url: string; iconUrl: string | null }[]
+): string | null {
+  return resources.find((r) => r.url === snapshot.url)?.iconUrl ?? snapshot.iconUrl;
+}
+
 /** Tinte suave de fondo a partir del color de la plataforma. */
 export function platformTint(hex: string): string {
   return `${hex}1f`;

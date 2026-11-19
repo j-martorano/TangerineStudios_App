@@ -40,10 +40,11 @@ import {
   STATUS_LABEL,
   type OutreachMessage,
   type OutreachPlatform,
+  type OutreachResource,
   type OutreachStatus,
 } from "@/lib/outreach/types";
 
-import { PlatformIcon, ResourceChip } from "./platform-icon";
+import { PlatformIcon, ResourceChip, currentIconFor } from "./platform-icon";
 import { StatusBadge } from "./status-badge";
 
 const NONE = "__none";
@@ -51,17 +52,19 @@ const NONE = "__none";
 type Props = {
   message: OutreachMessage | null;
   platforms: OutreachPlatform[];
+  /** Páginas y samples actuales, para mostrar sus íconos de hoy. */
+  resources: OutreachResource[];
   open: boolean;
   onClose: () => void;
 };
 
 /** Ver, editar o borrar un mensaje del registro. */
-export function MessageDialog({ message, platforms, open, onClose }: Props) {
+export function MessageDialog({ message, platforms, resources, open, onClose }: Props) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         {open && message ? (
-          <FormBody key={message.id} message={message} platforms={platforms} onClose={onClose} />
+          <FormBody key={message.id} message={message} platforms={platforms} resources={resources} onClose={onClose} />
         ) : null}
       </DialogContent>
     </Dialog>
@@ -71,10 +74,12 @@ export function MessageDialog({ message, platforms, open, onClose }: Props) {
 function FormBody({
   message,
   platforms,
+  resources,
   onClose,
 }: {
   message: OutreachMessage;
   platforms: OutreachPlatform[];
+  resources: OutreachResource[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -224,7 +229,7 @@ function FormBody({
           <Label>Páginas y samples que fueron</Label>
           <div className="flex flex-wrap gap-1">
             {message.resources.map((r, i) => (
-              <ResourceChip key={i} kind={r.kind} name={r.name} iconUrl={r.iconUrl} href={r.url} />
+              <ResourceChip key={i} kind={r.kind} name={r.name} iconUrl={currentIconFor(r, resources)} href={r.url} />
             ))}
           </div>
         </div>
