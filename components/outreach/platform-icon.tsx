@@ -159,7 +159,7 @@ export function PlatformChip({
         className
       )}
     >
-      <PlatformIcon icon={icon} iconUrl={iconUrl} className="size-3" style={{ color }} />
+      <PlatformIcon icon={icon} iconUrl={iconUrl} className="size-3.5" style={{ color }} />
       {name}
     </span>
   );
@@ -184,7 +184,7 @@ export function ResourceChip({
   );
   const inner = (
     <>
-      <ResourceIcon kind={kind} iconUrl={iconUrl} className="size-3" />
+      <ResourceIcon kind={kind} iconUrl={iconUrl} className="size-3.5" />
       {name}
     </>
   );
