@@ -535,6 +535,156 @@ export type Database = {
         }
         Relationships: []
       }
+      outreach_messages: {
+        Row: {
+          client_name: string
+          created_at: string
+          created_by: string | null
+          id: string
+          message: string
+          notes: string | null
+          platform_id: string | null
+          platform_name: string
+          post_url: string | null
+          resources: Json
+          sent_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_name: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message: string
+          notes?: string | null
+          platform_id?: string | null
+          platform_name?: string
+          post_url?: string | null
+          resources?: Json
+          sent_at: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_name?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message?: string
+          notes?: string | null
+          platform_id?: string | null
+          platform_name?: string
+          post_url?: string | null
+          resources?: Json
+          sent_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_messages_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_messages_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "outreach_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      outreach_platforms: {
+        Row: {
+          color: string
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+          sort_order: number
+          template: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+          template?: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+          template?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      outreach_resources: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          kind: string
+          name: string
+          sort_order: number
+          tag: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          kind: string
+          name: string
+          sort_order?: number
+          tag: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          sort_order?: number
+          tag?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      outreach_settings: {
+        Row: {
+          default_template: string
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          default_template?: string
+          id?: number
+          updated_at?: string
+        }
+        Update: {
+          default_template?: string
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payment_methods: {
         Row: {
           color: string

@@ -16,6 +16,7 @@ export const TABS = [
   { key: "editors", href: "/editors", label: "Editores", exact: false },
   { key: "finanzas", href: "/finanzas", label: "Finanzas", exact: false },
   { key: "facturas", href: "/facturas", label: "Facturas", exact: false },
+  { key: "outreach", href: "/outreach", label: "Outreach", exact: false },
   { key: "boveda", href: "/boveda", label: "Bóveda", exact: false },
   { key: "configuracion", href: "/configuracion", label: "Configuración", exact: false },
   { key: "mantenimiento", href: "/admin", label: "Mantenimiento", exact: false },
@@ -52,6 +53,8 @@ export const TAB_DESCRIPTIONS: Record<TabKey, string> = {
   editors: "Editores, lo que cobra cada uno y su vínculo con Discord.",
   finanzas: "Toda la plata: cobros, pagos, ganancia y servicios fijos.",
   facturas: "Facturas emitidas y sus PDFs.",
+  outreach:
+    "Mensajes para contactar leads: arma el texto con páginas y samples, y lleva el registro de lo enviado.",
   boveda: "Contraseñas compartidas. Cada una se habilita aparte.",
   configuracion:
     "Métodos de pago, servicios fijos y datos de facturación del estudio.",

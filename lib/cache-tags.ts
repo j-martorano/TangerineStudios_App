@@ -10,6 +10,7 @@ export const CACHE_TAGS = {
   invoices:  "invoices",
   settings:  "settings",
   templates: "templates",
+  outreach:  "outreach",
 } as const;
 
 export type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];

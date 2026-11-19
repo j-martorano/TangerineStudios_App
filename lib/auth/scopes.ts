@@ -36,6 +36,8 @@ export const SCOPES = {
   projectForm: ["dashboard", "kanban", "projects", "clients"],
   /** Backfill de fechas. */
   maintenance: ["mantenimiento"],
+  /** Outreach: plataformas, páginas, samples, plantillas y registro de mensajes. */
+  outreach: ["outreach"],
 } as const satisfies Record<string, readonly TabKey[]>;
 
 export type Scope = keyof typeof SCOPES;
