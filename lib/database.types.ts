@@ -603,38 +603,50 @@ export type Database = {
           color: string
           created_at: string
           icon: string | null
+          icon_url: string | null
           id: string
           name: string
           sort_order: number
-          template: string
+          template_id: string | null
           updated_at: string
         }
         Insert: {
           color?: string
           created_at?: string
           icon?: string | null
+          icon_url?: string | null
           id?: string
           name: string
           sort_order?: number
-          template?: string
+          template_id?: string | null
           updated_at?: string
         }
         Update: {
           color?: string
           created_at?: string
           icon?: string | null
+          icon_url?: string | null
           id?: string
           name?: string
           sort_order?: number
-          template?: string
+          template_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "outreach_platforms_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "outreach_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       outreach_resources: {
         Row: {
           created_at: string
           description: string | null
+          icon_url: string | null
           id: string
           kind: string
           name: string
@@ -646,6 +658,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
+          icon_url?: string | null
           id?: string
           kind: string
           name: string
@@ -657,6 +670,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
+          icon_url?: string | null
           id?: string
           kind?: string
           name?: string
@@ -669,18 +683,53 @@ export type Database = {
       }
       outreach_settings: {
         Row: {
-          default_template: string
+          default_template_id: string | null
           id: number
           updated_at: string
         }
         Insert: {
-          default_template?: string
+          default_template_id?: string | null
           id?: number
           updated_at?: string
         }
         Update: {
-          default_template?: string
+          default_template_id?: string | null
           id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_settings_default_template_id_fkey"
+            columns: ["default_template_id"]
+            isOneToOne: false
+            referencedRelation: "outreach_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      outreach_templates: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
           updated_at?: string
         }
         Relationships: []

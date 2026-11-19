@@ -9,7 +9,7 @@ import { currentMonthKeyAR } from "@/lib/argentina-date";
 import type { OutreachMessage, OutreachPlatform } from "@/lib/outreach/types";
 
 import { MessageDialog } from "./message-dialog";
-import { PlatformChip } from "./platform-icon";
+import { PlatformChip, ResourceChip } from "./platform-icon";
 import { QuickStatusBadge } from "./status-badge";
 
 /**
@@ -173,7 +173,7 @@ function MessageRow({
       <TableCell className="px-2 py-2.5 font-medium">{m.clientName}</TableCell>
       <TableCell className="px-2 py-2.5">
         {platform ? (
-          <PlatformChip name={platform.name} icon={platform.icon} color={platform.color} />
+          <PlatformChip name={platform.name} icon={platform.icon} iconUrl={platform.iconUrl} color={platform.color} />
         ) : m.platformName ? (
           <PlatformChip name={m.platformName} icon={null} color="#888888" />
         ) : (
@@ -204,16 +204,7 @@ function MessageRow({
         {m.resources.length > 0 ? (
           <div className="flex flex-wrap gap-1">
             {m.resources.map((r, i) => (
-              <span
-                key={i}
-                className={`rounded-full border px-2 py-0.5 text-[11px] ${
-                  r.kind === "sample"
-                    ? "border-[#37ACFF]/40 text-[#37ACFF]"
-                    : "border-[#FFAC37]/40 text-[#FFAC37]"
-                }`}
-              >
-                {r.name}
-              </span>
+              <ResourceChip key={i} kind={r.kind} name={r.name} iconUrl={r.iconUrl} />
             ))}
           </div>
         ) : (

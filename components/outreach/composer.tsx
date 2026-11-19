@@ -3,50 +3,34 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ClipboardCheckIcon,
-  CopyIcon,
-  PlusIcon,
-  RotateCcwIcon,
-  SettingsIcon,
-  XIcon,
-} from "lucide-react";
+import { ClipboardCheckIcon, CopyIcon, PlusIcon, RotateCcwIcon, SettingsIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { todayAR } from "@/lib/argentina-date";
 import { createOutreachMessage } from "@/lib/outreach/actions";
-import { renderMessage, templateFor } from "@/lib/outreach/render";
-import {
-  KIND_LABEL_PLURAL,
-  type OutreachConfig,
-  type OutreachResource,
-  type ResourceKind,
-} from "@/lib/outreach/types";
+import { renderSegments, templateFor } from "@/lib/outreach/render";
+import { KIND_LABEL_PLURAL, type OutreachConfig, type OutreachResource, type ResourceKind } from "@/lib/outreach/types";
+import { cn } from "@/lib/utils";
 
-import { PlatformIcon } from "./platform-icon";
+import { PlatformIcon, ResourceIcon } from "./platform-icon";
+import { RenderedMessage, TemplateEditor } from "./template-editor";
 
 /**
- * Constructor de mensajes. El texto sale de la plantilla (de la plataforma o
- * la default) con las etiquetas reemplazadas por el nombre, las páginas y los
- * samples elegidos. Se puede retocar a mano antes de copiar; «Registrar y
- * copiar» guarda el mensaje tal cual quedó en el registro de abajo.
+ * Constructor de mensajes. Se edita la plantilla con las etiquetas a la vista
+ * (vista «Plantilla»); «Resultado» muestra el mensaje con las etiquetas ya
+ * reemplazadas por el nombre, las páginas y los samples elegidos. Copiar y
+ * Registrar siempre usan el resultado, y dejan esa vista a la vista.
  */
 
 type Slots = Record<ResourceKind, (string | null)[]>;
+type View = "plantilla" | "resultado";
 
 export function OutreachComposer({ config }: { config: OutreachConfig }) {
-  const { platforms, resources, defaultTemplate } = config;
+  const { platforms, resources } = config;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -55,11 +39,14 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
   const [slots, setSlots] = useState<Slots>({ pagina: [], sample: [] });
   const [postUrl, setPostUrl] = useState("");
   const [sentAt, setSentAt] = useState(todayAR());
-  /** Texto editado a mano; null = se regenera solo desde la plantilla. */
-  const [manual, setManual] = useState<string | null>(null);
+  const [template, setTemplate] = useState(() => templateFor(platforms[0] ?? null, config));
+  const [templateEdited, setTemplateEdited] = useState(false);
+  const [view, setView] = useState<View>("plantilla");
 
   const platform = platforms.find((p) => p.id === platformId) ?? null;
+  const platformTemplate = templateFor(platform, config);
   const byId = useMemo(() => new Map(resources.map((r) => [r.id, r])), [resources]);
+  const knownTags = useMemo(() => resources.map((r) => r.tag), [resources]);
 
   const selected: OutreachResource[] = useMemo(
     () =>
@@ -69,17 +56,32 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
     [slots, byId]
   );
 
-  const rendered = useMemo(
+  const segments = useMemo(
     () =>
-      renderMessage(templateFor(platform, defaultTemplate), {
+      renderSegments(template, {
         clientName: clientName.trim(),
         platformName: platform?.name ?? "",
         selected,
         all: resources,
       }),
-    [platform, defaultTemplate, clientName, selected, resources]
+    [template, clientName, platform, selected, resources]
   );
-  const text = manual ?? rendered;
+  const text = segments.map((s) => s.text).join("");
+
+  function changePlatform(id: string) {
+    setPlatformId(id);
+    if (!templateEdited) {
+      setTemplate(templateFor(platforms.find((p) => p.id === id) ?? null, config));
+    }
+  }
+  function editTemplate(v: string) {
+    setTemplate(v);
+    setTemplateEdited(v !== platformTemplate);
+  }
+  function reloadTemplate() {
+    setTemplate(platformTemplate);
+    setTemplateEdited(false);
+  }
 
   function addSlot(kind: ResourceKind) {
     setSlots((s) => ({ ...s, [kind]: [...s[kind], null] }));
@@ -106,6 +108,7 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
       toast.error("El mensaje está vacío");
       return;
     }
+    setView("resultado");
     if (await copyText()) toast.success("Mensaje copiado");
   }
 
@@ -118,6 +121,7 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
       toast.error("El mensaje está vacío");
       return;
     }
+    setView("resultado");
     // Copiar primero: el portapapeles necesita el click del usuario.
     const copied = await copyText();
     startTransition(async () => {
@@ -128,7 +132,7 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
         postUrl,
         status: "enviado",
         notes: null,
-        resources: selected.map((r) => ({ kind: r.kind, name: r.name, url: r.url })),
+        resources: selected.map((r) => ({ kind: r.kind, name: r.name, url: r.url, iconUrl: r.iconUrl })),
         sentAt,
       });
       if (!res.ok) {
@@ -138,7 +142,6 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
       toast.success(copied ? "Registrado y copiado" : "Registrado (no se pudo copiar)");
       setClientName("");
       setPostUrl("");
-      setManual(null);
       setSentAt(todayAR());
       router.refresh();
     });
@@ -160,14 +163,14 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
         <div className="flex flex-col gap-1.5">
           <Label>Plataforma</Label>
           {platforms.length > 0 ? (
-            <Select value={platformId} onValueChange={(v) => v && setPlatformId(v)}>
+            <Select value={platformId} onValueChange={(v) => v && changePlatform(v)}>
               <SelectTrigger className="min-w-44">
                 <SelectValue>
                   {(v: string | null) => {
                     const p = platforms.find((x) => x.id === v);
                     return p ? (
                       <>
-                        <PlatformIcon icon={p.icon} className="size-4" style={{ color: p.color }} />
+                        <PlatformIcon icon={p.icon} iconUrl={p.iconUrl} className="size-4" style={{ color: p.color }} />
                         {p.name}
                       </>
                     ) : (
@@ -179,56 +182,70 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
               <SelectContent>
                 {platforms.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
-                    <PlatformIcon icon={p.icon} className="size-4" style={{ color: p.color }} />
+                    <PlatformIcon icon={p.icon} iconUrl={p.iconUrl} className="size-4" style={{ color: p.color }} />
                     {p.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           ) : (
-            <Link
-              href="/outreach/configuracion"
-              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-            >
+            <Link href="/outreach/configuracion" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
               Sin plataformas: creá una en Configurar
             </Link>
           )}
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="ml-auto"
-          render={<Link href="/outreach/configuracion" />}
-        >
-          <SettingsIcon data-icon="inline-start" />
-          Configurar
-        </Button>
-      </div>
 
-      <div className="relative">
-        <Textarea
-          value={text}
-          onChange={(e) => setManual(e.target.value)}
-          spellCheck={false}
-          className="min-h-56 bg-card/60 px-4 py-3 text-base leading-relaxed md:text-base"
-          placeholder="Sin plantilla: escribí el mensaje o configurá una en Configurar."
-        />
-        {manual != null ? (
-          <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-            <span>Editado a mano: no se regenera al cambiar las opciones.</span>
-            <button
-              type="button"
-              onClick={() => setManual(null)}
-              className="inline-flex items-center gap-1 text-foreground underline-offset-4 hover:underline"
-            >
-              <RotateCcwIcon className="size-3" />
-              Volver a la plantilla
-            </button>
+        <div className="ml-auto flex items-end gap-2">
+          <div className="inline-flex rounded-lg border border-border p-0.5">
+            {(["plantilla", "resultado"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setView(v)}
+                className={cn(
+                  "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                  view === v ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {v === "plantilla" ? "Plantilla" : "Resultado"}
+              </button>
+            ))}
           </div>
-        ) : null}
+          <Button variant="ghost" size="sm" render={<Link href="/outreach/configuracion" />}>
+            <SettingsIcon data-icon="inline-start" />
+            Configurar
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-[1fr_1fr_auto] md:items-start">
+      {view === "plantilla" ? (
+        <div>
+          <TemplateEditor
+            value={template}
+            onChange={editTemplate}
+            knownTags={knownTags}
+            minHeightClass="min-h-56"
+            placeholder="Sin plantilla: escribí el mensaje acá o creá una en Configurar."
+          />
+          {templateEdited ? (
+            <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Plantilla retocada para este mensaje.</span>
+              <button
+                type="button"
+                onClick={reloadTemplate}
+                className="inline-flex items-center gap-1 text-foreground underline-offset-4 hover:underline"
+              >
+                <RotateCcwIcon className="size-3" />
+                Volver a la de {platform?.name ?? "la plataforma"}
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <RenderedMessage segments={segments} minHeightClass="min-h-56" />
+      )}
+
+      <div className="flex flex-wrap items-start gap-6">
         {(["pagina", "sample"] as const).map((kind) => (
           <SlotColumn
             key={kind}
@@ -241,7 +258,7 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
           />
         ))}
 
-        <div className="flex w-full flex-col gap-2 md:w-72">
+        <div className="ml-auto flex w-full flex-col gap-2 sm:w-80">
           <div className="grid grid-cols-[1fr_auto] gap-2">
             <Input
               value={postUrl}
@@ -289,17 +306,27 @@ function SlotColumn({
 }) {
   const label = kind === "sample" ? "#Samples" : KIND_LABEL_PLURAL[kind];
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex w-full flex-col gap-2 sm:w-60">
       <Label>{label}</Label>
       {slots.map((id, i) => {
         // Un recurso elegido en otro slot no se vuelve a ofrecer.
         const taken = new Set(slots.filter((v, j) => v && j !== i));
         return (
-          <div key={i} className="flex items-center gap-1.5">
+          <div key={i} className="flex items-center gap-1">
             <Select value={id} onValueChange={(v) => onSet(i, v)}>
               <SelectTrigger className="w-full">
                 <SelectValue>
-                  {(v: string | null) => options.find((o) => o.id === v)?.name ?? "Elegir…"}
+                  {(v: string | null) => {
+                    const o = options.find((x) => x.id === v);
+                    return o ? (
+                      <>
+                        <ResourceIcon kind={kind} iconUrl={o.iconUrl} className="size-4" />
+                        {o.name}
+                      </>
+                    ) : (
+                      "Elegir…"
+                    );
+                  }}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -307,27 +334,20 @@ function SlotColumn({
                   .filter((o) => !taken.has(o.id))
                   .map((o) => (
                     <SelectItem key={o.id} value={o.id}>
+                      <ResourceIcon kind={kind} iconUrl={o.iconUrl} className="size-4" />
                       {o.name}
                     </SelectItem>
                   ))}
               </SelectContent>
             </Select>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onRemove(i)}
-              aria-label="Quitar"
-            >
+            <Button variant="ghost" size="icon-sm" onClick={() => onRemove(i)} aria-label="Quitar">
               <XIcon />
             </Button>
           </div>
         );
       })}
       {options.length === 0 ? (
-        <Link
-          href="/outreach/configuracion"
-          className="text-xs text-muted-foreground underline-offset-4 hover:underline"
-        >
+        <Link href="/outreach/configuracion" className="text-xs text-muted-foreground underline-offset-4 hover:underline">
           No hay {KIND_LABEL_PLURAL[kind].toLowerCase()} configurados
         </Link>
       ) : (

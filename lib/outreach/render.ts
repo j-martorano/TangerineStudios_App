@@ -1,5 +1,6 @@
 import {
   KIND_TAG_PREFIX,
+  type OutreachConfig,
   type OutreachPlatform,
   type OutreachResource,
   type ResourceKind,
@@ -38,15 +39,19 @@ export const FIXED_TAGS: readonly { tag: string; help: string }[] = [
   { tag: "SAMPLES", help: "Los samples elegidos, uno por línea (Nombre: link)" },
 ];
 
+const FIXED_TAG_SET = new Set(FIXED_TAGS.map((t) => t.tag));
 const TAG_RE = /\{([A-Z0-9_]+)\}/g;
 
-/** Plantilla efectiva: la de la plataforma si tiene, si no la default. */
+/**
+ * Plantilla efectiva de una plataforma: la suya si eligió una, si no la
+ * default general. Devuelve el cuerpo ("" si no hay ninguna).
+ */
 export function templateFor(
-  platform: Pick<OutreachPlatform, "template"> | null | undefined,
-  defaultTemplate: string
+  platform: Pick<OutreachPlatform, "templateId"> | null | undefined,
+  config: Pick<OutreachConfig, "templates" | "defaultTemplateId">
 ): string {
-  const own = platform?.template ?? "";
-  return own.trim() ? own : defaultTemplate;
+  const id = platform?.templateId ?? config.defaultTemplateId;
+  return config.templates.find((t) => t.id === id)?.body ?? "";
 }
 
 /**
@@ -70,38 +75,95 @@ export function tagsIn(template: string): string[] {
   return [...out];
 }
 
+/** Pedazo de una plantilla: texto suelto o una etiqueta (conocida o no). */
+export type TemplateSegment =
+  | { kind: "text"; text: string }
+  | { kind: "tag"; text: string; tag: string; known: boolean };
+
+/** Parte la plantilla en texto y etiquetas, para pintarlas en el editor. */
+export function templateSegments(
+  template: string,
+  knownTags: Iterable<string>
+): TemplateSegment[] {
+  const known = new Set<string>([...FIXED_TAG_SET, ...knownTags]);
+  const out: TemplateSegment[] = [];
+  let last = 0;
+  for (const m of template.matchAll(TAG_RE)) {
+    const at = m.index ?? 0;
+    if (at > last) out.push({ kind: "text", text: template.slice(last, at) });
+    out.push({ kind: "tag", text: m[0], tag: m[1], known: known.has(m[1]) });
+    last = at + m[0].length;
+  }
+  if (last < template.length) out.push({ kind: "text", text: template.slice(last) });
+  return out;
+}
+
+/** Pedazo del mensaje final: texto suelto, un valor que vino de una etiqueta, o una etiqueta sin resolver. */
+export type RenderedSegment =
+  | { kind: "text"; text: string }
+  | { kind: "value"; text: string; tag: string }
+  | { kind: "unresolved"; text: string; tag: string };
+
 function listLines(items: RenderContext["selected"]): string {
   return items.map((r) => `${r.name}: ${r.url}`).join("\n");
 }
 
-export function renderMessage(template: string, ctx: RenderContext): string {
+/**
+ * Arma el mensaje final como segmentos (para mostrar qué se reemplazó).
+ * `renderMessage` es lo mismo pero en texto plano.
+ */
+export function renderSegments(template: string, ctx: RenderContext): RenderedSegment[] {
   const pages = ctx.selected.filter((r) => r.kind === "pagina");
   const samples = ctx.selected.filter((r) => r.kind === "sample");
   const byTag = new Map(ctx.all.map((r) => [r.tag, r.url]));
-
   const lists: Record<string, string> = {
     PAGINAS: listLines(pages),
     SAMPLES: listLines(samples),
   };
 
+  const out: RenderedSegment[] = [];
+  const push = (seg: RenderedSegment) => {
+    const prev = out[out.length - 1];
+    if (seg.kind === "text" && prev?.kind === "text") prev.text += seg.text;
+    else out.push(seg);
+  };
+
   const lines = template.split(/\r?\n/);
-  const out: string[] = [];
+  let blankRun = 0;
   for (const line of lines) {
     const trimmed = line.trim();
     // Línea que es solo una lista vacía: se va entera.
     const soloTag = /^\{(PAGINAS|SAMPLES)\}$/.exec(trimmed);
     if (soloTag && lists[soloTag[1]] === "") continue;
 
-    out.push(
-      line.replace(TAG_RE, (whole, tag: string) => {
-        if (tag === "NOMBRE") return ctx.clientName;
-        if (tag === "PLATAFORMA") return ctx.platformName;
-        if (tag in lists) return lists[tag];
-        const url = byTag.get(tag);
-        return url ?? whole;
-      })
-    );
+    // Las líneas borradas no deberían dejar más de un renglón en blanco.
+    if (trimmed === "") {
+      blankRun += 1;
+      if (blankRun > 1) continue;
+    } else {
+      blankRun = 0;
+    }
+
+    if (out.length > 0) push({ kind: "text", text: "\n" });
+    let last = 0;
+    for (const m of line.matchAll(TAG_RE)) {
+      const at = m.index ?? 0;
+      if (at > last) push({ kind: "text", text: line.slice(last, at) });
+      const tag = m[1];
+      if (tag === "NOMBRE") push({ kind: "value", text: ctx.clientName, tag });
+      else if (tag === "PLATAFORMA") push({ kind: "value", text: ctx.platformName, tag });
+      else if (tag in lists) push({ kind: "value", text: lists[tag], tag });
+      else if (byTag.has(tag)) push({ kind: "value", text: byTag.get(tag)!, tag });
+      else push({ kind: "unresolved", text: m[0], tag });
+      last = at + m[0].length;
+    }
+    if (last < line.length) push({ kind: "text", text: line.slice(last) });
   }
-  // Las líneas borradas no deberían dejar más de un renglón en blanco.
-  return out.join("\n").replace(/\n{3,}/g, "\n\n");
+  return out;
+}
+
+export function renderMessage(template: string, ctx: RenderContext): string {
+  return renderSegments(template, ctx)
+    .map((s) => s.text)
+    .join("");
 }

@@ -1,39 +1,54 @@
 -- Outreach: constructor de mensajes para contactar leads + registro de lo enviado.
 --
--- 1. outreach_settings   → mensaje default (plantilla con etiquetas) cuando la
---                          plataforma no tiene uno propio.
--- 2. outreach_platforms  → dónde se manda (Reddit, Instagram…). Cada una puede
---                          tener su propia plantilla.
+-- 1. outreach_templates  → mensajes base (plantillas con etiquetas). Hay una
+--                          biblioteca: cada plataforma elige cuál usa y
+--                          outreach_settings dice cuál es el default general.
+-- 2. outreach_platforms  → dónde se manda (Reddit, Instagram…), con ícono
+--                          (del catálogo o una imagen subida) y su plantilla.
 -- 3. outreach_resources  → páginas (web, portfolio) y samples (ejemplos de
 --                          edición, en general links). Cada uno tiene una
 --                          etiqueta ({PAGINA_TANGERINE_WEB}, {SAMPLE_TALKING_HEAD})
 --                          que la plantilla puede usar para que el link se
---                          pegue solo. `description` queda para que una IA
---                          elija qué samples van según el lead.
+--                          pegue solo, y un ícono (favicon detectado o imagen
+--                          subida). `description` queda para que una IA elija
+--                          qué samples van según el lead.
 -- 4. outreach_messages   → registro de cada mensaje enviado, con su estado.
 --                          Guarda una copia de los recursos usados (jsonb) y
 --                          del nombre de la plataforma para que el historial
 --                          sobreviva a borrados.
 --
--- Permisos: las cuatro tablas son de la pestaña "outreach" (tabs_for +
--- apply_tab_policies). Las lecturas de la app van con service role.
+-- Permisos: las cinco tablas son de la pestaña "outreach" (tabs_for +
+-- apply_tab_policies). Las lecturas de la app van con service role. Los
+-- íconos subidos van al bucket público `outreach-icons` (escribe el servidor).
 
-create table public.outreach_settings (
-  id               integer primary key default 1 check (id = 1),
-  default_template text not null default '',
-  updated_at       timestamptz not null default now()
-);
-
-create table public.outreach_platforms (
+create table public.outreach_templates (
   id         uuid primary key default gen_random_uuid(),
   name       text not null unique,
-  icon       text,
-  color      text not null default '#888888',
-  -- Plantilla propia. Vacía = usa la default de outreach_settings.
-  template   text not null default '',
+  body       text not null default '',
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+create table public.outreach_settings (
+  id                  integer primary key default 1 check (id = 1),
+  default_template_id uuid references public.outreach_templates(id) on delete set null,
+  updated_at          timestamptz not null default now()
+);
+
+create table public.outreach_platforms (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null unique,
+  -- key del catálogo de íconos (components/outreach/platform-icon.tsx)
+  icon        text,
+  -- imagen subida o detectada; si está, le gana al catálogo
+  icon_url    text,
+  color       text not null default '#888888',
+  -- Plantilla de esta plataforma. Null = usa la default de outreach_settings.
+  template_id uuid references public.outreach_templates(id) on delete set null,
+  sort_order  integer not null default 0,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
 );
 
 create table public.outreach_resources (
@@ -43,6 +58,7 @@ create table public.outreach_resources (
   url         text not null,
   -- Etiqueta para la plantilla, sin llaves: PAGINA_TANGERINE_WEB, SAMPLE_TALKING_HEAD.
   tag         text not null unique check (tag ~ '^[A-Z0-9_]+$'),
+  icon_url    text,
   description text,
   sort_order  integer not null default 0,
   created_at  timestamptz not null default now(),
@@ -59,7 +75,7 @@ create table public.outreach_messages (
   status        text not null default 'enviado'
                   check (status in ('enviado', 'respondido', 'interesado', 'cliente', 'descartado')),
   notes         text,
-  -- [{ "kind": "sample", "name": "Talking-head", "url": "https://…" }, …]
+  -- [{ "kind": "sample", "name": "Talking-head", "url": "https://…", "iconUrl": null }, …]
   resources     jsonb not null default '[]'::jsonb,
   -- Fecha de envío (calendario de Argentina). Decide en qué mes se muestra.
   sent_at       date not null,
@@ -71,6 +87,9 @@ create table public.outreach_messages (
 create index outreach_messages_sent_at_idx
   on public.outreach_messages (sent_at desc, created_at desc);
 
+create trigger outreach_templates_set_updated_at
+  before update on public.outreach_templates
+  for each row execute function set_updated_at();
 create trigger outreach_settings_set_updated_at
   before update on public.outreach_settings
   for each row execute function set_updated_at();
@@ -87,11 +106,14 @@ create trigger outreach_messages_set_updated_at
 -- ---------------------------------------------------------------------------
 -- Permisos
 -- ---------------------------------------------------------------------------
+alter table public.outreach_templates enable row level security;
 alter table public.outreach_settings  enable row level security;
 alter table public.outreach_platforms enable row level security;
 alter table public.outreach_resources enable row level security;
 alter table public.outreach_messages  enable row level security;
 
+create policy "auth all outreach_templates" on public.outreach_templates
+  for all to authenticated using (true) with check (true);
 create policy "auth all outreach_settings" on public.outreach_settings
   for all to authenticated using (true) with check (true);
 create policy "auth all outreach_platforms" on public.outreach_platforms
@@ -155,28 +177,41 @@ as $$
         else array['configuracion'] end
     when tbl in ('project_templates', 'sub_clients') then
       array['dashboard', 'kanban', 'projects', 'clients']
-    when tbl in ('outreach_settings', 'outreach_platforms', 'outreach_resources', 'outreach_messages') then
+    when tbl in ('outreach_templates', 'outreach_settings', 'outreach_platforms',
+                 'outreach_resources', 'outreach_messages') then
       array['outreach']
     else '{}'::text[]
   end;
 $$;
 
+select public.apply_tab_policies('outreach_templates');
 select public.apply_tab_policies('outreach_settings');
 select public.apply_tab_policies('outreach_platforms');
 select public.apply_tab_policies('outreach_resources');
 select public.apply_tab_policies('outreach_messages');
 
+-- Íconos subidos (plataformas, páginas y samples). Bucket público de lectura;
+-- escribe solo el servidor (service role), así que no hace falta policy de
+-- escritura para usuarios.
+insert into storage.buckets (id, name, public)
+values ('outreach-icons', 'outreach-icons', true)
+on conflict (id) do nothing;
+
 -- ---------------------------------------------------------------------------
 -- Datos iniciales (se editan desde /outreach/configuracion)
 -- ---------------------------------------------------------------------------
-insert into public.outreach_settings (id, default_template) values (1,
+insert into public.outreach_templates (id, name, body, sort_order) values
+  ('a0000000-0000-4000-8000-000000000001', 'Default',
 'Hey! I''m Yoako, a senior video editor with 8 years of experience, and I run Tangerine Studios, where we specialize in YouTube videos, Meta ads, and social media content. We excel particularly at [educational YouTube videos], and that''s why I found your post very interesting!
 
 We have a team of editors, so we can handle more content than a single editor while keeping everything consistent and high-quality. I''m personally involved in every project, bringing my editing expertise and strategic input to help make each video as engaging and effective as possible.
 
 Here''s our website and a couple of examples relevant to what you''re looking for:
 {PAGINAS}
-{SAMPLES}');
+{SAMPLES}', 1);
+
+insert into public.outreach_settings (id, default_template_id)
+values (1, 'a0000000-0000-4000-8000-000000000001');
 
 insert into public.outreach_platforms (name, icon, color, sort_order) values
   ('Reddit',    'message-circle', '#FF4500', 1),

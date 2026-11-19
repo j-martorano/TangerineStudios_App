@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import {
   AtSignIcon,
   BotIcon,
@@ -28,13 +29,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { createElement } from "react";
-
 import { cn } from "@/lib/utils";
+import type { ResourceKind } from "@/lib/outreach/types";
 
 /**
  * Catálogo de íconos para plataformas de outreach. lucide no trae logos de
- * marcas, así que son genéricos: el color de la plataforma hace el resto.
+ * marcas, así que son genéricos: el color de la plataforma hace el resto. Si
+ * la plataforma tiene una imagen subida (`iconUrl`), se usa esa.
  */
 export const PLATFORM_ICONS: readonly { key: string; Icon: LucideIcon; label: string }[] = [
   { key: "message-circle", Icon: MessageCircleIcon, label: "Chat / Reddit" },
@@ -71,15 +72,29 @@ export function platformIconFor(key: string | null | undefined): LucideIcon {
   return (key && BY_KEY.get(key)) || GlobeIcon;
 }
 
+/** Ícono por defecto de los samples (el que propuso Joaco). */
+export const SAMPLE_DEFAULT_ICON = "/outreach/sample.svg";
+
+/** Imagen cuadrada con esquinas redondeadas (favicon, ícono subido…). */
+function IconImage({ src, className }: { src: string; className?: string }) {
+  // <img> a propósito: son URLs de Storage o favicons externos y next/image
+  // exigiría declarar cada dominio.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt="" className={cn("size-4 shrink-0 rounded-[30%] object-cover", className)} />;
+}
+
 export function PlatformIcon({
   icon,
+  iconUrl,
   className,
   style,
 }: {
   icon: string | null | undefined;
+  iconUrl?: string | null;
   className?: string;
   style?: React.CSSProperties;
 }) {
+  if (iconUrl) return <IconImage src={iconUrl} className={className} />;
   // createElement en vez de <Icon/>: el ícono sale de un mapa y la regla
   // react-hooks/static-components no distingue eso de crear un componente.
   return createElement(platformIconFor(icon), {
@@ -87,6 +102,21 @@ export function PlatformIcon({
     style,
     "aria-hidden": true,
   });
+}
+
+/** Ícono de una página o sample: la imagen guardada, o el default de su tipo. */
+export function ResourceIcon({
+  kind,
+  iconUrl,
+  className,
+}: {
+  kind: ResourceKind;
+  iconUrl: string | null | undefined;
+  className?: string;
+}) {
+  if (iconUrl) return <IconImage src={iconUrl} className={className} />;
+  if (kind === "sample") return <IconImage src={SAMPLE_DEFAULT_ICON} className={className} />;
+  return <GlobeIcon className={cn("size-4 shrink-0 text-[#FFAC37]", className)} aria-hidden />;
 }
 
 /** Tinte suave de fondo a partir del color de la plataforma. */
@@ -98,11 +128,13 @@ export function platformTint(hex: string): string {
 export function PlatformChip({
   name,
   icon,
+  iconUrl,
   color,
   className,
 }: {
   name: string;
   icon: string | null | undefined;
+  iconUrl?: string | null;
   color: string;
   className?: string;
 }) {
@@ -114,8 +146,40 @@ export function PlatformChip({
         className
       )}
     >
-      <PlatformIcon icon={icon} className="size-3" style={{ color }} />
+      <PlatformIcon icon={icon} iconUrl={iconUrl} className="size-3" style={{ color }} />
       {name}
     </span>
+  );
+}
+
+/** Chip de una página o sample (naranja / azul) con su ícono. */
+export function ResourceChip({
+  kind,
+  name,
+  iconUrl,
+  href,
+}: {
+  kind: ResourceKind;
+  name: string;
+  iconUrl: string | null | undefined;
+  href?: string;
+}) {
+  const cls = cn(
+    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] whitespace-nowrap",
+    kind === "sample" ? "border-[#37ACFF]/40 text-[#37ACFF]" : "border-[#FFAC37]/40 text-[#FFAC37]",
+    href && "hover:underline"
+  );
+  const inner = (
+    <>
+      <ResourceIcon kind={kind} iconUrl={iconUrl} className="size-3" />
+      {name}
+    </>
+  );
+  return href ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={cls} onClick={(e) => e.stopPropagation()}>
+      {inner}
+    </a>
+  ) : (
+    <span className={cls}>{inner}</span>
   );
 }

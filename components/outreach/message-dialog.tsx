@@ -43,7 +43,7 @@ import {
   type OutreachStatus,
 } from "@/lib/outreach/types";
 
-import { PlatformIcon } from "./platform-icon";
+import { PlatformIcon, ResourceChip } from "./platform-icon";
 import { StatusBadge } from "./status-badge";
 
 const NONE = "__none";
@@ -165,7 +165,7 @@ function FormBody({
                   if (p) {
                     return (
                       <>
-                        <PlatformIcon icon={p.icon} className="size-4" style={{ color: p.color }} />
+                        <PlatformIcon icon={p.icon} iconUrl={p.iconUrl} className="size-4" style={{ color: p.color }} />
                         {p.name}
                       </>
                     );
@@ -178,7 +178,7 @@ function FormBody({
               <SelectItem value={NONE}>{orphanName || "Sin plataforma"}</SelectItem>
               {platforms.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
-                  <PlatformIcon icon={p.icon} className="size-4" style={{ color: p.color }} />
+                  <PlatformIcon icon={p.icon} iconUrl={p.iconUrl} className="size-4" style={{ color: p.color }} />
                   {p.name}
                 </SelectItem>
               ))}
@@ -224,19 +224,7 @@ function FormBody({
           <Label>Páginas y samples que fueron</Label>
           <div className="flex flex-wrap gap-1">
             {message.resources.map((r, i) => (
-              <a
-                key={i}
-                href={r.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`rounded-full border px-2 py-0.5 text-[11px] hover:underline ${
-                  r.kind === "sample"
-                    ? "border-[#37ACFF]/40 text-[#37ACFF]"
-                    : "border-[#FFAC37]/40 text-[#FFAC37]"
-                }`}
-              >
-                {r.name}
-              </a>
+              <ResourceChip key={i} kind={r.kind} name={r.name} iconUrl={r.iconUrl} href={r.url} />
             ))}
           </div>
         </div>

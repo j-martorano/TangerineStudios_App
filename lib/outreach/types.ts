@@ -59,14 +59,24 @@ export function isResourceKind(v: string): v is ResourceKind {
   return (RESOURCE_KINDS as readonly string[]).includes(v);
 }
 
+/** Mensaje base con etiquetas. Las plataformas eligen uno de estos. */
+export type OutreachTemplate = {
+  id: string;
+  name: string;
+  body: string;
+  sortOrder: number;
+};
+
 export type OutreachPlatform = {
   id: string;
   name: string;
-  /** key del catálogo de íconos (components/outreach/platform-icons.ts) */
+  /** key del catálogo de íconos (components/outreach/platform-icon.tsx) */
   icon: string | null;
+  /** imagen subida o detectada; si está, le gana al catálogo */
+  iconUrl: string | null;
   color: string;
-  /** Plantilla propia; vacía = usa la default. */
-  template: string;
+  /** Plantilla de esta plataforma; null = usa la default general. */
+  templateId: string | null;
   sortOrder: number;
 };
 
@@ -77,6 +87,7 @@ export type OutreachResource = {
   url: string;
   /** Sin llaves: PAGINA_TANGERINE_WEB. En la plantilla va {PAGINA_TANGERINE_WEB}. */
   tag: string;
+  iconUrl: string | null;
   /** Qué muestra (para elegir a mano hoy y para la IA mañana). */
   description: string | null;
   sortOrder: number;
@@ -87,6 +98,7 @@ export type ResourceSnapshot = {
   kind: ResourceKind;
   name: string;
   url: string;
+  iconUrl: string | null;
 };
 
 export type OutreachMessage = {
@@ -105,7 +117,9 @@ export type OutreachMessage = {
 };
 
 export type OutreachConfig = {
+  templates: OutreachTemplate[];
+  /** Plantilla general, para plataformas sin una propia. */
+  defaultTemplateId: string | null;
   platforms: OutreachPlatform[];
   resources: OutreachResource[];
-  defaultTemplate: string;
 };

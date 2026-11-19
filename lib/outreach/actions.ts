@@ -1,16 +1,19 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 
 import { assertScope } from "@/lib/auth/permissions";
 import { CACHE_TAGS } from "@/lib/cache-tags";
+import { createBotClient } from "@/lib/supabase/bot";
 import { createClient } from "@/lib/supabase/server";
 import { OUTREACH_STATUSES, RESOURCE_KINDS, type OutreachStatus } from "./types";
 
 /**
  * Escrituras de Outreach. Todas con la sesión del usuario (RLS por pestaña)
- * y detrás de assertScope("outreach").
+ * y detrás de assertScope("outreach"). Los íconos van al bucket público
+ * `outreach-icons` con service role (el bucket no tiene policies de escritura).
  */
 
 export type OutreachResult<T = undefined> =
@@ -44,20 +47,86 @@ function firstIssue(err: z.ZodError): string {
   return err.issues[0]?.message ?? "Datos inválidos";
 }
 
+function dbError(error: { code?: string; message: string }, uniqueMsg: string): string {
+  return error.code === "23505" ? uniqueMsg : error.message;
+}
+
 // ---------------------------------------------------------------------------
-// Plantilla default
+// Mensajes base (plantillas)
 // ---------------------------------------------------------------------------
 
-export async function updateDefaultTemplate(template: string): Promise<OutreachResult> {
+const templateSchema = z.object({
+  id: uuid.optional(),
+  name: z.string().trim().min(1, "Poné un nombre").max(60, "Nombre demasiado largo"),
+  body: z.string().max(10000, "El mensaje es demasiado largo"),
+});
+
+export type TemplateInput = z.input<typeof templateSchema>;
+
+/** Crea (sin id) o actualiza (con id) un mensaje base. */
+export async function saveTemplate(input: TemplateInput): Promise<OutreachResult<{ id: string }>> {
   const guard = await assertScope("outreach");
   if (!guard.ok) return guard;
-  const parsed = z.string().max(10000, "La plantilla es demasiado larga").safeParse(template);
+  const parsed = templateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+  const { id, ...fields } = parsed.data;
 
+  const sb = await createClient();
+  if (id) {
+    const { error } = await sb.from("outreach_templates").update(fields).eq("id", id);
+    if (error) return { ok: false, error: dbError(error, "Ya existe un mensaje con ese nombre") };
+    revalidateOutreach();
+    return { ok: true, data: { id } };
+  }
+  const { data: last } = await sb
+    .from("outreach_templates")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const { data, error } = await sb
+    .from("outreach_templates")
+    .insert({ ...fields, sort_order: (last?.sort_order ?? 0) + 1 })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: dbError(error, "Ya existe un mensaje con ese nombre") };
+
+  // El primero que se crea pasa a ser el default general.
+  const { data: settings } = await sb
+    .from("outreach_settings")
+    .select("default_template_id")
+    .eq("id", 1)
+    .maybeSingle();
+  if (!settings || !settings.default_template_id) {
+    await sb
+      .from("outreach_settings")
+      .upsert({ id: 1, default_template_id: data.id }, { onConflict: "id" });
+  }
+  revalidateOutreach();
+  return { ok: true, data: { id: data.id } };
+}
+
+export async function deleteTemplate(id: string): Promise<OutreachResult> {
+  const guard = await assertScope("outreach");
+  if (!guard.ok) return guard;
+  if (!uuid.safeParse(id).success) return { ok: false, error: "ID inválido" };
+  const sb = await createClient();
+  // Las plataformas que lo usaban quedan con la default general (FK on delete set null).
+  const { error } = await sb.from("outreach_templates").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidateOutreach();
+  return { ok: true };
+}
+
+/** Qué mensaje base usan las plataformas que no eligieron uno propio. */
+export async function setDefaultTemplate(id: string | null): Promise<OutreachResult> {
+  const guard = await assertScope("outreach");
+  if (!guard.ok) return guard;
+  if (id !== null && !uuid.safeParse(id).success) return { ok: false, error: "ID inválido" };
   const sb = await createClient();
   const { error } = await sb
     .from("outreach_settings")
-    .upsert({ id: 1, default_template: parsed.data }, { onConflict: "id" });
+    .upsert({ id: 1, default_template_id: id }, { onConflict: "id" });
   if (error) return { ok: false, error: error.message };
   revalidateOutreach();
   return { ok: true };
@@ -71,8 +140,9 @@ const platformSchema = z.object({
   id: uuid.optional(),
   name: z.string().trim().min(1, "Poné un nombre").max(60, "Nombre demasiado largo"),
   icon: z.string().trim().max(40).nullable(),
+  iconUrl: optionalUrl,
   color: hexColor,
-  template: z.string().max(10000, "La plantilla es demasiado larga"),
+  templateId: uuid.nullable(),
 });
 
 export type PlatformInput = z.input<typeof platformSchema>;
@@ -83,7 +153,8 @@ export async function savePlatform(input: PlatformInput): Promise<OutreachResult
   if (!guard.ok) return guard;
   const parsed = platformSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
-  const { id, ...fields } = parsed.data;
+  const { id, iconUrl, templateId, ...rest } = parsed.data;
+  const fields = { ...rest, icon_url: iconUrl, template_id: templateId };
 
   const sb = await createClient();
   if (id) {
@@ -137,6 +208,7 @@ const resourceSchema = z.object({
     .toUpperCase()
     .regex(/^[A-Z0-9_]+$/, "La etiqueta solo puede tener letras, números y guiones bajos")
     .max(60, "Etiqueta demasiado larga"),
+  iconUrl: optionalUrl,
   description: optionalText(500),
 });
 
@@ -147,7 +219,8 @@ export async function saveResource(input: ResourceInput): Promise<OutreachResult
   if (!guard.ok) return guard;
   const parsed = resourceSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
-  const { id, ...fields } = parsed.data;
+  const { id, iconUrl, ...rest } = parsed.data;
+  const fields = { ...rest, icon_url: iconUrl };
 
   const sb = await createClient();
   if (id) {
@@ -186,6 +259,137 @@ export async function deleteResource(id: string): Promise<OutreachResult> {
 }
 
 // ---------------------------------------------------------------------------
+// Íconos: subir una imagen o detectar el favicon de un link
+// ---------------------------------------------------------------------------
+
+const ICON_BUCKET = "outreach-icons";
+const ICON_MAX_BYTES = 1024 * 1024;
+const ICON_TYPES: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/svg+xml": "svg",
+  "image/x-icon": "ico",
+  "image/vnd.microsoft.icon": "ico",
+  "image/avif": "avif",
+};
+
+async function storeIcon(bytes: ArrayBuffer, contentType: string): Promise<OutreachResult<{ url: string }>> {
+  const ext = ICON_TYPES[contentType.split(";")[0].trim().toLowerCase()];
+  if (!ext) return { ok: false, error: `Formato de imagen no soportado (${contentType || "desconocido"})` };
+  if (bytes.byteLength === 0) return { ok: false, error: "La imagen está vacía" };
+  if (bytes.byteLength > ICON_MAX_BYTES) return { ok: false, error: "La imagen no puede pesar más de 1 MB" };
+
+  const path = `${randomUUID()}.${ext}`;
+  const sb = createBotClient();
+  const { error } = await sb.storage
+    .from(ICON_BUCKET)
+    .upload(path, bytes, { contentType: contentType.split(";")[0].trim(), upsert: false });
+  if (error) return { ok: false, error: `No se pudo guardar la imagen: ${error.message}` };
+  const { data } = sb.storage.from(ICON_BUCKET).getPublicUrl(path);
+  return { ok: true, data: { url: data.publicUrl } };
+}
+
+/** Sube una imagen (campo "file" del FormData) y devuelve su URL pública. */
+export async function uploadIcon(formData: FormData): Promise<OutreachResult<{ url: string }>> {
+  const guard = await assertScope("outreach");
+  if (!guard.ok) return guard;
+  const file = formData.get("file");
+  if (!(file instanceof File)) return { ok: false, error: "Falta la imagen" };
+  return storeIcon(await file.arrayBuffer(), file.type);
+}
+
+async function fetchWithTimeout(url: string, ms: number, init?: RequestInit): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: ctrl.signal,
+      redirect: "follow",
+      headers: {
+        "user-agent": "Mozilla/5.0 (compatible; TangerineStudiosApp/1.0)",
+        accept: init?.headers instanceof Headers ? (init.headers.get("accept") ?? "*/*") : "*/*",
+        ...(init?.headers && !(init.headers instanceof Headers) ? init.headers : {}),
+      },
+    });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** Busca en el HTML los <link rel="icon"> y devuelve el mejor candidato. */
+function iconLinksFrom(html: string, base: URL): string[] {
+  const out: { href: string; score: number }[] = [];
+  const linkRe = /<link\b[^>]*>/gi;
+  for (const m of html.matchAll(linkRe)) {
+    const tag = m[0];
+    const rel = /\brel\s*=\s*["']?([^"'>]+)/i.exec(tag)?.[1]?.toLowerCase() ?? "";
+    if (!/\bicon\b|apple-touch-icon/.test(rel)) continue;
+    const href = /\bhref\s*=\s*["']?([^"'\s>]+)/i.exec(tag)?.[1];
+    if (!href) continue;
+    const sizes = /\bsizes\s*=\s*["']?(\d+)x\d+/i.exec(tag)?.[1];
+    let score = sizes ? Math.min(Number(sizes), 512) : 32;
+    if (rel.includes("apple-touch-icon")) score = Math.max(score, 180);
+    if (/\.svg(\?|$)/i.test(href)) score += 1000;
+    try {
+      out.push({ href: new URL(href, base).toString(), score });
+    } catch {
+      // href roto: se ignora
+    }
+  }
+  return out.sort((a, b) => b.score - a.score).map((c) => c.href);
+}
+
+/**
+ * Detecta el ícono de una página (favicon, apple-touch-icon…), lo descarga y
+ * lo guarda en el bucket. Si la página no se deja leer, usa el servicio de
+ * favicons de Google como último recurso.
+ */
+export async function detectFavicon(pageUrl: string): Promise<OutreachResult<{ url: string }>> {
+  const guard = await assertScope("outreach");
+  if (!guard.ok) return guard;
+  let base: URL;
+  try {
+    base = new URL(pageUrl.trim());
+    if (base.protocol !== "http:" && base.protocol !== "https:") throw new Error();
+  } catch {
+    return { ok: false, error: "Link inválido" };
+  }
+
+  const candidates: string[] = [];
+  try {
+    const res = await fetchWithTimeout(base.toString(), 6000, { headers: { accept: "text/html,*/*" } });
+    if (res.ok) {
+      const html = (await res.text()).slice(0, 400_000);
+      candidates.push(...iconLinksFrom(html, new URL(res.url || base.toString())));
+    }
+  } catch {
+    // La página no responde o bloquea bots: probamos igual con /favicon.ico.
+  }
+  candidates.push(new URL("/favicon.ico", base).toString());
+  candidates.push(
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(base.hostname)}&sz=128`
+  );
+
+  for (const url of candidates) {
+    try {
+      const res = await fetchWithTimeout(url, 6000, { headers: { accept: "image/*,*/*" } });
+      if (!res.ok) continue;
+      const type = res.headers.get("content-type") ?? "";
+      const bytes = await res.arrayBuffer();
+      if (bytes.byteLength < 32) continue;
+      const stored = await storeIcon(bytes, type || "image/x-icon");
+      if (stored.ok) return stored;
+    } catch {
+      // siguiente candidato
+    }
+  }
+  return { ok: false, error: "No se encontró un ícono para esa página. Podés subir uno a mano." };
+}
+
+// ---------------------------------------------------------------------------
 // Registro de mensajes
 // ---------------------------------------------------------------------------
 
@@ -193,6 +397,7 @@ const snapshotSchema = z.object({
   kind: z.enum(RESOURCE_KINDS),
   name: z.string().trim().min(1).max(80),
   url: z.string().trim().max(2000),
+  iconUrl: z.string().trim().max(2000).nullable().default(null),
 });
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida");
@@ -306,10 +511,4 @@ export async function deleteOutreachMessage(id: string): Promise<OutreachResult>
   if (error) return { ok: false, error: error.message };
   revalidateOutreach();
   return { ok: true };
-}
-
-// ---------------------------------------------------------------------------
-
-function dbError(error: { code?: string; message: string }, uniqueMsg: string): string {
-  return error.code === "23505" ? uniqueMsg : error.message;
 }

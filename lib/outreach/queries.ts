@@ -9,6 +9,7 @@ import {
   type OutreachMessage,
   type OutreachPlatform,
   type OutreachResource,
+  type OutreachTemplate,
   type ResourceSnapshot,
 } from "./types";
 
@@ -25,7 +26,12 @@ function parseSnapshots(raw: unknown): ResourceSnapshot[] {
     const r = item as Record<string, unknown>;
     if (typeof r.kind !== "string" || !isResourceKind(r.kind)) continue;
     if (typeof r.name !== "string" || typeof r.url !== "string") continue;
-    out.push({ kind: r.kind, name: r.name, url: r.url });
+    out.push({
+      kind: r.kind,
+      name: r.name,
+      url: r.url,
+      iconUrl: typeof r.iconUrl === "string" ? r.iconUrl : null,
+    });
   }
   return out;
 }
@@ -33,29 +39,38 @@ function parseSnapshots(raw: unknown): ResourceSnapshot[] {
 export const fetchOutreachConfig = unstable_cache(
   async (): Promise<OutreachConfig> => {
     const sb = createBotClient();
-    const [platformsRes, resourcesRes, settingsRes] = await Promise.all([
+    const [templatesRes, platformsRes, resourcesRes, settingsRes] = await Promise.all([
+      sb.from("outreach_templates").select("id, name, body, sort_order").order("sort_order").order("name"),
       sb
         .from("outreach_platforms")
-        .select("id, name, icon, color, template, sort_order")
+        .select("id, name, icon, icon_url, color, template_id, sort_order")
         .order("sort_order")
         .order("name"),
       sb
         .from("outreach_resources")
-        .select("id, kind, name, url, tag, description, sort_order")
+        .select("id, kind, name, url, tag, icon_url, description, sort_order")
         .order("sort_order")
         .order("name"),
-      sb.from("outreach_settings").select("default_template").eq("id", 1).maybeSingle(),
+      sb.from("outreach_settings").select("default_template_id").eq("id", 1).maybeSingle(),
     ]);
+    if (templatesRes.error) throw new Error(templatesRes.error.message);
     if (platformsRes.error) throw new Error(platformsRes.error.message);
     if (resourcesRes.error) throw new Error(resourcesRes.error.message);
     if (settingsRes.error) throw new Error(settingsRes.error.message);
 
+    const templates: OutreachTemplate[] = (templatesRes.data ?? []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      body: t.body,
+      sortOrder: t.sort_order,
+    }));
     const platforms: OutreachPlatform[] = (platformsRes.data ?? []).map((p) => ({
       id: p.id,
       name: p.name,
       icon: p.icon,
+      iconUrl: p.icon_url,
       color: p.color,
-      template: p.template,
+      templateId: p.template_id,
       sortOrder: p.sort_order,
     }));
     const resources: OutreachResource[] = (resourcesRes.data ?? []).flatMap((r) =>
@@ -67,6 +82,7 @@ export const fetchOutreachConfig = unstable_cache(
               name: r.name,
               url: r.url,
               tag: r.tag,
+              iconUrl: r.icon_url,
               description: r.description,
               sortOrder: r.sort_order,
             },
@@ -74,9 +90,10 @@ export const fetchOutreachConfig = unstable_cache(
         : []
     );
     return {
+      templates,
+      defaultTemplateId: settingsRes.data?.default_template_id ?? null,
       platforms,
       resources,
-      defaultTemplate: settingsRes.data?.default_template ?? "",
     };
   },
   ["outreach-config"],
