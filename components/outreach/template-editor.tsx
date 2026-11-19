@@ -46,10 +46,12 @@ export function TemplateEditor({
           s.kind === "text" ? (
             <span key={i}>{s.text}</span>
           ) : (
+            // Sin padding ni margen: el ancho tiene que ser idéntico al del
+            // textarea de arriba o el cursor se corre.
             <span
               key={i}
               className={cn(
-                "rounded-sm px-0.5",
+                "rounded-sm",
                 s.known ? "bg-[#FFAC37]/25 text-[#FFAC37]" : "bg-[#FF3737]/20 text-[#FF3737]"
               )}
               title={s.known ? undefined : "Etiqueta desconocida: no se va a reemplazar"}

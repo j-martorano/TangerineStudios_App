@@ -5,6 +5,7 @@ import { ChevronsUpDownIcon, ScanSearchIcon, Trash2Icon, UploadIcon } from "luci
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { detectFavicon, uploadIcon } from "@/lib/outreach/actions";
 
@@ -13,6 +14,10 @@ import { detectFavicon, uploadIcon } from "@/lib/outreach/actions";
  * un link, subir una imagen o quitarla. `preview` muestra el ícono actual;
  * `children` (opcional) va dentro del popover, antes de los botones (el
  * catálogo de íconos de las plataformas).
+ *
+ * Si se pasa `detectUrl` (el link del recurso), se detecta de ahí. Si no,
+ * el popover ofrece un campo para pegar un link (las plataformas no tienen
+ * link propio, pero su ícono sale de su sitio).
  */
 export function IconField({
   value,
@@ -33,14 +38,16 @@ export function IconField({
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
+  const [manualUrl, setManualUrl] = useState("");
 
   function detect() {
-    if (!detectUrl?.trim()) {
-      toast.error("Primero poné el link");
+    const url = (detectUrl ?? manualUrl).trim();
+    if (!url) {
+      toast.error(detectUrl !== undefined ? "Primero poné el link" : "Pegá el link del sitio");
       return;
     }
     startTransition(async () => {
-      const res = await detectFavicon(detectUrl);
+      const res = await detectFavicon(url);
       if (!res.ok) {
         toast.error(res.error);
         return;
@@ -73,7 +80,7 @@ export function IconField({
         {preview}
         <ChevronsUpDownIcon className="size-3 opacity-50" />
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-2" align="start">
+      <PopoverContent className="w-72 p-2" align="start">
         {children}
         <div className={children ? "mt-2 flex flex-col gap-1 border-t border-border pt-2" : "flex flex-col gap-1"}>
           {detectUrl !== undefined ? (
@@ -81,7 +88,28 @@ export function IconField({
               <ScanSearchIcon data-icon="inline-start" />
               {pending ? "Buscando…" : "Detectar del link"}
             </Button>
-          ) : null}
+          ) : (
+            <div className="flex items-center gap-1">
+              <Input
+                value={manualUrl}
+                onChange={(e) => setManualUrl(e.target.value)}
+                placeholder="https://reddit.com"
+                aria-label="Link del sitio"
+                autoComplete="off"
+                className="h-7 text-xs"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    detect();
+                  }
+                }}
+              />
+              <Button type="button" variant="outline" size="sm" onClick={detect} disabled={pending} title="Detectar el ícono del sitio">
+                <ScanSearchIcon data-icon="inline-start" />
+                {pending ? "…" : "Detectar"}
+              </Button>
+            </div>
+          )}
           <Button
             type="button"
             variant="ghost"
