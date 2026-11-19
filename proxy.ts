@@ -9,9 +9,9 @@ export const config = {
   matcher: [
     // Match all paths except:
     // - Next internals (_next/static, _next/image)
-    // - Favicon y assets públicos (branding/)
+    // - Íconos (favicon.ico, icon.png, apple-icon.png) y assets públicos (branding/)
     // - API routes del bot de Discord (/api/discord/) — reciben requests
     //   externos sin sesión, tienen su propia verificación de firma Ed25519
-    "/((?!_next/static|_next/image|favicon.ico|branding/|api/discord/).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|branding/|api/discord/).*)",
   ],
 };
