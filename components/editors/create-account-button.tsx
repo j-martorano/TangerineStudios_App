@@ -88,7 +88,7 @@ export function CreateAccountButton({ editor, credentials, appUrl }: Props) {
               email: emailGuess,
               displayName: editor.name,
               role: "member",
-              tabs: ["kanban", "boveda"],
+              tabs: [],
               credentialIds: [],
               editorId: editor.id,
             }}
