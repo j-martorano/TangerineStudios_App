@@ -24,12 +24,13 @@ import { KIND_LABEL, type OutreachResource, type ResourceKind } from "@/lib/outr
 import { IconField } from "../icon-field";
 import { ResourceIcon } from "../platform-icon";
 
-const GRID = "md:grid-cols-[auto_1fr_1.4fr_1fr_1.2fr_auto]";
+const GRID = "md:grid-cols-[auto_1fr_1.3fr_0.9fr_1.6fr_auto]";
 
 /**
  * Páginas o samples (según `kind`): ícono, nombre, link, etiqueta y
- * descripción. La etiqueta se propone sola a partir del nombre mientras no
- * se toque; el ícono se detecta del link o se sube.
+ * contexto (qué es exactamente: lo usa la IA para elegir qué mandar). La
+ * etiqueta se propone sola a partir del nombre mientras no se toque; el
+ * ícono se detecta del link o se sube.
  */
 export function ResourcesManager({
   kind,
@@ -48,7 +49,7 @@ export function ResourcesManager({
         <span>Nombre</span>
         <span>Link</span>
         <span>Etiqueta</span>
-        <span>Descripción</span>
+        <span>Contexto para la IA</span>
         <span className="w-16" />
       </div>
       {items.length === 0 && !creating ? (
@@ -57,6 +58,10 @@ export function ResourcesManager({
       {items.map((r) => (
         <ResourceRow key={r.id} kind={kind} resource={r} />
       ))}
+      <p className="px-1 text-xs text-muted-foreground">
+        El contexto le explica a la IA qué es cada {KIND_LABEL[kind].toLowerCase()} (rubro, estilo, tipo de
+        video) para que elija bien cuál mandarle a cada cliente.
+      </p>
       {creating ? (
         <ResourceRow kind={kind} resource={null} onDone={() => setCreating(false)} />
       ) : (
@@ -168,8 +173,12 @@ function ResourceRow({
       <Input
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="Qué muestra (para elegir bien)"
-        aria-label="Descripción"
+        placeholder={
+          kind === "sample"
+            ? "Ej.: edición dinámica para gaming, cortes rápidos y memes"
+            : "Ej.: portfolio general con trabajos corporativos"
+        }
+        aria-label="Contexto para la IA"
       />
       <div className="flex w-16 items-center justify-end gap-1">
         {dirty ? (

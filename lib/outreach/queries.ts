@@ -51,7 +51,7 @@ export const fetchOutreachConfig = unstable_cache(
         .select("id, kind, name, url, tag, icon_url, description, sort_order")
         .order("sort_order")
         .order("name"),
-      sb.from("outreach_settings").select("default_template_id").eq("id", 1).maybeSingle(),
+      sb.from("outreach_settings").select("default_template_id, ai_prompt, ai_model").eq("id", 1).maybeSingle(),
     ]);
     if (templatesRes.error) throw new Error(templatesRes.error.message);
     if (platformsRes.error) throw new Error(platformsRes.error.message);
@@ -94,6 +94,8 @@ export const fetchOutreachConfig = unstable_cache(
       defaultTemplateId: settingsRes.data?.default_template_id ?? null,
       platforms,
       resources,
+      aiPrompt: settingsRes.data?.ai_prompt ?? null,
+      aiModel: settingsRes.data?.ai_model ?? null,
     };
   },
   ["outreach-config"],

@@ -8,6 +8,10 @@ import { assertScope } from "@/lib/auth/permissions";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { createBotClient } from "@/lib/supabase/bot";
 import { createClient } from "@/lib/supabase/server";
+import { DEFAULT_AI_MODEL, buildSystemInstruction, buildUserPrompt, parseAiResponse, type AiGeneration } from "./ai-prompt";
+import { GeminiError, generateJson } from "./gemini";
+import { fetchOutreachConfig } from "./queries";
+import { templateFor } from "./render";
 import { OUTREACH_STATUSES, RESOURCE_KINDS, type OutreachStatus } from "./types";
 
 /**
@@ -511,4 +515,86 @@ export async function deleteOutreachMessage(id: string): Promise<OutreachResult>
   if (error) return { ok: false, error: error.message };
   revalidateOutreach();
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Modo IA (Gemini)
+// ---------------------------------------------------------------------------
+
+const aiSettingsSchema = z.object({
+  /** Vacío = volver al prompt por defecto. */
+  prompt: z.string().max(8000, "El prompt es demasiado largo"),
+  /** Vacío = modelo por defecto. */
+  model: z
+    .string()
+    .trim()
+    .max(80)
+    .regex(/^[a-z0-9.\-]*$/i, "Nombre de modelo inválido"),
+});
+
+export type AiSettingsInput = z.input<typeof aiSettingsSchema>;
+
+/** Prompt y modelo de la IA. Texto vacío = usar el default del código. */
+export async function saveAiSettings(input: AiSettingsInput): Promise<OutreachResult> {
+  const guard = await assertScope("outreach");
+  if (!guard.ok) return guard;
+  const parsed = aiSettingsSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+  const sb = await createClient();
+  const { error } = await sb
+    .from("outreach_settings")
+    .upsert(
+      { id: 1, ai_prompt: parsed.data.prompt.trim() || null, ai_model: parsed.data.model || null },
+      { onConflict: "id" }
+    );
+  if (error) return { ok: false, error: error.message };
+  revalidateOutreach();
+  return { ok: true };
+}
+
+const generateSchema = z.object({
+  clientName: z.string().trim().max(120),
+  platformId: uuid.nullable(),
+  context: z
+    .string()
+    .trim()
+    .min(1, "Pegá algo de contexto del cliente: el posteo, quién es, qué hace")
+    .max(20000, "El contexto es demasiado largo"),
+});
+
+export type GenerateInput = z.input<typeof generateSchema>;
+
+/**
+ * Le pide a Gemini un mensaje para este lead. Devuelve el mensaje con
+ * etiquetas (va al editor de plantilla) y los recursos que eligió; el
+ * mensaje final lo arma el constructor como siempre.
+ */
+export async function generateOutreachMessage(input: GenerateInput): Promise<OutreachResult<AiGeneration>> {
+  const guard = await assertScope("outreach");
+  if (!guard.ok) return guard;
+  const parsed = generateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+  const d = parsed.data;
+
+  const config = await fetchOutreachConfig();
+  const platform = config.platforms.find((p) => p.id === d.platformId) ?? null;
+  const userPrompt = buildUserPrompt({
+    clientName: d.clientName,
+    platformName: platform?.name ?? "",
+    baseTemplate: templateFor(platform, config),
+    context: d.context,
+    resources: config.resources,
+  });
+
+  try {
+    const raw = await generateJson({
+      model: config.aiModel?.trim() || DEFAULT_AI_MODEL,
+      systemInstruction: buildSystemInstruction(config.aiPrompt),
+      userPrompt,
+    });
+    return { ok: true, data: parseAiResponse(raw, config.resources) };
+  } catch (e) {
+    if (e instanceof GeminiError) return { ok: false, error: e.message };
+    return { ok: false, error: e instanceof Error ? e.message : "No se pudo generar el mensaje" };
+  }
 }

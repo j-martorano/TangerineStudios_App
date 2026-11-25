@@ -683,16 +683,22 @@ export type Database = {
       }
       outreach_settings: {
         Row: {
+          ai_model: string | null
+          ai_prompt: string | null
           default_template_id: string | null
           id: number
           updated_at: string
         }
         Insert: {
+          ai_model?: string | null
+          ai_prompt?: string | null
           default_template_id?: string | null
           id?: number
           updated_at?: string
         }
         Update: {
+          ai_model?: string | null
+          ai_prompt?: string | null
           default_template_id?: string | null
           id?: number
           updated_at?: string

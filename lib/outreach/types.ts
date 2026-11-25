@@ -88,7 +88,7 @@ export type OutreachResource = {
   /** Sin llaves: PAGINA_TANGERINE_WEB. En la plantilla va {PAGINA_TANGERINE_WEB}. */
   tag: string;
   iconUrl: string | null;
-  /** Qué muestra (para elegir a mano hoy y para la IA mañana). */
+  /** Contexto: qué es exactamente este link. La IA elige con esto; también sirve para elegir a mano. */
   description: string | null;
   sortOrder: number;
 };
@@ -122,4 +122,8 @@ export type OutreachConfig = {
   defaultTemplateId: string | null;
   platforms: OutreachPlatform[];
   resources: OutreachResource[];
+  /** Instrucciones para la IA; null = el prompt por defecto (lib/outreach/ai-prompt.ts). */
+  aiPrompt: string | null;
+  /** Modelo de Gemini; null = el default del código. */
+  aiModel: string | null;
 };

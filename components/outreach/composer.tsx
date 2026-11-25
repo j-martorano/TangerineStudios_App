@@ -3,15 +3,24 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ClipboardCheckIcon, CopyIcon, PlusIcon, RotateCcwIcon, SettingsIcon, XIcon } from "lucide-react";
+import {
+  ClipboardCheckIcon,
+  CopyIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  SettingsIcon,
+  SparklesIcon,
+  XIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { todayAR } from "@/lib/argentina-date";
-import { createOutreachMessage } from "@/lib/outreach/actions";
+import { createOutreachMessage, generateOutreachMessage } from "@/lib/outreach/actions";
 import { renderSegments, templateFor } from "@/lib/outreach/render";
 import { KIND_LABEL_PLURAL, type OutreachConfig, type OutreachResource, type ResourceKind } from "@/lib/outreach/types";
 import { cn } from "@/lib/utils";
@@ -24,15 +33,21 @@ import { RenderedMessage, TemplateEditor } from "./template-editor";
  * (vista «Plantilla»); «Resultado» muestra el mensaje con las etiquetas ya
  * reemplazadas por el nombre, las páginas y los samples elegidos. Copiar y
  * Registrar siempre usan el resultado, y dejan esa vista a la vista.
+ *
+ * Modo IA: se pega el contexto del cliente (el posteo, quién es) y Gemini
+ * escribe el mensaje con etiquetas y elige las páginas y samples. El
+ * resultado cae en el mismo editor y los mismos slots, así se revisa, se
+ * retoca y se registra igual que un mensaje a mano.
  */
 
 type Slots = Record<ResourceKind, (string | null)[]>;
 type View = "plantilla" | "resultado";
 
-export function OutreachComposer({ config }: { config: OutreachConfig }) {
+export function OutreachComposer({ config, aiConfigured }: { config: OutreachConfig; aiConfigured: boolean }) {
   const { platforms, resources } = config;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [generating, startGenerating] = useTransition();
 
   const [clientName, setClientName] = useState("");
   const [platformId, setPlatformId] = useState<string | null>(platforms[0]?.id ?? null);
@@ -42,6 +57,9 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
   const [template, setTemplate] = useState(() => templateFor(platforms[0] ?? null, config));
   const [templateEdited, setTemplateEdited] = useState(false);
   const [view, setView] = useState<View>("plantilla");
+  const [aiMode, setAiMode] = useState(false);
+  const [context, setContext] = useState("");
+  const [rationale, setRationale] = useState("");
 
   const platform = platforms.find((p) => p.id === platformId) ?? null;
   const platformTemplate = templateFor(platform, config);
@@ -91,6 +109,30 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
   }
   function removeSlot(kind: ResourceKind, index: number) {
     setSlots((s) => ({ ...s, [kind]: s[kind].filter((_, i) => i !== index) }));
+  }
+
+  function generate() {
+    if (!context.trim()) {
+      toast.error("Pegá algo de contexto del cliente: el posteo, quién es, qué hace");
+      return;
+    }
+    startGenerating(async () => {
+      const res = await generateOutreachMessage({ clientName, platformId, context });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      const chosen = res.data.resourceIds.map((id) => byId.get(id)).filter((r): r is OutreachResource => r != null);
+      setTemplate(res.data.message);
+      setTemplateEdited(res.data.message !== platformTemplate);
+      setSlots({
+        pagina: chosen.filter((r) => r.kind === "pagina").map((r) => r.id),
+        sample: chosen.filter((r) => r.kind === "sample").map((r) => r.id),
+      });
+      setRationale(res.data.rationale);
+      setView("resultado");
+      toast.success("Mensaje generado: revisalo antes de mandarlo");
+    });
   }
 
   async function copyText(): Promise<boolean> {
@@ -143,6 +185,8 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
       setClientName("");
       setPostUrl("");
       setSentAt(todayAR());
+      setContext("");
+      setRationale("");
       router.refresh();
     });
   }
@@ -196,6 +240,16 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
         </div>
 
         <div className="ml-auto flex items-end gap-2">
+          <Button
+            variant={aiMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => setAiMode((v) => !v)}
+            aria-pressed={aiMode}
+            className={cn(aiMode && "bg-[#37ACFF] text-black hover:bg-[#37ACFF]/85")}
+          >
+            <SparklesIcon data-icon="inline-start" />
+            Modo IA
+          </Button>
           <div className="inline-flex rounded-lg border border-border p-0.5">
             {(["plantilla", "resultado"] as const).map((v) => (
               <button
@@ -217,6 +271,42 @@ export function OutreachComposer({ config }: { config: OutreachConfig }) {
           </Button>
         </div>
       </div>
+
+      {aiMode ? (
+        <div className="flex flex-col gap-2 rounded-lg border border-[#37ACFF]/30 bg-[#37ACFF]/5 p-3">
+          <Label htmlFor="outreach-context">Contexto del cliente</Label>
+          <Textarea
+            id="outreach-context"
+            value={context}
+            onChange={(e) => setContext(e.target.value)}
+            placeholder="Pegá el posteo o contá quién es: qué hace, qué tipo de videos sube, qué necesita. Con eso la IA escribe el mensaje y elige qué páginas y samples mandarle."
+            className="min-h-28 bg-background/60"
+            disabled={generating}
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={generate}
+              disabled={generating || !aiConfigured}
+              className="bg-[#37ACFF] font-semibold text-black hover:bg-[#37ACFF]/85"
+            >
+              <SparklesIcon data-icon="inline-start" />
+              {generating ? "Generando…" : "Generar mensaje"}
+            </Button>
+            {!aiConfigured ? (
+              <span className="text-xs text-[#FFAC37]">
+                Falta la API key de Gemini (GEMINI_API_KEY en Vercel).{" "}
+                <Link href="/outreach/configuracion" className="underline underline-offset-4">
+                  Ver en Configurar
+                </Link>
+              </span>
+            ) : rationale ? (
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground/80">Por qué eligió esto:</span> {rationale}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {view === "plantilla" ? (
         <div>

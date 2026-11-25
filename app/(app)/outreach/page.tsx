@@ -5,6 +5,7 @@ import { OutreachComposer } from "@/components/outreach/composer";
 import { OutreachTable } from "@/components/outreach/messages-table";
 import { todayAR } from "@/lib/argentina-date";
 import { requireTab } from "@/lib/auth/permissions";
+import { geminiConfigured } from "@/lib/outreach/gemini";
 import { fetchOutreachConfig, fetchOutreachMessages } from "@/lib/outreach/queries";
 
 type SearchParams = Promise<{ q?: string; year?: string }>;
@@ -54,7 +55,7 @@ export default async function OutreachPage({ searchParams }: { searchParams: Sea
         </p>
       </header>
 
-      <OutreachComposer config={config} />
+      <OutreachComposer config={config} aiConfigured={geminiConfigured()} />
 
       <hr className="border-border" />
 

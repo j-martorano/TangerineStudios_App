@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 
+import { AiSettings } from "@/components/outreach/config/ai-settings";
 import { PlatformsManager } from "@/components/outreach/config/platforms-manager";
 import { ResourcesManager } from "@/components/outreach/config/resources-manager";
 import { TagsHelp } from "@/components/outreach/config/tags-help";
 import { TemplatesManager } from "@/components/outreach/config/templates-manager";
 import { requireTab } from "@/lib/auth/permissions";
+import { geminiConfigured } from "@/lib/outreach/gemini";
 import { fetchOutreachConfig } from "@/lib/outreach/queries";
 
 export default async function OutreachConfigPage() {
@@ -33,6 +35,10 @@ export default async function OutreachConfigPage() {
           platforms={config.platforms}
           resources={config.resources}
         />
+      </Section>
+
+      <Section title="IA">
+        <AiSettings prompt={config.aiPrompt} model={config.aiModel} configured={geminiConfigured()} />
       </Section>
 
       <Section title="Plataformas">
