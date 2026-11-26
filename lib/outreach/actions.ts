@@ -8,7 +8,7 @@ import { assertScope } from "@/lib/auth/permissions";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { createBotClient } from "@/lib/supabase/bot";
 import { createClient } from "@/lib/supabase/server";
-import { DEFAULT_AI_MODEL, buildSystemInstruction, buildUserPrompt, parseAiResponse, type AiGeneration } from "./ai-prompt";
+import { AI_LANGUAGES, DEFAULT_AI_MODEL, buildSystemInstruction, buildUserPrompt, parseAiResponse, type AiGeneration } from "./ai-prompt";
 import { GeminiError, generateJson } from "./gemini";
 import { fetchOutreachConfig } from "./queries";
 import { templateFor } from "./render";
@@ -560,6 +560,10 @@ const generateSchema = z.object({
     .trim()
     .min(1, "Pegá algo de contexto del cliente: el posteo, quién es, qué hace")
     .max(20000, "El contexto es demasiado largo"),
+  /** auto = el del contexto del cliente. */
+  language: z.enum(AI_LANGUAGES.map((l) => l.value) as [string, ...string[]]).default("auto"),
+  /** Mensaje base elegido en el constructor; si no viene, el de la plataforma. "" = sin referencia. */
+  baseTemplate: z.string().max(8000).optional(),
 });
 
 export type GenerateInput = z.input<typeof generateSchema>;
@@ -581,8 +585,9 @@ export async function generateOutreachMessage(input: GenerateInput): Promise<Out
   const userPrompt = buildUserPrompt({
     clientName: d.clientName,
     platformName: platform?.name ?? "",
-    baseTemplate: templateFor(platform, config),
+    baseTemplate: d.baseTemplate ?? templateFor(platform, config),
     context: d.context,
+    language: d.language as (typeof AI_LANGUAGES)[number]["value"],
     resources: config.resources,
   });
 

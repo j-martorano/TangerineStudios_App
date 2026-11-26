@@ -20,6 +20,7 @@ export function TemplateEditor({
   placeholder,
   className,
   minHeightClass = "min-h-40",
+  textareaRef,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -28,6 +29,8 @@ export function TemplateEditor({
   placeholder?: string;
   className?: string;
   minHeightClass?: string;
+  /** Para insertar texto donde está el cursor desde afuera. */
+  textareaRef?: React.Ref<HTMLTextAreaElement>;
 }) {
   const segments = useMemo(() => templateSegments(value, knownTags), [value, knownTags]);
 
@@ -64,6 +67,7 @@ export function TemplateEditor({
         {"\n"}
       </div>
       <textarea
+        ref={textareaRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         spellCheck={false}

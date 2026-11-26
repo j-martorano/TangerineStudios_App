@@ -23,22 +23,43 @@ export const FALLBACK_AI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash", 
 /** Instrucciones editables desde Configuración. Lo que no se puede tocar va en FORMAT_RULES. */
 export const DEFAULT_AI_PROMPT = `Sos el asistente de outreach de Tangerine Studios, un estudio de edición de video. Escribís el primer mensaje a un potencial cliente a partir del contexto que te pasan (quién es, qué publicó, qué hace).
 
-Reglas:
-- Escribí en el idioma del contexto del cliente (si publicó en inglés, el mensaje va en inglés).
-- Tono cercano y profesional, sin sonar a plantilla ni a vendedor. Corto: entre 80 y 150 palabras.
-- Usá el mensaje base como referencia de estilo y estructura, pero adaptalo al cliente: mencioná algo concreto de lo que hace o publicó y por qué le serviría una edición.
-- Elegí solo las páginas y samples que tengan que ver con el cliente (rubro, estilo, tipo de video). Mejor uno o dos samples bien elegidos que muchos. Si ninguno encaja, mandá la web o el portfolio general.
-- No prometas precios ni plazos. No inventes trabajos ni clientes anteriores, ni digas que viste o seguís cosas del cliente que no estén en el contexto.`;
+Cómo escribir:
+- Tono cercano y profesional, de persona a persona, sin sonar a plantilla ni a vendedor. Corto: entre 80 y 150 palabras.
+- Arrancá con algo concreto del cliente (qué publicó, qué hace, qué problema contó) y conectalo con lo que una buena edición le resolvería.
+- El mensaje base es solo una referencia de estructura y de cómo se presenta el estudio: no lo copies, adaptalo al cliente.
+- No prometas precios ni plazos. No inventes trabajos, clientes ni datos, y no digas que viste o seguís cosas del cliente que no estén en el contexto.
+
+Cómo elegir páginas y samples:
+- Leé el contexto de cada uno (rubro, estilo, tipo de video) y quedate con los que más se parezcan a lo que el cliente hace o necesita: primero por rubro, después por tipo de video, después por estilo.
+- Mandá 1 o 2 samples como máximo. Si ninguno se parece de verdad al cliente, no fuerces uno: mandá solo la web o el portfolio general.
+- Una sola página (la web o el portfolio), salvo que haya una específica del rubro del cliente.
+- Presentá cada link con una frase que diga por qué le sirve a ese cliente, no como una lista suelta.`;
 
 /** Reglas técnicas fijas: van siempre después del prompt de Joaco. */
 export const FORMAT_RULES = `Formato de respuesta (obligatorio):
+- Escribí el mensaje en el idioma que dice «Idioma del mensaje» en el pedido. El mensaje base puede estar en otro idioma: eso no importa, es solo referencia de estructura.
 - Para poner el link de una página o sample escribí su etiqueta exacta entre llaves (por ejemplo {SAMPLE_TALKING_HEAD}) en el lugar del mensaje donde va. Nunca escribas URLs ni inventes etiquetas: solo las de la lista.
-- Podés usar {NOMBRE} donde vaya el nombre del cliente.
+- Saludá con {NOMBRE} (se reemplaza por el nombre del cliente); no escribas el nombre a mano.
 - Respondé en JSON con: "message" (el mensaje completo, con saltos de línea), "resourceTags" (las etiquetas de las páginas y samples que usaste, sin llaves) y "rationale" (una línea en español explicando por qué elegiste esos recursos).`;
+
+/** Idioma del mensaje. «auto» = el del contexto del cliente. */
+export const AI_LANGUAGES = [
+  { value: "auto", label: "El del contexto" },
+  { value: "es", label: "Español" },
+  { value: "en", label: "English" },
+] as const;
+export type AiLanguage = (typeof AI_LANGUAGES)[number]["value"];
+
+const LANGUAGE_INSTRUCTION: Record<AiLanguage, string> = {
+  auto: "el mismo idioma en que está escrito el contexto del cliente (si el contexto está en español, el mensaje va en español; si está en inglés, en inglés). Ignorá el idioma del mensaje base.",
+  es: "español (rioplatense, con voseo). Aunque el contexto o el mensaje base estén en otro idioma.",
+  en: "English. Even if the client context or the base message are in another language.",
+};
 
 export type AiPromptInput = {
   clientName: string;
   platformName: string;
+  language?: AiLanguage;
   /** Mensaje base de la plataforma, como referencia de estilo ("" si no hay). */
   baseTemplate: string;
   /** Lo que pegó Joaco: el posteo, quién es el cliente, qué necesita. */
@@ -65,6 +86,7 @@ export function buildUserPrompt(input: AiPromptInput): string {
   const parts = [
     `Cliente: ${input.clientName.trim() || "(sin nombre todavía; usá {NOMBRE})"}`,
     `Plataforma donde se manda: ${input.platformName || "(sin especificar)"}`,
+    `Idioma del mensaje: ${LANGUAGE_INSTRUCTION[input.language ?? "auto"]}`,
     "",
     "Mensaje base de esta plataforma (referencia de estilo y estructura):",
     '"""',

@@ -1,11 +1,23 @@
 "use client";
 
-import { Fragment, useState } from "react";
-import { CopyIcon, ExternalLinkIcon } from "lucide-react";
+import { Fragment, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { CopyIcon, ExternalLinkIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { currentMonthKeyAR } from "@/lib/argentina-date";
+import { deleteOutreachMessage } from "@/lib/outreach/actions";
 import type { OutreachMessage, OutreachPlatform, OutreachResource } from "@/lib/outreach/types";
 
 import { MessageDialog } from "./message-dialog";
@@ -15,7 +27,8 @@ import { QuickStatusBadge } from "./status-badge";
 /**
  * Registro de mensajes enviados, con el mismo formato que el spreadsheet de
  * proyectos: un bloque por mes (según la fecha de envío), del más reciente al
- * más viejo, con el mes actual siempre arriba aunque esté vacío.
+ * más viejo, con el mes actual siempre arriba aunque esté vacío. Cada fila
+ * tiene copiar y borrar a la derecha; click en la fila abre el detalle.
  */
 
 const MONTH_NAMES = [
@@ -41,7 +54,7 @@ const COL_HEADERS = [
   { label: "Post", className: "w-14" },
   { label: "Páginas y samples", className: "w-64" },
   { label: "Mensaje", className: "" },
-  { label: "", className: "w-10" },
+  { label: "", className: "w-20" },
 ] as const;
 
 const COL_SPAN = COL_HEADERS.length;
@@ -57,7 +70,25 @@ type Props = {
 
 export function OutreachTable({ messages, platforms, resources }: Props) {
   const [editing, setEditing] = useState<OutreachMessage | null>(null);
+  const [deleting, setDeleting] = useState<OutreachMessage | null>(null);
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
   const currentMK = currentMonthKeyAR();
+
+  function confirmDelete() {
+    if (!deleting) return;
+    const target = deleting;
+    startTransition(async () => {
+      const res = await deleteOutreachMessage(target.id);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Mensaje borrado");
+      setDeleting(null);
+      router.refresh();
+    });
+  }
 
   const map = new Map<string, OutreachMessage[]>();
   for (const m of messages) {
@@ -125,6 +156,7 @@ export function OutreachTable({ messages, platforms, resources }: Props) {
                     resources={resources}
                     bg={idx % 2 === 0 ? ROW_BG_EVEN : ROW_BG_ODD}
                     onOpen={() => setEditing(m)}
+                    onDelete={() => setDeleting(m)}
                   />
                 ))
               )}
@@ -140,6 +172,28 @@ export function OutreachTable({ messages, platforms, resources }: Props) {
         open={editing != null}
         onClose={() => setEditing(null)}
       />
+
+      <AlertDialog open={deleting != null} onOpenChange={(o) => !o && !pending && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Borrar el mensaje a {deleting?.clientName}</AlertDialogTitle>
+            <AlertDialogDescription>Se saca del registro. No se puede deshacer.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDelete();
+              }}
+              disabled={pending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/85"
+            >
+              {pending ? "Borrando…" : "Borrar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
@@ -150,12 +204,14 @@ function MessageRow({
   resources,
   bg,
   onOpen,
+  onDelete,
 }: {
   message: OutreachMessage;
   platform: OutreachPlatform | null;
   resources: OutreachResource[];
   bg: string;
   onOpen: () => void;
+  onDelete: () => void;
 }) {
   async function copy(e: React.MouseEvent) {
     e.stopPropagation();
@@ -223,14 +279,27 @@ function MessageRow({
         </span>
       </TableCell>
       <TableCell className="pr-3 pl-2 py-2.5">
-        <button
-          type="button"
-          onClick={copy}
-          className="inline-flex text-muted-foreground hover:text-foreground"
-          aria-label="Copiar mensaje"
-        >
-          <CopyIcon className="size-4" />
-        </button>
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={copy}
+            className="inline-flex text-muted-foreground hover:text-foreground"
+            aria-label="Copiar mensaje"
+          >
+            <CopyIcon className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="inline-flex text-muted-foreground hover:text-destructive"
+            aria-label="Borrar mensaje"
+          >
+            <Trash2Icon className="size-4" />
+          </button>
+        </div>
       </TableCell>
     </TableRow>
   );

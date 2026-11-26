@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,10 +21,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { todayAR } from "@/lib/argentina-date";
 import { createOutreachMessage, generateOutreachMessage } from "@/lib/outreach/actions";
+import { AI_LANGUAGES, type AiLanguage } from "@/lib/outreach/ai-prompt";
 import { renderSegments, templateFor } from "@/lib/outreach/render";
 import { KIND_LABEL_PLURAL, type OutreachConfig, type OutreachResource, type ResourceKind } from "@/lib/outreach/types";
 import { cn } from "@/lib/utils";
 
+import { TagsHelp } from "./config/tags-help";
 import { PlatformIcon, ResourceIcon } from "./platform-icon";
 import { RenderedMessage, TemplateEditor } from "./template-editor";
 
@@ -33,6 +35,10 @@ import { RenderedMessage, TemplateEditor } from "./template-editor";
  * (vista «Plantilla»); «Resultado» muestra el mensaje con las etiquetas ya
  * reemplazadas por el nombre, las páginas y los samples elegidos. Copiar y
  * Registrar siempre usan el resultado, y dejan esa vista a la vista.
+ *
+ * El mensaje base se elige arriba: el de la plataforma (default), cualquiera
+ * de la biblioteca, o «Vacío» para escribir desde cero. Debajo del editor
+ * están los chips de etiquetas: click = insertar donde está el cursor.
  *
  * Modo IA: se pega el contexto del cliente (el posteo, quién es) y Gemini
  * escribe el mensaje con etiquetas y elige las páginas y samples. El
@@ -43,28 +49,49 @@ import { RenderedMessage, TemplateEditor } from "./template-editor";
 type Slots = Record<ResourceKind, (string | null)[]>;
 type View = "plantilla" | "resultado";
 
+/** Qué mensaje base está cargado: el de la plataforma, uno puntual, o nada. */
+const BASE_AUTO = "__auto";
+const BASE_EMPTY = "__empty";
+
 export function OutreachComposer({ config, aiConfigured }: { config: OutreachConfig; aiConfigured: boolean }) {
-  const { platforms, resources } = config;
+  const { platforms, resources, templates } = config;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [generating, startGenerating] = useTransition();
+  const editorRef = useRef<HTMLTextAreaElement>(null);
 
   const [clientName, setClientName] = useState("");
   const [platformId, setPlatformId] = useState<string | null>(platforms[0]?.id ?? null);
+  const [baseId, setBaseId] = useState<string>(BASE_AUTO);
   const [slots, setSlots] = useState<Slots>({ pagina: [], sample: [] });
   const [postUrl, setPostUrl] = useState("");
   const [sentAt, setSentAt] = useState(todayAR());
   const [template, setTemplate] = useState(() => templateFor(platforms[0] ?? null, config));
-  const [templateEdited, setTemplateEdited] = useState(false);
   const [view, setView] = useState<View>("plantilla");
   const [aiMode, setAiMode] = useState(false);
   const [context, setContext] = useState("");
+  const [language, setLanguage] = useState<AiLanguage>("auto");
   const [rationale, setRationale] = useState("");
 
   const platform = platforms.find((p) => p.id === platformId) ?? null;
-  const platformTemplate = templateFor(platform, config);
   const byId = useMemo(() => new Map(resources.map((r) => [r.id, r])), [resources]);
+  const byTag = useMemo(() => new Map(resources.map((r) => [r.tag, r])), [resources]);
   const knownTags = useMemo(() => resources.map((r) => r.tag), [resources]);
+
+  /** Cuerpo del mensaje base elegido; con eso se sabe si el editor fue retocado. */
+  function baseBodyFor(base: string, platId: string | null): string {
+    if (base === BASE_EMPTY) return "";
+    if (base === BASE_AUTO) return templateFor(platforms.find((p) => p.id === platId) ?? null, config);
+    return templates.find((t) => t.id === base)?.body ?? "";
+  }
+  const baseBody = baseBodyFor(baseId, platformId);
+  const templateEdited = template !== baseBody;
+  const baseLabel =
+    baseId === BASE_EMPTY
+      ? "Vacío"
+      : baseId === BASE_AUTO
+        ? `El de ${platform?.name ?? "la plataforma"}`
+        : (templates.find((t) => t.id === baseId)?.name ?? "Mensaje");
 
   const selected: OutreachResource[] = useMemo(
     () =>
@@ -88,17 +115,15 @@ export function OutreachComposer({ config, aiConfigured }: { config: OutreachCon
 
   function changePlatform(id: string) {
     setPlatformId(id);
-    if (!templateEdited) {
-      setTemplate(templateFor(platforms.find((p) => p.id === id) ?? null, config));
-    }
+    // Si el editor no fue tocado y sigue al de la plataforma, cambia con ella.
+    if (baseId === BASE_AUTO && !templateEdited) setTemplate(baseBodyFor(BASE_AUTO, id));
   }
-  function editTemplate(v: string) {
-    setTemplate(v);
-    setTemplateEdited(v !== platformTemplate);
+  function changeBase(id: string) {
+    setBaseId(id);
+    setTemplate(baseBodyFor(id, platformId));
   }
   function reloadTemplate() {
-    setTemplate(platformTemplate);
-    setTemplateEdited(false);
+    setTemplate(baseBody);
   }
 
   function addSlot(kind: ResourceKind) {
@@ -111,20 +136,36 @@ export function OutreachComposer({ config, aiConfigured }: { config: OutreachCon
     setSlots((s) => ({ ...s, [kind]: s[kind].filter((_, i) => i !== index) }));
   }
 
+  /** Inserta {TAG} donde está el cursor; si es una página o sample, también la marca como elegida. */
+  function insertTag(tag: string) {
+    const ins = `{${tag}}`;
+    const el = editorRef.current;
+    const start = el?.selectionStart ?? template.length;
+    const end = el?.selectionEnd ?? start;
+    setTemplate(template.slice(0, start) + ins + template.slice(end));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + ins.length, start + ins.length);
+    });
+    const r = byTag.get(tag);
+    if (r && !slots[r.kind].includes(r.id)) {
+      setSlots((s) => ({ ...s, [r.kind]: [...s[r.kind], r.id] }));
+    }
+  }
+
   function generate() {
     if (!context.trim()) {
       toast.error("Pegá algo de contexto del cliente: el posteo, quién es, qué hace");
       return;
     }
     startGenerating(async () => {
-      const res = await generateOutreachMessage({ clientName, platformId, context });
+      const res = await generateOutreachMessage({ clientName, platformId, context, language, baseTemplate: baseBody });
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
       const chosen = res.data.resourceIds.map((id) => byId.get(id)).filter((r): r is OutreachResource => r != null);
       setTemplate(res.data.message);
-      setTemplateEdited(res.data.message !== platformTemplate);
       setSlots({
         pagina: chosen.filter((r) => r.kind === "pagina").map((r) => r.id),
         sample: chosen.filter((r) => r.kind === "sample").map((r) => r.id),
@@ -238,6 +279,23 @@ export function OutreachComposer({ config, aiConfigured }: { config: OutreachCon
             </Link>
           )}
         </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>Mensaje base</Label>
+          <Select value={baseId} onValueChange={(v) => v && changeBase(v)}>
+            <SelectTrigger className="min-w-44" aria-label="Mensaje base">
+              <SelectValue>{() => baseLabel}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={BASE_AUTO}>El de la plataforma</SelectItem>
+              {templates.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+              <SelectItem value={BASE_EMPTY}>Vacío (escribir desde cero)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="ml-auto flex items-end gap-2">
           <Button
@@ -292,6 +350,23 @@ export function OutreachComposer({ config, aiConfigured }: { config: OutreachCon
               <SparklesIcon data-icon="inline-start" />
               {generating ? "Generando…" : "Generar mensaje"}
             </Button>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="outreach-language" className="text-xs text-muted-foreground">
+                Idioma
+              </Label>
+              <Select value={language} onValueChange={(v) => v && setLanguage(v as AiLanguage)}>
+                <SelectTrigger id="outreach-language" size="sm" className="min-w-40 bg-background/60" aria-label="Idioma del mensaje">
+                  <SelectValue>{(v: string | null) => AI_LANGUAGES.find((l) => l.value === v)?.label ?? ""}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {AI_LANGUAGES.map((l) => (
+                    <SelectItem key={l.value} value={l.value}>
+                      {l.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {!aiConfigured ? (
               <span className="text-xs text-[#FFAC37]">
                 Falta la API key de Gemini (GEMINI_API_KEY en Vercel).{" "}
@@ -299,37 +374,44 @@ export function OutreachComposer({ config, aiConfigured }: { config: OutreachCon
                   Ver en Configurar
                 </Link>
               </span>
-            ) : rationale ? (
-              <p className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground/80">Por qué eligió esto:</span> {rationale}
-              </p>
             ) : null}
           </div>
+          {rationale ? (
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground/80">Por qué eligió esto:</span> {rationale}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
       {view === "plantilla" ? (
-        <div>
+        <div className="flex flex-col gap-2">
           <TemplateEditor
             value={template}
-            onChange={editTemplate}
+            onChange={setTemplate}
             knownTags={knownTags}
+            textareaRef={editorRef}
             minHeightClass="min-h-56"
-            placeholder="Sin plantilla: escribí el mensaje acá o creá una en Configurar."
+            placeholder={
+              baseId === BASE_EMPTY
+                ? "Escribí el mensaje acá. Los chips de abajo insertan las etiquetas donde esté el cursor."
+                : "Sin plantilla: escribí el mensaje acá o creá una en Configurar."
+            }
           />
           {templateEdited ? (
-            <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-              <span>Plantilla retocada para este mensaje.</span>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Mensaje retocado para este envío.</span>
               <button
                 type="button"
                 onClick={reloadTemplate}
                 className="inline-flex items-center gap-1 text-foreground underline-offset-4 hover:underline"
               >
                 <RotateCcwIcon className="size-3" />
-                Volver a la de {platform?.name ?? "la plataforma"}
+                Volver a «{baseLabel}»
               </button>
             </div>
           ) : null}
+          <TagsHelp resources={resources} onPick={insertTag} />
         </div>
       ) : (
         <RenderedMessage segments={segments} minHeightClass="min-h-56" />
