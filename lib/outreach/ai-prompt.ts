@@ -11,7 +11,14 @@ import type { OutreachResource } from "./types";
  * Registrar funcionan sin cambios.
  */
 
-export const DEFAULT_AI_MODEL = "gemini-2.5-flash";
+/**
+ * Modelo por defecto y cadena de reserva (gemini.ts prueba uno tras otro).
+ * Con la cuota gratuita los modelos nuevos viven saturados y Google retira
+ * los viejos para cuentas nuevas (gemini-2.5-flash ya devuelve 404), así que
+ * si algo cambia se actualiza acá sin tocar la DB.
+ */
+export const DEFAULT_AI_MODEL = "gemini-3.5-flash";
+export const FALLBACK_AI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.7-flash"];
 
 /** Instrucciones editables desde Configuración. Lo que no se puede tocar va en FORMAT_RULES. */
 export const DEFAULT_AI_PROMPT = `Sos el asistente de outreach de Tangerine Studios, un estudio de edición de video. Escribís el primer mensaje a un potencial cliente a partir del contexto que te pasan (quién es, qué publicó, qué hace).
@@ -21,7 +28,7 @@ Reglas:
 - Tono cercano y profesional, sin sonar a plantilla ni a vendedor. Corto: entre 80 y 150 palabras.
 - Usá el mensaje base como referencia de estilo y estructura, pero adaptalo al cliente: mencioná algo concreto de lo que hace o publicó y por qué le serviría una edición.
 - Elegí solo las páginas y samples que tengan que ver con el cliente (rubro, estilo, tipo de video). Mejor uno o dos samples bien elegidos que muchos. Si ninguno encaja, mandá la web o el portfolio general.
-- No prometas precios ni plazos. No inventes trabajos ni clientes anteriores.`;
+- No prometas precios ni plazos. No inventes trabajos ni clientes anteriores, ni digas que viste o seguís cosas del cliente que no estén en el contexto.`;
 
 /** Reglas técnicas fijas: van siempre después del prompt de Joaco. */
 export const FORMAT_RULES = `Formato de respuesta (obligatorio):

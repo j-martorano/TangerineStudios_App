@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { saveAiSettings } from "@/lib/outreach/actions";
-import { DEFAULT_AI_MODEL, DEFAULT_AI_PROMPT } from "@/lib/outreach/ai-prompt";
+import { DEFAULT_AI_MODEL, DEFAULT_AI_PROMPT, FALLBACK_AI_MODELS } from "@/lib/outreach/ai-prompt";
 
 /**
  * Prompt y modelo del modo IA. El prompt viene cargado con el default y se
@@ -112,7 +112,8 @@ export function AiSettings({
         </p>
         <p>
           El modelo por defecto es <code className="font-mono text-xs">{DEFAULT_AI_MODEL}</code>, que tiene cuota
-          gratuita diaria. Si Google lo cambia, se puede poner otro acá sin tocar código.
+          gratuita diaria. Si está saturado o Google lo retira, se prueba automáticamente con{" "}
+          {FALLBACK_AI_MODELS.join(", ")}. Si hace falta otro, se puede poner acá sin tocar código.
         </p>
       </div>
     </div>
