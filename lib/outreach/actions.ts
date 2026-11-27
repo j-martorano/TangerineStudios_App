@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag, updateTag } from "next/cache";
 import { z } from "zod";
 
 import { assertScope } from "@/lib/auth/permissions";
@@ -549,6 +549,19 @@ export async function saveAiSettings(input: AiSettingsInput): Promise<OutreachRe
     );
   if (error) return { ok: false, error: error.message };
   revalidateOutreach();
+  return { ok: true };
+}
+
+/**
+ * Vuelve a pedirle a Google la lista de modelos (si no, se renueva sola cada
+ * 6 horas). updateTag y no revalidateTag: este último sirve la lista vieja una
+ * vez más y refresca de fondo, y Joaco vería lo mismo hasta recargar dos veces.
+ */
+export async function refreshAiModels(): Promise<OutreachResult> {
+  const guard = await assertScope("outreach");
+  if (!guard.ok) return guard;
+  updateTag(CACHE_TAGS.geminiModels);
+  revalidatePath("/outreach/configuracion");
   return { ok: true };
 }
 

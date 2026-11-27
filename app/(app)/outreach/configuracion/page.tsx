@@ -8,11 +8,11 @@ import { TagsHelp } from "@/components/outreach/config/tags-help";
 import { TemplatesManager } from "@/components/outreach/config/templates-manager";
 import { requireTab } from "@/lib/auth/permissions";
 import { geminiConfigured } from "@/lib/outreach/gemini";
-import { fetchOutreachConfig } from "@/lib/outreach/queries";
+import { fetchGeminiModels, fetchOutreachConfig } from "@/lib/outreach/queries";
 
 export default async function OutreachConfigPage() {
   await requireTab("outreach");
-  const config = await fetchOutreachConfig();
+  const [config, models] = await Promise.all([fetchOutreachConfig(), fetchGeminiModels()]);
 
   return (
     <main className="flex w-full flex-col gap-10 p-6 md:p-8">
@@ -38,7 +38,7 @@ export default async function OutreachConfigPage() {
       </Section>
 
       <Section title="IA">
-        <AiSettings prompt={config.aiPrompt} model={config.aiModel} configured={geminiConfigured()} />
+        <AiSettings prompt={config.aiPrompt} model={config.aiModel} models={models} configured={geminiConfigured()} />
       </Section>
 
       <Section title="Plataformas">

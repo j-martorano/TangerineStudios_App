@@ -142,3 +142,84 @@ async function request(opts: GenerateOpts, disableThinking: boolean): Promise<st
   }
   return text;
 }
+
+// ---------------------------------------------------------------------------
+// Lista de modelos
+// ---------------------------------------------------------------------------
+
+export type GeminiModelInfo = {
+  /** Id que va en la URL, sin el prefijo "models/" (p. ej. "gemini-3.5-flash"). */
+  id: string;
+  /** Nombre que le pone Google (p. ej. "Gemini 3.5 Flash"). */
+  label: string;
+};
+
+type ModelsResponse = {
+  models?: {
+    name?: string;
+    displayName?: string;
+    supportedGenerationMethods?: string[];
+  }[];
+  nextPageToken?: string;
+};
+
+/** Soportan generateContent pero no sirven para escribir un mensaje de texto. */
+const NOT_FOR_TEXT =
+  /embedding|-tts|image|audio|live|robotics|aqa|imagen|veo|lyria|nano-banana|transcribe|antigravity|computer-use|deep-research|learnlm/i;
+
+/**
+ * Modelos que Google habilita hoy para la key y sirven para generar texto.
+ * Devuelve [] si no hay key o Google no responde: la lista es una ayuda para
+ * elegir en Configuración, nunca bloquea la pantalla. Cacheada en queries.ts.
+ */
+export async function listGeminiModels(): Promise<GeminiModelInfo[]> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) return [];
+  const base = (process.env.GEMINI_API_BASE?.trim() || DEFAULT_BASE).replace(
+    /\/+$/,
+    "",
+  );
+  const out = new Map<string, GeminiModelInfo>();
+  let pageToken = "";
+  try {
+    for (let page = 0; page < 5; page++) {
+      const url = `${base}/models?pageSize=200${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`;
+      const res = await fetch(url, {
+        headers: { "x-goog-api-key": apiKey },
+        signal: AbortSignal.timeout(8_000),
+        cache: "no-store",
+      });
+      if (!res.ok) break;
+      const body = (await res.json()) as ModelsResponse;
+      for (const m of body.models ?? []) {
+        const id = m.name?.replace(/^models\//, "") ?? "";
+        if (
+          !id ||
+          !m.supportedGenerationMethods?.includes("generateContent") ||
+          NOT_FOR_TEXT.test(id)
+        )
+          continue;
+        out.set(id, { id, label: m.displayName?.trim() || id });
+      }
+      pageToken = body.nextPageToken ?? "";
+      if (!pageToken) break;
+    }
+  } catch {
+    // Se devuelve lo que haya llegado.
+  }
+  return sortModels([...out.values()]);
+}
+
+/** Primero el default y los de reserva, después el resto del más nuevo al más viejo. */
+function sortModels(models: GeminiModelInfo[]): GeminiModelInfo[] {
+  const pinned = [DEFAULT_AI_MODEL, ...FALLBACK_AI_MODELS];
+  const rank = (id: string) => {
+    const i = pinned.indexOf(id);
+    return i === -1 ? pinned.length : i;
+  };
+  return [...models].sort(
+    (a, b) =>
+      rank(a.id) - rank(b.id) ||
+      b.id.localeCompare(a.id, "en", { numeric: true }),
+  );
+}

@@ -11,6 +11,8 @@ export const CACHE_TAGS = {
   settings:  "settings",
   templates: "templates",
   outreach:  "outreach",
+  /** Lista de modelos de Gemini; se renueva sola, aparte de los datos de outreach. */
+  geminiModels: "gemini-models",
 } as const;
 
 export type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];

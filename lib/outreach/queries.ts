@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache";
 
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { createBotClient } from "@/lib/supabase/bot";
+import { listGeminiModels, type GeminiModelInfo } from "./gemini";
 import {
   isOutreachStatus,
   isResourceKind,
@@ -131,3 +132,26 @@ export const fetchOutreachMessages = unstable_cache(
   ["outreach-messages"],
   { tags: [CACHE_TAGS.outreach] }
 );
+
+/**
+ * Lista de modelos de Gemini, 6 horas en caché (Google la cambia poco);
+ * «Actualizar lista» en Configuración la refresca a mano. Un resultado vacío
+ * (sin key, Google caído) se tira como error para que no quede cacheado.
+ */
+const cachedGeminiModels = unstable_cache(
+  async (): Promise<GeminiModelInfo[]> => {
+    const models = await listGeminiModels();
+    if (!models.length) throw new Error("Gemini no devolvió modelos");
+    return models;
+  },
+  ["gemini-models"],
+  { revalidate: 60 * 60 * 6, tags: [CACHE_TAGS.geminiModels] }
+);
+
+export async function fetchGeminiModels(): Promise<GeminiModelInfo[]> {
+  try {
+    return await cachedGeminiModels();
+  } catch {
+    return [];
+  }
+}
